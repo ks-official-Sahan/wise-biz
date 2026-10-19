@@ -1,4 +1,4 @@
-export { CURRENCY_EXPONENTS, exponentOf, isCurrency } from "./currency.ts";
+export { CURRENCY_EXPONENTS, exponentOf, isCurrency, toCurrency } from "./currency.ts";
 export {
   CurrencyMismatchError,
   MoneyArgumentError,
@@ -21,6 +21,7 @@ export {
   zero,
 } from "./money.ts";
 export type { Money } from "./money.ts";
+export type { Currency } from "./currency.ts";
 export { divRound, roundToIncrement } from "./rounding.ts";
 export type { RoundingMode } from "./rounding.ts";
 export { allocate, multiply, percent, splitEvenly } from "./allocate.ts";

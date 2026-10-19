@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { MoneyParseError, UnknownCurrencyError } from "./errors.ts";
+import { MoneyArgumentError, MoneyParseError, UnknownCurrencyError } from "./errors.ts";
 import { format, parse } from "./format.ts";
 import { money } from "./money.ts";
+
+import type { Money } from "./money.ts";
 
 const nbsp = (s: string) => s.replace(/[\u00a0\u202f]/g, " ");
 
@@ -30,7 +32,9 @@ describe("format", () => {
   });
 
   it("unknown currency throws", () => {
-    expect(() => format({ minor: 1, currency: "XXX" }, "en-US")).toThrow(UnknownCurrencyError);
+    expect(() => format({ minor: 1, currency: "XXX" } as unknown as Money, "en-US")).toThrow(
+      UnknownCurrencyError,
+    );
   });
 });
 
@@ -71,6 +75,28 @@ describe("parse", () => {
     expect(() => parse("", "USD")).toThrow(MoneyParseError);
     expect(() => parse("abc", "USD")).toThrow(MoneyParseError);
     expect(() => parse("1.2.3", "USD")).toThrow(MoneyParseError);
+    for (const bad of ["1,2,3", "1,,0", ",5", "12,34", "1,2345", "1,234,56"])
+      expect(() => parse(bad, "USD")).toThrow(MoneyParseError);
+    expect(() => parse("1.5", "EUR", "de-DE")).toThrow(MoneyParseError);
+    expect(() => parse("1.2.3", "EUR", "de-DE")).toThrow(MoneyParseError);
+    expect(() => parse("1 2 3", "EUR", "fr-FR")).toThrow(MoneyParseError);
     expect(() => parse("1", "XXX")).toThrow(UnknownCurrencyError);
+  });
+
+  it("accepts valid grouping incl. nbsp/narrow nbsp for space groups", () => {
+    expect(parse("1.234", "EUR", "de-DE")).toEqual(money(123400, "EUR"));
+    expect(parse("1\u00a0234,5", "EUR", "fr-FR")).toEqual(money(123450, "EUR"));
+    expect(parse("1\u202f234,5", "EUR", "fr-FR")).toEqual(money(123450, "EUR"));
+    expect(parse("1 234 567", "JPY", "fr-FR")).toEqual(money(1234567, "JPY"));
+  });
+
+  it("invalid locale throws MoneyArgumentError with cause", () => {
+    expect(() => parse("1", "USD", "not_a_locale!")).toThrow(MoneyArgumentError);
+    expect(() => format(money(1, "USD"), "not_a_locale!")).toThrow(MoneyArgumentError);
+    try {
+      format(money(1, "USD"), "not_a_locale!");
+    } catch (error) {
+      expect((error as Error).cause).toBeInstanceOf(RangeError);
+    }
   });
 });

@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { CURRENCY_EXPONENTS, exponentOf, isCurrency } from "./currency.ts";
+import { CURRENCY_EXPONENTS, exponentOf, isCurrency, toCurrency } from "./currency.ts";
 import { UnknownCurrencyError } from "./errors.ts";
 
 describe("currency table", () => {
   it.each([
     ["JPY", 0],
+    ["KPW", 2],
     ["KRW", 0],
     ["USD", 2],
     ["LKR", 2],
@@ -38,5 +39,10 @@ describe("currency table", () => {
   it("exponentOf throws on unknown codes", () => {
     expect(() => exponentOf("XXX")).toThrow(UnknownCurrencyError);
     expect(() => exponentOf("constructor")).toThrow(UnknownCurrencyError);
+  });
+
+  it("toCurrency narrows or throws", () => {
+    expect(toCurrency("USD")).toBe("USD");
+    expect(() => toCurrency("usd")).toThrow(UnknownCurrencyError);
   });
 });

@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { CurrencyMismatchError, MoneyOverflowError, UnknownCurrencyError } from "./errors.ts";
+import { toCurrency } from "./currency.ts";
+import {
+  CurrencyMismatchError,
+  MoneyArgumentError,
+  MoneyOverflowError,
+  UnknownCurrencyError,
+} from "./errors.ts";
 import {
   abs,
   add,
@@ -28,8 +34,9 @@ describe("money ops", () => {
 
   it("rejects unknown currency, fractions, NaN and unsafe integers", () => {
     expect(() => money(1, "XXX")).toThrow(UnknownCurrencyError);
-    expect(() => usd(1.5)).toThrow(MoneyOverflowError);
-    expect(() => usd(Number.NaN)).toThrow(MoneyOverflowError);
+    expect(() => usd(1.5)).toThrow(MoneyArgumentError);
+    expect(() => usd(Number.NaN)).toThrow(MoneyArgumentError);
+    expect(() => usd(Infinity)).toThrow(MoneyArgumentError);
     expect(() => usd(Number.MAX_SAFE_INTEGER + 1)).toThrow(MoneyOverflowError);
   });
 
@@ -77,12 +84,12 @@ describe("money ops", () => {
     const max = usd(Number.MAX_SAFE_INTEGER);
     expect(() => add(max, usd(1))).toThrow(MoneyOverflowError);
     expect(() => sub(neg(max), usd(1))).toThrow(MoneyOverflowError);
-    expect(() => fromBigint(BigInt(Number.MAX_SAFE_INTEGER) + 1n, "USD")).toThrow(
+    expect(() => fromBigint(BigInt(Number.MAX_SAFE_INTEGER) + 1n, toCurrency("USD"))).toThrow(
       MoneyOverflowError,
     );
-    expect(() => fromBigint(-BigInt(Number.MAX_SAFE_INTEGER) - 1n, "USD")).toThrow(
+    expect(() => fromBigint(-BigInt(Number.MAX_SAFE_INTEGER) - 1n, toCurrency("USD"))).toThrow(
       MoneyOverflowError,
     );
-    expect(fromBigint(5n, "USD")).toEqual(usd(5));
+    expect(fromBigint(5n, toCurrency("USD"))).toEqual(usd(5));
   });
 });

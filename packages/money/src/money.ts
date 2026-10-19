@@ -1,18 +1,23 @@
-import { exponentOf } from "./currency.ts";
-import { CurrencyMismatchError, MoneyOverflowError } from "./errors.ts";
+import { toCurrency } from "./currency.ts";
+import { CurrencyMismatchError, MoneyArgumentError, MoneyOverflowError } from "./errors.ts";
 
-export type Money = Readonly<{ minor: number; currency: string }>;
+import type { Currency } from "./currency.ts";
+
+declare const moneyBrand: unique symbol;
+export type Money = Readonly<{ minor: number; currency: Currency }> & {
+  readonly [moneyBrand]: true;
+};
 
 const MAX = BigInt(Number.MAX_SAFE_INTEGER);
 const MIN = -MAX;
 
-function make(minor: number, currency: string): Money {
+function make(minor: number, currency: Currency): Money {
   if (!Number.isSafeInteger(minor)) throw new MoneyOverflowError();
-  return Object.freeze({ minor: minor === 0 ? 0 : minor, currency });
+  return Object.freeze({ minor: minor === 0 ? 0 : minor, currency }) as Money;
 }
 
 /** Build Money from a bigint intermediate, enforcing the safe-integer guard. */
-export function fromBigint(minor: bigint, currency: string): Money {
+export function fromBigint(minor: bigint, currency: Currency): Money {
   if (minor > MAX || minor < MIN) throw new MoneyOverflowError();
   return make(Number(minor), currency);
 }
@@ -22,8 +27,11 @@ function same(a: Money, b: Money): void {
 }
 
 export function money(minor: number, currency: string): Money {
-  exponentOf(currency);
-  return make(minor, currency);
+  const code = toCurrency(currency);
+  if (typeof minor !== "number" || !Number.isFinite(minor) || !Number.isInteger(minor)) {
+    throw new MoneyArgumentError(`Minor units must be an integer: ${String(minor)}`);
+  }
+  return make(minor, code);
 }
 
 export function zero(currency: string): Money {
