@@ -1,0 +1,49 @@
+name: Bug report
+description: Something works wrong or differently than documented.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: Do not paste secrets, tokens, or card data. Redact PII.
+  - type: textarea
+    id: summary
+    attributes:
+      label: What happened
+      description: Actual behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: "1. ...\n2. ..."
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - POS (checkout, offline)
+        - Admin / back office
+        - Storefront
+        - API
+        - Platform / infra
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or screenshots
+      description: Redact tenant data and PII.

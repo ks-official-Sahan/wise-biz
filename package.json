@@ -26,7 +26,8 @@
     "infra:reset": "sh -c 'printf \"Delete ALL local infra data (volumes)? [y/N] \"; read a; [ \"$a\" = y ] || { echo aborted; exit 1; }; docker compose -f infra/docker/compose.yaml --profile kafka --profile init down -v && pnpm infra:up'",
     "infra:logs": "docker compose -f infra/docker/compose.yaml --profile kafka logs -f --tail=100",
     "db:psql": "docker compose -f infra/docker/compose.yaml exec -e PGPASSWORD=wb_app postgres psql -U wb_app -h localhost -d wise_biz",
-    "env:check": "node scripts/check-env-example.mts"
+    "env:check": "node scripts/check-env-example.mts",
+    "licenses:check": "node scripts/check-licenses.mts"
   },
   "devDependencies": {
     "@changesets/cli": "3.0.3",

@@ -19,3 +19,10 @@ minimumReleaseAgeExclude:
   - "@commitlint/lint@21.2.4"
   - "@commitlint/load@21.2.4"
   - "@commitlint/rules@21.2.4"
+
+auditConfig:
+  ignoreGhsas:
+    # braces@3.0.3 (no patched release) reached only via @wise-biz/config >
+    # @next/eslint-plugin-next > fast-glob: lint-time tooling, never shipped at runtime.
+    # Re-check on every Renovate eslint group PR; remove once a patched braces exists.
+    - GHSA-vfj7-8cjw-p6xm
