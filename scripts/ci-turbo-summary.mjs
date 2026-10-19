@@ -41,11 +41,12 @@ function newestSummary() {
 const out = (line) => process.stdout.write(`${line}\n`);
 
 /** @param {string} value */
-// Task ids and cache statuses come from PR-controlled names: keep one line, escape table pipes.
+// Task ids and cache statuses come from PR-controlled names: keep one line, then escape
+// backslashes before pipes so an input `\|` cannot un-escape a table separator.
 const cell = (value) =>
   String(value)
     .replace(/[\r\n]+/g, " ")
-    .replace(/\|/g, "\\|");
+    .replace(/[\\|]/g, "\\$&");
 
 /** @param {TurboTask} task */
 function cacheStatus(task) {
