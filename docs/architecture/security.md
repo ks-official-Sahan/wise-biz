@@ -16,7 +16,7 @@ PIN rules: per-tenant unique, hashed with Argon2id + pepper, 5 tries → lockout
 
 ## Authorization
 
-`@pos/policy`: RBAC + ABAC.
+`@wise-biz/policy`: RBAC + ABAC.
 - Role grants permissions (`sales:void`).
 - Membership scope narrows to branches.
 - Conditions: amount limits (`discount ≤ 10%`, `refund ≤ 5,000 LKR`), time windows, device class, shift open.

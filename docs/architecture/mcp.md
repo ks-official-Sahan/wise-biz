@@ -1,6 +1,6 @@
 # MCP servers
 
-Two servers, separate deployments, separate credentials, shared `@pos/mcp-core` (tool registry, policy guard, audit, rate limit, confirmation tokens).
+Two servers, separate deployments, separate credentials, shared `@wise-biz/mcp-core` (tool registry, policy guard, audit, rate limit, confirmation tokens).
 
 Tools call **the same application use cases** as the API. MCP never queries tables directly, so permissions, validation, audit, and outbox apply identically.
 
@@ -11,7 +11,7 @@ For tenant owners and managers in any MCP client.
 | Aspect | Rule |
 |---|---|
 | Auth | OAuth 2.1 + PKCE via identity module; token audience `mcp-store`; scopes map to permissions; tenant fixed in token |
-| Authorization | Every tool declares `permission` + `scope`; checked with `@pos/policy` for the token's user; branch-narrowed memberships apply |
+| Authorization | Every tool declares `permission` + `scope`; checked with `@wise-biz/policy` for the token's user; branch-narrowed memberships apply |
 | Entitlement | Tool family gated by plan (`mcp.store` entitlement) |
 | Reads | Reports, sales search, stock levels, low stock, expiring batches, top products, staff performance, customer lookup (PII masked unless `customers:view_pii`) |
 | Writes | Price change, promotion create/pause, stock adjust (with reason), PO draft, staff role change, device suspend, theme publish |
@@ -40,7 +40,7 @@ For the platform owner only. All-access, with guard rails.
 
 Tool families: tenants (create, suspend, plan change, grant pay-as-you-go features), devices (global blacklist), billing (credits, trial extend), support (impersonate read-only with glass-break), ops (DLQ replay, projection rebuild, cache purge, feature flags), data (export, backup trigger, restore).
 
-## Shared core (`@pos/mcp-core`)
+## Shared core (`@wise-biz/mcp-core`)
 
 ```ts
 defineTool({

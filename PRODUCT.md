@@ -4,7 +4,7 @@
 
 A universal POS platform any store can brand as its own: checkout that never waits, inventory that never lies, and management that hides its own complexity.
 
-Codename: **POS Platform**. Package scope `@pos/*` is a placeholder until a name is chosen.
+Product: **wise-biz**. Package scope `@wise-biz/*`.
 
 ## Problems we solve
 

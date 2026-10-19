@@ -28,7 +28,7 @@
 - `apps/edge` Worker: route by path (`/v1/*` → API origin, future `/v1/insights/*` → Django), pre-verify device signatures, coarse rate limiting (KV/Durable Objects), shortlinks (`/s/:code` from KV), storefront edge cache with tag purge.
 - R2 for media and backups (via media-kit).
 - Cloudflare Access + Tunnel in front of the platform console and platform MCP.
-- Workers-compatible modules (pure Hono + `@pos/contracts`) can run at edge later; the transactional core stays in-region near Postgres.
+- Workers-compatible modules (pure Hono + `@wise-biz/contracts`) can run at edge later; the transactional core stays in-region near Postgres.
 
 ## CI (GitHub Actions)
 
@@ -53,7 +53,7 @@ Branch protection: required checks, 1 review, signed commits for release tags. C
 
 ## Releases and flags
 
-- Feature flags per tenant/branch/plan (`@pos/entitlements` reads flags + plan). Kill switches for integrations and MCP writes.
+- Feature flags per tenant/branch/plan (`@wise-biz/entitlements` reads flags + plan). Kill switches for integrations and MCP writes.
 - Mobile: store releases for native changes; OTA (EAS Update) for JS within the same runtime version; minimum version gate via `426`.
 - Desktop: staged rollout (10% → 50% → 100%) through update channels.
 

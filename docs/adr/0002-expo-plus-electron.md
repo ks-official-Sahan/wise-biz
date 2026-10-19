@@ -7,8 +7,8 @@ Targets: Android, iOS, tablets, web, Windows, macOS, Linux (HarmonyOS later). De
 
 ## Decision
 - `apps/pos`: Expo (React Native + Expo Router) for Android, iOS, and web (react-native-web).
-- `apps/desktop`: Electron loads the Expo web export; the main process provides a hardware bridge (`@pos/hardware` over IPC) and SQLite (better-sqlite3).
-- Shared UI in `@pos/ui`, shared logic in packages; platform code behind ports.
+- `apps/desktop`: Electron loads the Expo web export; the main process provides a hardware bridge (`@wise-biz/hardware` over IPC) and SQLite (better-sqlite3).
+- Shared UI in `@wise-biz/ui`, shared logic in packages; platform code behind ports.
 
 ## Why not
 - react-native-windows/macos: no Linux; smaller ecosystem for POS peripherals.

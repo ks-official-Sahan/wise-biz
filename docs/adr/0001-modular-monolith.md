@@ -6,7 +6,7 @@ Status: accepted · 2026-10-18
 The product needs microservice-level boundaries (independent scaling, Django migration, ERP growth) but starts with a small team. Full microservices now would add distributed transactions, network failure modes, and ops cost before any module needs them.
 
 ## Decision
-One deployable `apps/api` that mounts modules. Each module: own Postgres schema, hexagonal layout (domain / application / ports / adapters), contracts in `@pos/contracts`, events via transactional outbox. Cross-module calls only through ports or events. `dependency-cruiser` blocks forbidden imports in CI.
+One deployable `apps/api` that mounts modules. Each module: own Postgres schema, hexagonal layout (domain / application / ports / adapters), contracts in `@wise-biz/contracts`, events via transactional outbox. Cross-module calls only through ports or events. `dependency-cruiser` blocks forbidden imports in CI.
 
 ## Consequences
 - Sale + stock movement stay in one ACID transaction while co-located.
