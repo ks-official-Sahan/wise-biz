@@ -5,7 +5,7 @@ Phases ship vertical slices. Each phase ends with a usability test and a load te
 ## P0 — Foundations (3–4 weeks)
 
 - Monorepo (pnpm + Turborepo), lint/tsconfig presets, CI (`ci.yml`, `security.yml`), compose stack.
-- `@pos/ids`, `@pos/money`, `@pos/contracts` skeleton, `@pos/policy`, `@pos/audit-chain`, `@pos/theme` (tokens + contrast validator).
+- `@wise-biz/ids`, `@wise-biz/money`, `@wise-biz/contracts` skeleton, `@wise-biz/policy`, `@wise-biz/audit-chain`, `@wise-biz/theme` (tokens + contrast validator).
 - `apps/api` with tenancy, identity (auth-kit Better Auth engine + tenancy extension), RLS, outbox + relay (pg broker), audit.
 - `apps/console` shell: sign-in, tenant/branch setup, users and roles.
 - Upstream PRs to `@sahan-sac/auth-kit` (tenant context) and `media-kit` (tenant prefix).
@@ -51,7 +51,7 @@ Phases ship vertical slices. Each phase ends with a usability test and a load te
 
 | Risk | Mitigation |
 |---|---|
-| RN hardware library quality varies | Wrap in `@pos/hardware`; Electron for heavy hardware stores; test matrix with real devices |
+| RN hardware library quality varies | Wrap in `@wise-biz/hardware`; Electron for heavy hardware stores; test matrix with real devices |
 | Offline sync bugs lose trust | Property-based tests, chaos drills (kill app mid-sale, clock skew, duplicate sends), outbox export fallback |
 | Scope creep (huge feature list) | Phase gates; features behind entitlements; ponytail reviews |
 | Country tax/fiscal rules | Tax engine data-driven; fiscal adapters per country (P2+) |

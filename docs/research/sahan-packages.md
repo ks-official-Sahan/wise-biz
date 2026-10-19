@@ -35,22 +35,22 @@ These carry straight into `AGENTS.md` non-negotiables.
 | # | Gap | Where | Upgrade |
 |---|---|---|---|
 | 1 | **No tenancy.** RBAC matrix is global per role; no tenant, branch, or membership concept | auth-kit `rbac/*` | Add `tenantId` + optional `branchIds` to the permission context; matrix per tenant; memberships table in adapters; tenant-scoped role catalogs |
-| 2 | **RBAC only.** No conditions (amount limits, time windows, device class) | auth-kit `rbac` | Add an ABAC condition layer (`@pos/policy` first, upstream later) |
+| 2 | **RBAC only.** No conditions (amount limits, time windows, device class) | auth-kit `rbac` | Add an ABAC condition layer (`@wise-biz/policy` first, upstream later) |
 | 3 | **Device = parsed user agent.** No device identity, keys, enrollment, or allow/deny list | auth-kit `security/device`, `request-device` | New `device` module: keypair enrollment, approval, device-bound tokens, RFC 9421 request signing verify |
 | 4 | **No quick PIN or operator switch** | auth-kit credentials | PIN credential type (Argon2id, per-tenant uniqueness, lockout), fast operator switch on the same device session |
 | 5 | **No offline auth.** Permission checks need a server or cache | auth-kit + client | Signed, expiring permission snapshot for devices; verify-only path in auth-kit-client |
-| 6 | **cuid IDs** in the Prisma schema | Sahan app | UUIDv7 everywhere (`@pos/ids`); adapters accept an ID generator |
+| 6 | **cuid IDs** in the Prisma schema | Sahan app | UUIDv7 everywhere (`@wise-biz/ids`); adapters accept an ID generator |
 | 7 | **analytics-kit is web analytics**, not business analytics; Redis-only, 500-member caps per day | analytics-kit | Keep for storefront. Business analytics is a new event pipeline (Kafka → rollups) |
 | 8 | **media-kit has no tenant scoping** | media-kit `accounts`, `storage` | Tenant folder prefix, per-tenant quotas, offline-sized variants for POS caching |
-| 9 | **email-kit templates live in the app**; no per-tenant branding or queue | email-kit | Tenant layout tokens (from `@pos/theme`), send via outbox consumer for retries and rate shaping |
+| 9 | **email-kit templates live in the app**; no per-tenant branding or queue | email-kit | Tenant layout tokens (from `@wise-biz/theme`), send via outbox consumer for retries and rate shaping |
 | 10 | **ai-core cost control is global** | ai-core | Per-tenant budgets/quotas, tool-call structured outputs for MCP and insights, audit hook |
 | 11 | **Next.js-coupled pieces** (`next-auth` engine, cookie helpers) | auth-kit | Prefer the Better Auth engine + Hono helpers for the API; keep Next helpers for the console |
-| 12 | **No MCP support** | — | New `@pos/mcp-core` reusing auth-kit OAuth/session, policy, audit hooks |
+| 12 | **No MCP support** | — | New `@wise-biz/mcp-core` reusing auth-kit OAuth/session, policy, audit hooks |
 | 13 | **CMS not packaged** (noted in the repo's own packages README) | app | Not needed for POS; storefront content uses simple tenant pages |
 | 14 | **Node crypto in server packages** | auth-kit, analytics-kit | Import only browser-safe subpaths in Expo; keep server subpaths out of the POS bundle (lint rule) |
 
 ## Plan
 
 1. Fork-free: contribute upgrades to the Sahan repo packages where general (tenancy context in auth-kit RBAC, ID generator injection, tenant prefix in media-kit, budgets in ai-core). Bump minor versions; keep backward compatible.
-2. POS-specific logic (devices, PIN, policy conditions, entitlements) lives in `@pos/*` and may be upstreamed later if it proves general.
+2. POS-specific logic (devices, PIN, policy conditions, entitlements) lives in `@wise-biz/*` and may be upstreamed later if it proves general.
 3. Pin exact versions in the POS monorepo; Renovate PRs for upgrades; contract tests against packed tarballs (the Sahan repo already verifies tarballs).

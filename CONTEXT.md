@@ -6,7 +6,8 @@ Shared language and current state. If code and this file disagree on a word, fix
 
 - Planning phase. No product code yet.
 - Reusable base: `@sahan-sac/*` packages from `github.com/ks-official-Sahan/Sahan` (auth-kit, auth-kit-client, ai-core, analytics-kit, media-kit, email-kit, chat-kit, blog-kit). Audit and upgrade plan: `docs/research/sahan-packages.md`.
-- Product name not chosen. Scope `@pos/*` is a placeholder.
+- Product name: **wise-biz** (repo `github.com/ks-official-Sahan/wise-biz`). Package scope `@wise-biz/*`.
+- Build steps and progress: `docs/prompts/README.md`, `docs/prompts/PROGRESS.md`.
 
 ## Tenancy hierarchy
 

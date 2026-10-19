@@ -31,7 +31,7 @@ Tenants edit **primitives and a few semantic overrides** only. Component tokens 
 
 ## Pipeline
 
-`@pos/theme`:
+`@wise-biz/theme`:
 1. Validate (zod) → contrast check (WCAG AA for text pairs, AA large for totals) → auto-adjust suggestions if failing.
 2. Generate tonal scale (OKLCH) from one brand color, light and dark variants.
 3. Compile: CSS custom properties (console, storefront, POS web), RN theme object (POS native), ESC/POS-safe settings (logo bitmap dithered, header font size).

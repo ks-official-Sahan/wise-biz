@@ -70,11 +70,11 @@ flowchart TB
 | POS client | Expo (React Native) + Expo Router | One codebase for Android, iOS, tablets, web (ADR 0002) |
 | Desktop | Electron wrapping the Expo web export | Mature USB/serial/HID access, auto-update, kiosk mode, Linux support |
 | Console / Storefront | Next.js (App Router) | Reuses Sahan admin patterns and auth-kit; SSR + SEO for storefront |
-| UI kit | `@pos/ui` on React Native primitives (renders on web via react-native-web) + Tailwind/NativeWind tokens | Shared components across POS and console widgets |
+| UI kit | `@wise-biz/ui` on React Native primitives (renders on web via react-native-web) + Tailwind/NativeWind tokens | Shared components across POS and console widgets |
 | Client state | Redux Toolkit (+ persist) for session/cart/UI; TanStack Query for server state | Requested; clear split between local truth and server cache |
 | Local DB | SQLite: expo-sqlite (native, web OPFS), better-sqlite3 in Electron main | Offline source of truth on device |
 | API | Hono on Node (deployable pieces on Workers) | Web-standard handlers; auth-kit already exports Hono helpers |
-| Validation | zod schemas in `@pos/contracts` → OpenAPI 3.1 + AsyncAPI 3 | One source for TS types, docs, Django codegen |
+| Validation | zod schemas in `@wise-biz/contracts` → OpenAPI 3.1 + AsyncAPI 3 | One source for TS types, docs, Django codegen |
 | ORM / SQL | Drizzle (typed SQL, explicit joins) | Predictable queries, no hidden N+1; auth-kit has a Drizzle adapter |
 | DB | PostgreSQL 18 (native `uuidv7()`), Neon or self-hosted | RLS, partitioning, PITR |
 | Cache / realtime | Redis (Upstash in cloud, Redis OSS self-hosted) | Rate limits, idempotency, pub/sub, permission cache |
@@ -127,7 +127,7 @@ modules/sales/
   application/   use cases: authorize → validate → transact → audit → outbox
   ports/         interfaces it needs (InventoryPort, PaymentsPort, Clock, Ids)
   adapters/      db (Drizzle), http routes (Hono), event handlers
-  contracts.ts   re-exports from @pos/contracts/sales
+  contracts.ts   re-exports from @wise-biz/contracts/sales
   schema.sql     owned tables (schema `sales`)
 ```
 

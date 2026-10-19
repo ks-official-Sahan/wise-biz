@@ -10,7 +10,7 @@
 - No `any`; `unknown` + zod at boundaries.
 - Files ≤ 300 lines; functions do one thing; names say what, not how.
 - No barrel files inside modules (tree-shaking, cycles); packages expose explicit `exports`.
-- Money via `@pos/money` only; no arithmetic on raw numbers for money.
+- Money via `@wise-biz/money` only; no arithmetic on raw numbers for money.
 - Dates: `Temporal` (polyfill) or date-fns-tz for branch-local business dates.
 
 ## Data access
@@ -22,7 +22,7 @@
 
 ## Frontend
 
-- `@pos/ui` components only in apps; no ad-hoc colors or sizes (tokens).
+- `@wise-biz/ui` components only in apps; no ad-hoc colors or sizes (tokens).
 - Accessibility props required by lint (`accessibilityLabel`, roles).
 - Redux for local session/cart/UI; TanStack Query for server data; no server data in Redux.
 - Event handlers: debounce search (120 ms), throttle scroll/resize (rAF), guard double submit.

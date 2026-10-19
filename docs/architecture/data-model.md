@@ -4,7 +4,7 @@
 
 | Rule | Detail |
 |---|---|
-| IDs | UUIDv7 everywhere (`uuid` type). Server default `uuidv7()` (Postgres 18); clients generate with `@pos/ids` for offline records. Time-ordered → B-tree friendly and sortable, without the random-insert page splits of UUIDv4. |
+| IDs | UUIDv7 everywhere (`uuid` type). Server default `uuidv7()` (Postgres 18); clients generate with `@wise-biz/ids` for offline records. Time-ordered → B-tree friendly and sortable, without the random-insert page splits of UUIDv4. |
 | Human numbers | Separate columns: `invoice_no` (tenant prefix + branch code + gapless sequence), `sale_no` per terminal. Never print UUIDs on receipts. |
 | Tenancy | `tenant_id uuid not null` on every tenant table, **first column of every composite index**. RLS: `using (tenant_id = current_setting('app.tenant_id')::uuid)`. |
 | Money | `bigint` minor units + `char(3)` currency. FX rate stored as `numeric(20,10)` snapshot on the document. |

@@ -28,18 +28,19 @@ Keep this file short. Read linked docs only when the task touches that area.
 | Market research, competitor flaws | `docs/research/pos-market.md` |
 | Why a decision was made | `docs/adr/` |
 | Code style, tests, commits | `docs/CONVENTIONS.md` |
+| Running a build step, progress | `docs/prompts/README.md`, `docs/prompts/PROGRESS.md` |
 
 ## Non-negotiables (always apply)
 
 1. **Tenant scope everywhere.** Every row, query, cache key, event, and log carries `tenant_id`. Postgres RLS is the backstop, not the only check.
 2. **IDs are UUIDv7.** Generated client-side for offline-created records. Never auto-increment, never cuid.
-3. **Money is integer minor units + ISO 4217 code** (`@pos/money`). No floats. Rounding only in `@pos/money`.
+3. **Money is integer minor units + ISO 4217 code** (`@wise-biz/money`). No floats. Rounding only in `@wise-biz/money`.
 4. **The checkout hot path never waits on the network.** Scan, add line, total, cash tender, and print run against local SQLite.
 5. **Every mutation:** authorize first → validate (zod) → idempotency key → DB transaction → audit row + outbox event **in the same transaction**.
 6. **Stock is a ledger.** Insert movements; never `UPDATE` quantities by hand. Balances are projections.
 7. **Unauthorized = 404**, not 403, on admin/platform surfaces.
 8. **No N+1.** Batch loads, joins, or dataloaders. Every new query path gets an index check (`EXPLAIN`).
-9. **Modules talk via contracts** (`@pos/contracts`) or events. No cross-module table reads. A module must be extractable as a service.
+9. **Modules talk via contracts** (`@wise-biz/contracts`) or events. No cross-module table reads. A module must be extractable as a service.
 10. **Secrets are parameters**, compared in constant time, never logged.
 11. **Docs:** use Context7 for library APIs before writing code against them.
 12. **Performance:** use performance optimization, best practices, latency critical system with realtime updates, use best data structures and algorithms

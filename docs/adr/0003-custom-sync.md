@@ -9,7 +9,7 @@ Offline selling must never lose a sale, must be tamper-evident, must re-run busi
 - Up: device outbox of **signed, hash-chained commands** (`CompleteSale`, `CloseShift`, …), idempotent by UUIDv7 + device sequence.
 - Down: per-tenant change feed with cursors, bulk snapshot for first boot, realtime nudge.
 - LAN peer sync between terminals in P2.
-- Library: `@pos/sync` (transport-agnostic, used by Expo and Electron).
+- Library: `@wise-biz/sync` (transport-agnostic, used by Expo and Electron).
 
 ## Consequences
 - More code to own and test (property tests, chaos drills required).

@@ -1,6 +1,6 @@
 # Modules
 
-Each module: owns a Postgres schema, exposes contracts in `@pos/contracts/<module>`, emits events `<module>.<entity>.<verb>`. Columns: **Owns** (tables), **Emits**, **Consumes**, **Phase**.
+Each module: owns a Postgres schema, exposes contracts in `@wise-biz/contracts/<module>`, emits events `<module>.<entity>.<verb>`. Columns: **Owns** (tables), **Emits**, **Consumes**, **Phase**.
 
 | Module | Responsibility | Owns | Emits | Consumes | Phase |
 |---|---|---|---|---|---|
@@ -45,6 +45,6 @@ reporting, insights, search, loyalty, billing (metering) = event consumers only
 
 1. Create `modules/<name>/` with domain, application, ports, adapters.
 2. Add schema migration under `modules/<name>/migrations`. RLS policy on every table.
-3. Add contracts and event schemas to `@pos/contracts`.
-4. Register routes in `apps/api`, permissions in `@pos/policy`, entitlement key in `@pos/entitlements`.
+3. Add contracts and event schemas to `@wise-biz/contracts`.
+4. Register routes in `apps/api`, permissions in `@wise-biz/policy`, entitlement key in `@wise-biz/entitlements`.
 5. Add a row to this table.

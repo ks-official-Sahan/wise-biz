@@ -31,7 +31,7 @@ Intent states: `created → pending → succeeded | failed | canceled`. Refunds 
 
 ## Hardware support
 
-All device I/O goes through `@pos/hardware` ports. Implementations per platform:
+All device I/O goes through `@wise-biz/hardware` ports. Implementations per platform:
 
 | Device | Electron (desktop) | Android | iOS | Web |
 |---|---|---|---|---|
@@ -43,15 +43,15 @@ All device I/O goes through `@pos/hardware` ports. Implementations per platform:
 | Scale | Serial (common protocols) | USB/BT | — | WebSerial |
 | Payment terminal | Vendor SDK / cloud API | SDK / cloud API | SDK / cloud API | Cloud API |
 
-Scanners: 1D linear and 2D imagers (QR, DataMatrix, PDF417) through HID or camera. GS1 parsing (application identifiers for batch and expiry) lives in `@pos/barcode`, so a scan can fill the batch automatically.
+Scanners: 1D linear and 2D imagers (QR, DataMatrix, PDF417) through HID or camera. GS1 parsing (application identifiers for batch and expiry) lives in `@wise-biz/barcode`, so a scan can fill the batch automatically.
 
 Value indicators (customer-facing price and change displays): the customer display page renders cart, totals, change due, a QR for the digital receipt, and a loyalty prompt, driven by the same cart state over IPC or LAN.
 
-Hardware drivers on React Native come from community libraries. Wrap each behind `@pos/hardware` and test on real devices before committing to one; replace freely.
+Hardware drivers on React Native come from community libraries. Wrap each behind `@wise-biz/hardware` and test on real devices before committing to one; replace freely.
 
 ## Receipts and documents
 
-`@pos/receipt`: one template model → renderers for ESC/POS bytes, HTML (email/digital), PDF (A4 invoices, quotations, letterhead).
+`@wise-biz/receipt`: one template model → renderers for ESC/POS bytes, HTML (email/digital), PDF (A4 invoices, quotations, letterhead).
 
 Template blocks: logo, letterhead, header text, store details, tax IDs, lines table, discounts, tax summary, tenders, change, loyalty balance, barcode/QR (digital receipt shortlink), footer, special notes per sale, custom fields. Per-branch overrides. Console preview uses real sample data.
 

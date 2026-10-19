@@ -1,6 +1,6 @@
 # API conventions
 
-Contract-first. Zod in `@pos/contracts` → OpenAPI 3.1 (HTTP) + AsyncAPI 3 (events). Node and future Django implement the same contracts.
+Contract-first. Zod in `@wise-biz/contracts` → OpenAPI 3.1 (HTTP) + AsyncAPI 3 (events). Node and future Django implement the same contracts.
 
 ## Shape
 

@@ -9,7 +9,7 @@ use case tx ──► outbox (same DB tx) ──► relay ──► Kafka topic 
 - **Outbox** table per database: `outbox(id uuid, tenant_id, topic, key, type, version, payload jsonb, headers jsonb, created_at, published_at)`.
 - **Relay** (`apps/workers`): reads unpublished rows with `for update skip locked` in batches of 500, publishes, marks `published_at`. Multiple relay replicas are safe. Postgres logical decoding (Debezium) is the upgrade path at high volume.
 - Delivery is **at-least-once**. Every consumer is idempotent: `processed_events(consumer, event_id)` unique, inserted in the consumer's own transaction.
-- Dev/test: Redpanda in compose. A `memory` broker adapter runs unit tests. Small self-hosted installs can run with `pg` broker (consumers poll outbox) — same interface (`@pos/contracts` `EventBus` port).
+- Dev/test: Redpanda in compose. A `memory` broker adapter runs unit tests. Small self-hosted installs can run with `pg` broker (consumers poll outbox) — same interface (`@wise-biz/contracts` `EventBus` port).
 
 ## Envelope (CloudEvents-compatible)
 
@@ -30,7 +30,7 @@ use case tx ──► outbox (same DB tx) ──► relay ──► Kafka topic 
 }
 ```
 
-Schemas: zod in `@pos/contracts/events`, exported as JSON Schema + AsyncAPI 3 for Django consumers. Breaking change → new `version`; publish both during migration.
+Schemas: zod in `@wise-biz/contracts/events`, exported as JSON Schema + AsyncAPI 3 for Django consumers. Breaking change → new `version`; publish both during migration.
 
 ## Topics and keys
 

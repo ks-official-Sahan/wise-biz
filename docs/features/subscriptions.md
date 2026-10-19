@@ -9,7 +9,7 @@ tenant ──< grants (feature_key, enabled, limit, source: payg|promo|manual, s
 tenant ──< usage_counters (feature_key, period, used)
 ```
 
-**Effective entitlements** = plan features ⊕ grants (grants override), minus anything suspended. Computed by `@pos/entitlements`, cached in Redis per tenant version, and shipped to devices as a signed token (`exp` 7 days for offline grace).
+**Effective entitlements** = plan features ⊕ grants (grants override), minus anything suspended. Computed by `@wise-biz/entitlements`, cached in Redis per tenant version, and shipped to devices as a signed token (`exp` 7 days for offline grace).
 
 ## Feature keys (examples)
 
