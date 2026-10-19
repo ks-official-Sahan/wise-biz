@@ -248,6 +248,9 @@ importers:
       '@wise-biz/errors':
         specifier: workspace:*
         version: link:../errors
+      '@wise-biz/ids':
+        specifier: workspace:*
+        version: link:../ids
       '@wise-biz/money':
         specifier: workspace:*
         version: link:../money

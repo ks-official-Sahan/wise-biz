@@ -1,10 +1,6 @@
 /** Hybrid logical clock (Kulkarni et al.). Universal, no IO. */
 
-export interface HlcTimestamp {
-  wallMs: number;
-  counter: number;
-  node: string;
-}
+export type HlcTimestamp = Readonly<{ wallMs: number; counter: number; node: string }>;
 
 export interface HlcOptions {
   node: string;
@@ -43,6 +39,13 @@ export function createHlc(options: HlcOptions): Hlc {
   let wall = 0;
   let counter = 0;
 
+  const physical = (): number => {
+    const pt = now();
+    if (!Number.isSafeInteger(pt) || pt < 0)
+      throw new RangeError("now() must be a non-negative safe integer");
+    return pt;
+  };
+
   const commit = (w: number, c: number): HlcTimestamp => {
     if (c > MAX_COUNTER) throw new HlcCounterOverflowError();
     wall = w;
@@ -52,11 +55,21 @@ export function createHlc(options: HlcOptions): Hlc {
 
   return {
     now() {
-      const pt = now();
+      const pt = physical();
       return pt > wall ? commit(pt, 0) : commit(wall, counter + 1);
     },
     receive(remote) {
-      const pt = now();
+      if (
+        !Number.isSafeInteger(remote.wallMs) ||
+        remote.wallMs < 0 ||
+        !Number.isInteger(remote.counter) ||
+        remote.counter < 0 ||
+        remote.counter > MAX_COUNTER ||
+        typeof remote.node !== "string" ||
+        remote.node === ""
+      )
+        throw new RangeError("invalid remote timestamp");
+      const pt = physical();
       const drift = remote.wallMs - pt;
       if (drift > maxDriftMs) throw new HlcDriftError(drift, maxDriftMs);
       const w = Math.max(wall, remote.wallMs, pt);

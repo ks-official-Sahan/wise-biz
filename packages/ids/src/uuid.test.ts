@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { createUuidv7, isUuidv7, timestampOf, uuidv7 } from "./uuid.ts";
+import { createUuidv7, isUuidv7, timestampOf, toUuid7, uuidv7 } from "./uuid.ts";
 
 function at<T>(a: readonly T[], i: number): T {
   const v = a[i];
@@ -85,11 +85,26 @@ describe("createUuidv7", () => {
   });
 });
 
+describe("clock guard", () => {
+  it.each([Number.NaN, Infinity, -1, 2 ** 48, 2 ** 53, -Infinity])("rejects now() = %s", (v) => {
+    const gen = createUuidv7({ now: () => v, random: seeded() });
+    expect(() => gen()).toThrow(RangeError);
+  });
+});
+
 describe("isUuidv7 / timestampOf", () => {
-  it("accepts lower and upper case", () => {
+  it("accepts lowercase only (canonical form)", () => {
     const id = uuidv7();
     expect(isUuidv7(id)).toBe(true);
-    expect(isUuidv7(id.toUpperCase())).toBe(true);
+    expect(isUuidv7(id.toUpperCase())).toBe(false);
+    expect(() => timestampOf(id.toUpperCase())).toThrow(TypeError);
+  });
+
+  it("toUuid7 narrows or throws TypeError", () => {
+    const id = uuidv7();
+    expect(toUuid7(id)).toBe(id);
+    expect(() => toUuid7("nope")).toThrow(TypeError);
+    expect(() => toUuid7(id.toUpperCase())).toThrow(TypeError);
   });
 
   it("rejects non-v7 values", () => {

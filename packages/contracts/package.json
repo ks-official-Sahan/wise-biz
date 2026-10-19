@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@wise-biz/errors": "workspace:*",
+    "@wise-biz/ids": "workspace:*",
     "@wise-biz/money": "workspace:*",
     "zod": "4.6.7"
   },

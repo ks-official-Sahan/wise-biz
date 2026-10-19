@@ -122,6 +122,32 @@ function sample(r: () => number): HlcTimestamp {
   };
 }
 
+describe("input validation", () => {
+  const ok = { wallMs: 1000, counter: 1, node: "b" };
+  it.each([
+    { ...ok, wallMs: Number.NaN },
+    { ...ok, wallMs: -1 },
+    { ...ok, wallMs: 1.5 },
+    { ...ok, wallMs: 2 ** 53 },
+    { ...ok, counter: Number.NaN },
+    { ...ok, counter: -1 },
+    { ...ok, counter: 0x10000 },
+    { ...ok, counter: 0.5 },
+    { ...ok, node: "" },
+    { ...ok, node: 5 as unknown as string },
+  ])("receive rejects %o", (remote) => {
+    const hlc = createHlc({ node: "a", now: () => 1000 });
+    expect(() => hlc.receive(remote)).toThrow(RangeError);
+    expect(hlc.now().wallMs).toBe(1000);
+  });
+
+  it.each([Number.NaN, -1, 1.5, 2 ** 53, Infinity])("rejects local now() = %s", (v) => {
+    const hlc = createHlc({ node: "a", now: () => v });
+    expect(() => hlc.now()).toThrow(RangeError);
+    expect(() => hlc.receive({ wallMs: 1, counter: 0, node: "b" })).toThrow(RangeError);
+  });
+});
+
 describe("compare / serialize / parse", () => {
   it("compares by wall, counter, node", () => {
     const base = { wallMs: 5, counter: 5, node: "m" };

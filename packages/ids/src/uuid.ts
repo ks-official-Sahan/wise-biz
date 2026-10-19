@@ -1,13 +1,18 @@
 /** UUIDv7 (RFC 9562), monotonic. Universal: only `globalThis.crypto.getRandomValues`. */
 
+declare const uuid7Brand: unique symbol;
+/** Canonical lowercase UUIDv7 string. */
+export type Uuid7 = string & { readonly [uuid7Brand]: true };
+
 export interface Uuidv7Deps {
   now: () => number;
   random: (bytes: Uint8Array) => void;
 }
 
 const HEX: string[] = Array.from({ length: 256 }, (_, i) => i.toString(16).padStart(2, "0"));
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const MAX_COUNTER = 0xfff;
+const MAX_MS = 2 ** 48;
 const POOL_SIZE = 1024;
 
 /**
@@ -16,7 +21,7 @@ const POOL_SIZE = 1024;
  * On counter overflow the stored timestamp advances 1 ms (virtual clock) and reseeds.
  * The stored timestamp never decreases, even if the system clock does.
  */
-export function createUuidv7(deps: Uuidv7Deps): () => string {
+export function createUuidv7(deps: Uuidv7Deps): () => Uuid7 {
   const pool = new Uint8Array(POOL_SIZE);
   let offset = POOL_SIZE;
   let lastMs = -1;
@@ -39,6 +44,8 @@ export function createUuidv7(deps: Uuidv7Deps): () => string {
 
   return () => {
     const nowMs = Math.floor(deps.now());
+    if (!Number.isSafeInteger(nowMs) || nowMs < 0 || nowMs >= MAX_MS)
+      throw new RangeError("now() must be a safe integer in [0, 2**48)");
     if (nowMs > lastMs) {
       lastMs = nowMs;
       reseed();
@@ -72,24 +79,24 @@ function byte(a: Uint8Array, i: number): number {
   return a[i] ?? 0;
 }
 
-function format(b: Uint8Array): string {
+function format(b: Uint8Array): Uuid7 {
   let s = "";
   for (let i = 0; i < 16; i++) {
     if (i === 4 || i === 6 || i === 8 || i === 10) s += "-";
     s += HEX[b[i] ?? 0] ?? "";
   }
-  return s;
+  return s as Uuid7;
 }
 
 /** Default generator: Date.now + crypto.getRandomValues. */
-export const uuidv7: () => string = createUuidv7({
+export const uuidv7: () => Uuid7 = createUuidv7({
   now: () => Date.now(),
   random: (bytes) => {
     globalThis.crypto.getRandomValues(bytes);
   },
 });
 
-export function isUuidv7(s: unknown): s is string {
+export function isUuidv7(s: unknown): s is Uuid7 {
   return typeof s === "string" && UUID_RE.test(s);
 }
 
@@ -97,4 +104,10 @@ export function isUuidv7(s: unknown): s is string {
 export function timestampOf(id: string): number {
   if (!isUuidv7(id)) throw new TypeError("Not a UUIDv7");
   return Number.parseInt(id.slice(0, 8) + id.slice(9, 13), 16);
+}
+
+/** Narrow a string to Uuid7. Throws TypeError if not canonical lowercase UUIDv7. */
+export function toUuid7(s: string): Uuid7 {
+  if (!isUuidv7(s)) throw new TypeError("Not a UUIDv7");
+  return s;
 }
