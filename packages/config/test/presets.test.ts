@@ -28,7 +28,9 @@ describe("universal runtime ban", () => {
   });
 
   it("flags dynamic import() of node built-ins", async () => {
-    expect(await lintFixture(universalDir, "index.ts")).toContain("no-restricted-syntax");
+    const rules = await lintFixture(universalDir, "index.ts");
+    // import("node:os"), import("fs"), import("fs/promises")
+    expect(rules.filter((r) => r === "no-restricted-syntax")).toHaveLength(3);
   });
 
   it("throws when the package root has no package.json", () => {

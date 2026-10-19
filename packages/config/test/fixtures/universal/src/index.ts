@@ -10,3 +10,5 @@ async function work(): Promise<number> {
 
 work();
 export const lazyOs = import("node:os");
+export const lazyFs = import("fs");
+export const lazyFsPromises = import("fs/promises");

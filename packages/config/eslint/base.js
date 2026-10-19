@@ -10,6 +10,12 @@ import { createTypeScriptImportResolver } from "eslint-import-resolver-typescrip
 import { importX } from "eslint-plugin-import-x";
 import { configs as tsConfigs, plugin as tsPlugin } from "typescript-eslint";
 
+/** esquery regex matching node:* and every bare built-in name (builtinModules includes subpaths). */
+const BUILTIN_SPECIFIER = `/^(node:|(${builtinModules
+  .filter((name) => !name.startsWith("node:"))
+  .map((name) => name.replace(/[/.]/g, "\\$&"))
+  .join("|")})$)/`;
+
 /** Config files may use default exports (tooling requires them). */
 export const CONFIG_FILES = ["**/*.config.{js,ts,cjs,mjs}", "eslint.config.js"];
 
@@ -47,7 +53,8 @@ export function base({ root }) {
             "no-restricted-syntax": [
               "error",
               {
-                selector: "ImportExpression > Literal[value=/^node:/]",
+                // import("node:x"), import("fs"), import("fs/promises"); same for require().
+                selector: `:matches(ImportExpression, CallExpression[callee.name="require"]) > Literal[value=${BUILTIN_SPECIFIER}]`,
                 message: "universal package: no Node built-ins",
               },
             ],
