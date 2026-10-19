@@ -13,7 +13,7 @@ import { configs as tsConfigs, plugin as tsPlugin } from "typescript-eslint";
 /** esquery regex matching node:* and every bare built-in name (builtinModules includes subpaths). */
 const BUILTIN_SPECIFIER = `/^(node:|(${builtinModules
   .filter((name) => !name.startsWith("node:"))
-  .map((name) => name.replace(/[/.]/g, "\\$&"))
+  .map((name) => name.replace(/[\\^$.*+?()[\]{}|/]/g, "\\$&"))
   .join("|")})$)/`;
 
 /** Config files may use default exports (tooling requires them). */
