@@ -12,7 +12,7 @@ Legend: ⬜ todo · 🟡 in progress · ✅ done · ⛔ blocked
 | P0-02 Local infra + env | ✅ | 2026-10-19 | 05f2d35 | MinIO images unpublished → RustFS 1.0.3 (S3 API) + aws-cli `storage-init` (profile `init`, run after `up --wait`, which fails on exited one-shots). Check script runs on plain `node` (no tsx). `env:check` added to `pnpm check`. Prod rejects `.env.example` placeholder secrets. Up ≈8 s. |
 | P0-03 CI baseline | ✅ | 2026-10-19 | bff48fa | Local: actionlint, audit, licenses, gitleaks, renovate-validator green. Awaiting first CI run (workflows trigger on PR / push to `master` only). Default branch is `master`, not `main`. gitleaks + actionlint as checksum-verified binaries (gitleaks-action needs an org license). GHSA-vfj7-8cjw-p6xm (braces, no patch, lint-only path) ignored in `auditConfig`. caniuse-lite CC-BY-4.0 allowed as reviewed exception. |
 | P0-04 Core packages | ✅ | 2026-10-19 | 416c081 | Single step (user chose over 04a/04b split). Own uuidv7 (no `uuid` dep), counter overflow advances a virtual ms. Money/Currency/Uuid7 branded; contracts parse to branded values. Per-document tax keeps line signs. JSON Schema generated with `io: "input"` (transforms). Heavy suites get explicit timeouts (parallel turbo + coverage). Coverage ids 100%/94% br, money 100%/93% br. |
-| P0-05 Crypto, policy, audit-chain | ⬜ | | | |
+| P0-05 Crypto, policy, audit-chain | ✅ | 2026-10-19 | d27dca0 | Own RFC 8785 canonicalize + hand-written UTF-8 (Hermes); @noble/hashes+curves 2.4 (strict RFC 8032). Vectors from pyca/cryptography + C2SP/wycheproof mirrors (rfc-editor.org/nist.gov blocked by proxy). verifyChain takes an anchor (tail truncation only detectable against one). Policy fails closed (scope, context, unknown condition keys); snapshots domain-separated, minVersion rollback guard, TTL cap. Overrides: approvers share the requesting terminal context (PIN on same device) — review suggestion declined. |
 | P0-06 API, DB, RLS | ⬜ | | | |
 | P0-07 Outbox, idempotency, audit | ⬜ | | | |
 | P0-08 Identity + tenancy | ⬜ | | | |
@@ -63,6 +63,10 @@ Tracked in `docs/prompts/P2/README.md` order; add rows here when P2 starts.
 - [ ] (P0-04) `pageOf()` needs a `.meta` id when OpenAPI generation lands; registry `defineEvent` throws on double module evaluation (HMR) — owner: P0-06
 - [ ] (P0-04) `Timestamp` accepts year 0000 / 9-digit fractions; `format()` output with symbol does not round-trip through `parse()` (by design, documented) — owner: next step touching contracts/money
 - [ ] (P0-04) ISO 4217: confirm XAD (Arab Accounting Dinar) status and add if active — owner: next step touching money
+- [ ] (P0-05) Cross-check RFC 8032 TEST 1–3 and RFC 8785 Appendix B number table against rfc-editor.org when reachable; add SHA-256 1M×"a" vector — owner: next step touching crypto
+- [ ] (P0-05) Audit verification job must pass the signed daily anchor (`expectedHead`/`expectedLength`) and assert `anchored: true` — owner: P0-07
+- [ ] (P0-05) Devices persist the highest policy snapshot version per tenant and pass it as `minVersion` — owner: P1-01
+- [ ] (P0-05) Tenant-wide permissions (no branch) for branch-scoped users currently deny; add an explicit tenant-wide marker when reports need it — owner: P1-14
 - [ ] (P0-01) Add jsx-a11y / RN a11y lint once a plugin supports ESLint 10 — owner: P0-09
 
 ## Decisions taken during build
