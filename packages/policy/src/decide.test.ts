@@ -73,7 +73,7 @@ describe("decide decision table", () => {
       reason: "branch_out_of_scope",
     });
     expect(decide(matrix, c, "sales:refund", res({ branchId: "b1" })).allow).toBe(true);
-    expect(decide(matrix, c, "sales:refund", res()).allow).toBe(true);
+    expect(decide(matrix, c, "sales:refund", res()).reason).toBe("branch_out_of_scope");
   });
   it("tenant mismatch denies, even owner, no override", () => {
     expect(

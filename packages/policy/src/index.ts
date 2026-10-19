@@ -1,4 +1,4 @@
-export { firstFailure, isValidConditions } from "./conditions.ts";
+export { isValidConditions } from "./conditions.ts";
 export type {
   Conditions,
   ConditionReason,
@@ -28,7 +28,7 @@ export {
   SYSTEM_ROLES,
 } from "./roles.ts";
 export type { SystemRole } from "./roles.ts";
-export { signSnapshot, verifySnapshot } from "./snapshot.ts";
+export { SNAPSHOT_DOMAIN_TAG, signSnapshot, verifySnapshot } from "./snapshot.ts";
 export type {
   PolicySnapshot,
   SignedSnapshot,

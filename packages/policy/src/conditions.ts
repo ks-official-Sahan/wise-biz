@@ -49,9 +49,21 @@ const nonNegInt = (n: unknown): n is number =>
   typeof n === "number" && Number.isSafeInteger(n) && n >= 0;
 const minute = (n: unknown): n is number => nonNegInt(n) && n < 1440;
 
-/** Structural check, used when loading rows or snapshots. Invalid conditions must never become grants. */
+const CONDITION_KEYS: ReadonlySet<string> = new Set([
+  "maxAmountMinor",
+  "maxDiscountBps",
+  "timeWindow",
+  "deviceClass",
+  "requiresOpenShift",
+]);
+const WINDOW_KEYS: ReadonlySet<string> = new Set(["startMinute", "endMinute", "days"]);
+const onlyKeys = (o: object, allowed: ReadonlySet<string>): boolean =>
+  Reflect.ownKeys(o).every((k) => typeof k === "string" && allowed.has(k));
+
+/** Structural, strict (unknown keys rejected) check. Invalid conditions must never become grants. */
 export function isValidConditions(value: unknown): value is Conditions {
   if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
+  if (!onlyKeys(value, CONDITION_KEYS)) return false;
   const c = value as Record<string, unknown>;
   if (c.maxAmountMinor !== undefined && !nonNegInt(c.maxAmountMinor)) return false;
   if (c.maxDiscountBps !== undefined && !nonNegInt(c.maxDiscountBps)) return false;
@@ -67,7 +79,8 @@ export function isValidConditions(value: unknown): value is Conditions {
   }
   const w = c.timeWindow;
   if (w !== undefined) {
-    if (typeof w !== "object" || w === null) return false;
+    if (typeof w !== "object" || w === null || Array.isArray(w) || !onlyKeys(w, WINDOW_KEYS))
+      return false;
     const tw = w as Record<string, unknown>;
     if (!minute(tw.startMinute) || !minute(tw.endMinute)) return false;
     const days = tw.days;
@@ -93,6 +106,24 @@ function inWindow(w: TimeWindow, ctx: DecisionContext): boolean {
   return w.days.includes(startDay as DayOfWeek);
 }
 
+/** Deep copy, deep-frozen. Input must already be valid. */
+export function freezeConditions(c: Conditions): Conditions {
+  const out: { -readonly [K in keyof Conditions]: Conditions[K] } = {};
+  if (c.maxAmountMinor !== undefined) out.maxAmountMinor = c.maxAmountMinor;
+  if (c.maxDiscountBps !== undefined) out.maxDiscountBps = c.maxDiscountBps;
+  if (c.requiresOpenShift !== undefined) out.requiresOpenShift = c.requiresOpenShift;
+  if (c.deviceClass !== undefined) out.deviceClass = Object.freeze([...c.deviceClass]);
+  if (c.timeWindow !== undefined) {
+    const { startMinute, endMinute, days } = c.timeWindow;
+    out.timeWindow = Object.freeze(
+      days === undefined
+        ? { startMinute, endMinute }
+        : { startMinute, endMinute, days: Object.freeze([...days]) },
+    );
+  }
+  return Object.freeze(out);
+}
+
 /** First failing condition's reason, or undefined when all pass. Missing inputs fail closed. */
 export function firstFailure(
   conditions: Conditions | undefined,
@@ -103,13 +134,13 @@ export function firstFailure(
   const { maxAmountMinor, maxDiscountBps, timeWindow, deviceClass, requiresOpenShift } = conditions;
   if (
     maxAmountMinor !== undefined &&
-    !(resource.amountMinor !== undefined && resource.amountMinor <= maxAmountMinor)
+    !(resource.amountMinor !== undefined && Math.abs(resource.amountMinor) <= maxAmountMinor)
   ) {
     return "amount_exceeds_limit";
   }
   if (
     maxDiscountBps !== undefined &&
-    !(resource.discountBps !== undefined && resource.discountBps <= maxDiscountBps)
+    !(resource.discountBps !== undefined && Math.abs(resource.discountBps) <= maxDiscountBps)
   ) {
     return "discount_exceeds_limit";
   }
