@@ -65,8 +65,8 @@ flowchart TB
 
 | Layer | Choice | Why |
 |---|---|---|
-| Monorepo | pnpm workspaces + Turborepo | Matches Sahan repo; cached builds |
-| Language | TypeScript strict | One language across client, server, packages |
+| Monorepo | pnpm workspaces + Turborepo | Matches Sahan repo; cached builds; Node 24 LTS, pnpm 12 (ADR 0008) |
+| Language | TypeScript strict | One language across client, server, packages; packages ship TS source (ADR 0008) |
 | POS client | Expo (React Native) + Expo Router | One codebase for Android, iOS, tablets, web (ADR 0002) |
 | Desktop | Electron wrapping the Expo web export | Mature USB/serial/HID access, auto-update, kiosk mode, Linux support |
 | Console / Storefront | Next.js (App Router) | Reuses Sahan admin patterns and auth-kit; SSR + SEO for storefront |

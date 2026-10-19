@@ -1,0 +1,11 @@
+pnpm-lock.yaml
+dist
+coverage
+.turbo
+docs/deps-graph.svg
+CHANGELOG.md
+
+# Hand-authored prose: not reflowed by Prettier
+/*.md
+docs/
+.claude/

@@ -1,0 +1,8 @@
+{
+  "extends": "./react.json",
+  "compilerOptions": {
+    "lib": ["ES2023"],
+    "types": [],
+    "customConditions": ["react-native"]
+  }
+}
