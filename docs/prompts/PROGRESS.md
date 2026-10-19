@@ -8,7 +8,7 @@ Legend: ⬜ todo · 🟡 in progress · ✅ done · ⛔ blocked
 
 | Step | Status | Date | Commit | Notes / deviations |
 |---|---|---|---|---|
-| P0-01 Monorepo | ⬜ | | | |
+| P0-01 Monorepo | ✅ | 2026-10-19 | 6c6d7e8 | Branch `cc/gracious-allen-044iq6` (harness) not `step/P0-01`. TS 6.0.3 not 7 (typescript-eslint <6.1). No eslint-plugin-react/jsx-a11y (no ESLint 10 support). Packages ship TS source (ADR 0008). Prose `.md` excluded from Prettier. Added `apps/ modules/ services/.gitkeep`, rule `modules-not-to-apps`, root `lint:root` task. |
 | P0-02 Local infra + env | ⬜ | | | |
 | P0-03 CI baseline | ⬜ | | | |
 | P0-04 Core packages | ⬜ | | | |
@@ -51,7 +51,13 @@ Tracked in `docs/prompts/P2/README.md` order; add rows here when P2 starts.
 ## Follow-ups
 
 <!-- - [ ] (P0-04) example: add GS1 exponent edge cases — owner: next step that touches money -->
+- [ ] (P0-01) `prepare: lefthook install` fails without `.git` (Docker/CI): set `LEFTHOOK=0` or guard it — owner: P0-02/P0-03
+- [ ] (P0-01) Lefthook `stage_fixed` with partially staged files: confirm unstaged hunks are not staged — owner: P0-03
+- [ ] (P0-01) `deps:graph` pipe has no pipefail — owner: P0-03
+- [ ] (P0-01) Remove `minimumReleaseAgeExclude` (commitlint 21.2.4) from `pnpm-workspace.yaml` after 2026-10-21 — owner: next step touching deps
+- [ ] (P0-01) Add jsx-a11y / RN a11y lint once a plugin supports ESLint 10 — owner: P0-09
 
 ## Decisions taken during build
 
 <!-- - 2026-10-20 P0-04: money as safe-integer number in TS (ADR 0005 addendum) -->
+- 2026-10-19 P0-01: internal packages ship TS source, Node 24 type stripping, `erasableSyntaxOnly`; toolchain pins (ADR 0008)
