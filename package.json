@@ -19,7 +19,14 @@
     "deps:graph": "depcruise --config .dependency-cruiser.cjs --output-type dot apps modules packages services | dot -T svg > docs/deps-graph.svg",
     "changeset": "changeset",
     "prepare": "lefthook install",
-    "lint:root": "eslint . --max-warnings 0"
+    "lint:root": "eslint . --max-warnings 0",
+    "infra:up": "docker compose -f infra/docker/compose.yaml up -d --wait --wait-timeout 90",
+    "infra:up:kafka": "docker compose -f infra/docker/compose.yaml --profile kafka up -d --wait --wait-timeout 90",
+    "infra:down": "docker compose -f infra/docker/compose.yaml --profile kafka down",
+    "infra:reset": "sh -c 'printf \"Delete ALL local infra data (volumes)? [y/N] \"; read a; [ \"$a\" = y ] || { echo aborted; exit 1; }; docker compose -f infra/docker/compose.yaml --profile kafka down -v && docker compose -f infra/docker/compose.yaml up -d --wait --wait-timeout 90'",
+    "infra:logs": "docker compose -f infra/docker/compose.yaml --profile kafka logs -f --tail=100",
+    "db:psql": "docker compose -f infra/docker/compose.yaml exec -e PGPASSWORD=wb_app postgres psql -U wb_app -h localhost -d wise_biz",
+    "env:check": "node scripts/check-env-example.mts"
   },
   "devDependencies": {
     "@changesets/cli": "3.0.3",

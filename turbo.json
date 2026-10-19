@@ -30,7 +30,7 @@
       "outputs": []
     },
     "check": {
-      "dependsOn": ["lint", "typecheck", "test", "//#depcruise", "//#lint:root"],
+      "dependsOn": ["lint", "typecheck", "test", "//#depcruise", "//#lint:root", "//#env:check"],
       "outputs": []
     },
     "clean": {
@@ -38,6 +38,10 @@
     },
     "//#lint:root": {
       "inputs": ["*.{js,cjs,mjs,ts}", "package.json", "packages/config/**"],
+      "outputs": []
+    },
+    "//#env:check": {
+      "inputs": [".env.example", "scripts/check-env-example.mts", "packages/env/src/**"],
       "outputs": []
     }
   }
