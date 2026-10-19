@@ -9,7 +9,7 @@ Legend: ⬜ todo · 🟡 in progress · ✅ done · ⛔ blocked
 | Step | Status | Date | Commit | Notes / deviations |
 |---|---|---|---|---|
 | P0-01 Monorepo | ✅ | 2026-10-19 | 6c6d7e8 | Branch `cc/gracious-allen-044iq6` (harness) not `step/P0-01`. TS 6.0.3 not 7 (typescript-eslint <6.1). No eslint-plugin-react/jsx-a11y (no ESLint 10 support). Packages ship TS source (ADR 0008). Prose `.md` excluded from Prettier. Added `apps/ modules/ services/.gitkeep`, rule `modules-not-to-apps`, root `lint:root` task. |
-| P0-02 Local infra + env | ⬜ | | | |
+| P0-02 Local infra + env | ✅ | 2026-10-19 | HASH | MinIO images unpublished → RustFS 1.0.3 (S3 API) + aws-cli `storage-init` (profile `init`, run after `up --wait`, which fails on exited one-shots). Check script runs on plain `node` (no tsx). `env:check` added to `pnpm check`. Prod rejects `.env.example` placeholder secrets. Up ≈8 s. |
 | P0-03 CI baseline | ⬜ | | | |
 | P0-04 Core packages | ⬜ | | | |
 | P0-05 Crypto, policy, audit-chain | ⬜ | | | |
@@ -55,6 +55,9 @@ Tracked in `docs/prompts/P2/README.md` order; add rows here when P2 starts.
 - [ ] (P0-01) Lefthook `stage_fixed` with partially staged files: confirm unstaged hunks are not staged — owner: P0-03
 - [ ] (P0-01) `deps:graph` pipe has no pipefail — owner: P0-03
 - [ ] (P0-01) Remove `minimumReleaseAgeExclude` (commitlint 21.2.4) from `pnpm-workspace.yaml` after 2026-10-21 — owner: next step touching deps
+- [ ] (P0-02) `assertProductionEnv` skips everything when NODE_ENV is unset/misspelled: call it at API startup with the resolved env and test the call — owner: P0-06
+- [ ] (P0-02) Length/placeholder checks cover `*_SECRET` (+ placeholder on `*_KEY`/`*_PASSWORD`); list prod-sensitive keys explicitly (API keys, DB passwords) — owner: P0-06
+- [ ] (P0-02) Dev storage creds duplicated in compose.yaml and .env.example; `db:psql` puts dev password in argv (dev-only) — owner: P0-03
 - [ ] (P0-01) Add jsx-a11y / RN a11y lint once a plugin supports ESLint 10 — owner: P0-09
 
 ## Decisions taken during build

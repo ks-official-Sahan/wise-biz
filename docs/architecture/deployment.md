@@ -14,6 +14,25 @@
 - One Dockerfile per app, multi-stage, `node:<lts>-slim` base, non-root user, read-only FS, healthcheck endpoint `/health` (liveness) and `/ready` (DB + Redis + broker).
 - `infra/docker/compose.yaml` for dev; `infra/k8s/` (Helm) when moving beyond a few nodes. Start on a container platform (Fly/Render/ECS/DigitalOcean App Platform) — no Kubernetes until needed.
 
+## Local setup
+
+```bash
+cp .env.example .env      # dev values match compose; never reuse them anywhere else
+pnpm infra:up             # postgres, redis, rustfs (S3), mailpit; pnpm infra:up:kafka adds redpanda
+pnpm env:check            # .env.example matches the code schemas (@wise-biz/env)
+pnpm db:psql              # psql as wb_app (RLS applies; NOBYPASSRLS)
+```
+
+| Service | Host port | Notes |
+|---|---|---|
+| Postgres 18 + pgvector | 5432 | DB `wise_biz`; roles `wb_migrator` (owns schemas, runs migrations), `wb_app` (runtime, `NOSUPERUSER NOBYPASSRLS`); extensions `pgcrypto`, `pg_trgm`, `vector`, `pg_stat_statements` |
+| Redis 8 | 6379 | |
+| Redpanda | 19092 (Kafka) | Profile `kafka`; Console on 8080 |
+| RustFS (S3-compatible) | 9000 (S3), 9001 (console) | Bucket `wise-biz` created by one-shot `storage-init` (aws-cli). MinIO images are no longer published; any S3 API works |
+| Mailpit | 1025 (SMTP), 8025 (UI) | All local mail lands here |
+
+`pnpm infra:down` stops containers and keeps data; `pnpm infra:reset` asks for confirmation, then deletes volumes so `infra/docker/postgres/init/*.sql` runs again (init SQL runs only on an empty volume). Apps read env only through `@wise-biz/env` (`defineEnv`), which fails fast naming invalid keys, never values; production also runs `assertProductionEnv()`.
+
 ## nginx
 
 - TLS termination (self-host), HTTP/2 + HTTP/3, gzip/brotli.

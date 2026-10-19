@@ -58,6 +58,9 @@ export function defineEnv<S extends z.ZodRawShape>(
   throw new EnvError(problems);
 }
 
+/** Values shipped in .env.example; production must never run with them. */
+const DEV_PLACEHOLDER = /change-me|^dev-only|^wb-dev-/i;
+
 /** Production-only guardrails. Pure: the secret source is a parameter. */
 export function assertProductionEnv(source: EnvSource = process.env): void {
   const env = clean(source);
@@ -69,6 +72,8 @@ export function assertProductionEnv(source: EnvSource = process.env): void {
   for (const [key, value] of Object.entries(env)) {
     if (key.endsWith("_SECRET") && value.length < MIN_SECRET) {
       problems.set(key, `too short (min ${String(MIN_SECRET)})`);
+    } else if (/_SECRET|_KEY$|_PASSWORD$/.test(key) && DEV_PLACEHOLDER.test(value)) {
+      problems.set(key, "dev placeholder from .env.example is not allowed in production");
     }
   }
   if ((EMAIL_PROVIDER ?? "capture") === "capture") {

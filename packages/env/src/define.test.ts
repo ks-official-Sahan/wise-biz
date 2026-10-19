@@ -112,6 +112,22 @@ describe("defineEnv", () => {
 describe("assertProductionEnv", () => {
   const ok = { NODE_ENV: "production", AUTH_SECRET: "x".repeat(32), EMAIL_PROVIDER: "smtp" };
 
+  it("rejects .env.example dev placeholders without echoing them", () => {
+    const placeholder = "dev-only-change-me-dev-only-change-me";
+    try {
+      assertProductionEnv({
+        ...ok,
+        AUTH_SECRET: placeholder,
+        STORAGE_SECRET_ACCESS_KEY: "wb-dev-secret-change-me",
+      });
+      expect.unreachable();
+    } catch (error) {
+      expect(String(error)).toMatch(/AUTH_SECRET: dev placeholder/);
+      expect(String(error)).toMatch(/STORAGE_SECRET_ACCESS_KEY: dev placeholder/);
+      expect(String(error)).not.toContain(placeholder);
+    }
+  });
+
   it("is a no-op outside production", () => {
     expect(() => {
       assertProductionEnv({ NODE_ENV: "development", AUTH_SECRET: "a" });
