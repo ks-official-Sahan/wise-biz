@@ -1,0 +1,4 @@
+kafka:
+  brokers: ["redpanda:9092"]
+analytics:
+  enabled: false

@@ -1,0 +1,155 @@
+name: wise-biz
+
+# Local dev only. Every host port binds 127.0.0.1; dev credentials must never reach the LAN.
+# Start: pnpm infra:up  (add Kafka: pnpm infra:up:kafka)
+
+services:
+  postgres:
+    image: pgvector/pgvector:0.8.7-pg18-trixie
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    command: postgres -c shared_preload_libraries=pg_stat_statements -c pg_stat_statements.track=all
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      # TCP, not the socket: the image's temporary init server listens on the socket only, so this
+      # stays unhealthy until init SQL has finished; the role query proves init actually ran.
+      test:
+        [
+          "CMD-SHELL",
+          'psql -h 127.0.0.1 -U postgres -d wise_biz -tAc "select 1 from pg_roles where rolname = ''wb_app''" | grep -q 1',
+        ]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+      start_period: 5s
+    restart: unless-stopped
+
+  redis:
+    image: redis:8.10.2-alpine
+    command: redis-server --appendonly yes --save ""
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      retries: 30
+    restart: unless-stopped
+
+  redpanda:
+    image: redpandadata/redpanda:v26.2.5
+    profiles: [kafka]
+    command:
+      - redpanda
+      - start
+      - --smp
+      - "1"
+      - --memory
+      - 1G
+      - --overprovisioned
+      - --mode
+      - dev-container
+      - --kafka-addr
+      - internal://0.0.0.0:9092,external://0.0.0.0:19092
+      - --advertise-kafka-addr
+      - internal://redpanda:9092,external://localhost:19092
+      - --rpc-addr
+      - redpanda:33145
+      - --advertise-rpc-addr
+      - redpanda:33145
+      - --default-log-level=warn
+    ports:
+      - "127.0.0.1:19092:19092"
+    volumes:
+      - redpandadata:/var/lib/redpanda/data
+    healthcheck:
+      test: ["CMD-SHELL", "rpk cluster health | grep -E 'Healthy:.+true' || exit 1"]
+      interval: 3s
+      retries: 30
+      start_period: 10s
+    restart: unless-stopped
+
+  redpanda-console:
+    image: redpandadata/console:v3.12.0
+    profiles: [kafka]
+    environment:
+      CONFIG_FILEPATH: /etc/console.yaml
+    volumes:
+      - ./redpanda/console.yaml:/etc/console.yaml:ro
+    ports:
+      - "127.0.0.1:8080:8080"
+    depends_on:
+      redpanda:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/admin/health >/dev/null || exit 1"]
+      interval: 5s
+      retries: 30
+      start_period: 5s
+    restart: unless-stopped
+
+  storage:
+    image: rustfs/rustfs:1.0.3
+    environment:
+      RUSTFS_ACCESS_KEY: wb-dev-access
+      RUSTFS_SECRET_KEY: wb-dev-secret-change-me
+      RUSTFS_VOLUMES: /data
+      RUSTFS_CONSOLE_ENABLE: "true"
+      RUSTFS_ADDRESS: ":9000"
+      RUSTFS_CONSOLE_ADDRESS: ":9001"
+    ports:
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
+    volumes:
+      - storagedata:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9000/health/ready || exit 1"]
+      interval: 3s
+      retries: 30
+      start_period: 5s
+    restart: unless-stopped
+
+  # One-shot bucket bootstrap. Own profile: `up --wait` treats an exited container as a failure,
+  # so infra:up runs it with `compose run` after the long-running services are healthy.
+  storage-init:
+    image: amazon/aws-cli:2.38.1
+    profiles: [init]
+    depends_on:
+      storage:
+        condition: service_healthy
+    restart: "no"
+    environment:
+      AWS_ACCESS_KEY_ID: wb-dev-access
+      AWS_SECRET_ACCESS_KEY: wb-dev-secret-change-me
+      AWS_DEFAULT_REGION: us-east-1
+      AWS_ENDPOINT_URL: http://storage:9000
+    entrypoint: ["sh", "-c"]
+    command:
+      - aws s3api head-bucket --bucket wise-biz 2>/dev/null || aws s3api create-bucket --bucket wise-biz
+
+  mailpit:
+    image: axllent/mailpit:v1.31.6
+    ports:
+      - "127.0.0.1:1025:1025"
+      - "127.0.0.1:8025:8025"
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: "1"
+      MP_SMTP_AUTH_ALLOW_INSECURE: "1"
+    healthcheck:
+      test: ["CMD", "/mailpit", "readyz"]
+      interval: 3s
+      retries: 20
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  redisdata:
+  redpandadata:
+  storagedata:

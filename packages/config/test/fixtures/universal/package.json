@@ -1,0 +1,8 @@
+{
+  "name": "@wise-biz/fixture-universal",
+  "private": true,
+  "type": "module",
+  "wiseBiz": {
+    "runtime": "universal"
+  }
+}

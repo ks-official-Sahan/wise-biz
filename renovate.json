@@ -1,0 +1,60 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended", "helpers:pinGitHubActionDigests", ":semanticCommits"],
+  "schedule": ["before 6am on monday"],
+  "timezone": "UTC",
+  "rangeStrategy": "pin",
+  "semanticCommitScope": "deps",
+  "labels": ["deps"],
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": ["before 6am on monday"]
+  },
+  "packageRules": [
+    {
+      "groupName": "expo",
+      "matchPackageNames": ["expo", "expo-*", "@expo/*"]
+    },
+    {
+      "groupName": "react",
+      "matchPackageNames": ["react", "react-dom", "react-native", "@types/react", "@types/react-*"]
+    },
+    {
+      "groupName": "eslint",
+      "matchPackageNames": [
+        "eslint",
+        "@eslint/*",
+        "typescript-eslint",
+        "eslint-plugin-*",
+        "eslint-config-*"
+      ]
+    },
+    {
+      "groupName": "types",
+      "matchPackageNames": ["@types/*"],
+      "excludePackageNames": ["@types/react", "@types/react-*"]
+    },
+    {
+      "groupName": "turbo",
+      "matchPackageNames": ["turbo", "@turbo/*"]
+    },
+    {
+      "groupName": "vitest",
+      "matchPackageNames": ["vitest", "@vitest/*"]
+    },
+    {
+      "groupName": "github actions",
+      "matchManagers": ["github-actions"]
+    },
+    {
+      "groupName": "infra images",
+      "matchManagers": ["docker-compose"]
+    },
+    {
+      "matchDepTypes": ["devDependencies"],
+      "matchUpdateTypes": ["patch"],
+      "automerge": true,
+      "minimumReleaseAge": "3 days"
+    }
+  ]
+}

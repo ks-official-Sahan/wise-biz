@@ -1,0 +1,18 @@
+pre-commit:
+  # Sequential: both rewrite the same files; Prettier runs last so its formatting wins.
+  piped: true
+  jobs:
+    - name: eslint
+      glob: "*.{js,cjs,mjs,ts,tsx}"
+      # Fixtures are deliberately invalid; presets.test.ts asserts their errors.
+      exclude: ["**/test/fixtures/**"]
+      run: pnpm exec eslint --fix --no-warn-ignored --max-warnings 0 {staged_files}
+      stage_fixed: true
+    - name: prettier
+      run: pnpm exec prettier --write --ignore-unknown {staged_files}
+      stage_fixed: true
+
+commit-msg:
+  jobs:
+    - name: commitlint
+      run: pnpm exec commitlint --edit {1}

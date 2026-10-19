@@ -1,0 +1,40 @@
+import { defineConfig } from "vitest/config";
+
+import type { ViteUserConfig } from "vitest/config";
+
+export interface CoverageThresholds {
+  lines?: number;
+  functions?: number;
+  branches?: number;
+  statements?: number;
+}
+
+export interface WiseBizVitestOptions {
+  coverage?: CoverageThresholds;
+  include?: string[];
+}
+
+const DEFAULT_INCLUDE = ["src/**/*.test.ts", "test/**/*.test.ts"];
+const DEFAULT_THRESHOLD = 80;
+
+/** Shared Vitest config for wise-biz packages. Overrides tune thresholds and test includes. */
+export function wiseBizVitest(options: WiseBizVitestOptions = {}): ViteUserConfig {
+  const { coverage = {} } = options;
+  return defineConfig({
+    test: {
+      include: options.include ?? DEFAULT_INCLUDE,
+      passWithNoTests: true,
+      coverage: {
+        provider: "v8",
+        reporter: ["text", "lcov"],
+        include: ["src/**"],
+        thresholds: {
+          lines: coverage.lines ?? DEFAULT_THRESHOLD,
+          functions: coverage.functions ?? DEFAULT_THRESHOLD,
+          branches: coverage.branches ?? DEFAULT_THRESHOLD,
+          statements: coverage.statements ?? DEFAULT_THRESHOLD,
+        },
+      },
+    },
+  });
+}

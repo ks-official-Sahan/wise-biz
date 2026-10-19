@@ -1,0 +1,45 @@
+{
+  "name": "wise-biz",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.14.0",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "check": "turbo run check",
+    "depcruise": "depcruise --config .dependency-cruiser.cjs apps modules packages services",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "clean": "turbo run clean && rm -rf node_modules .turbo",
+    "deps:graph": "depcruise --config .dependency-cruiser.cjs --output-type dot apps modules packages services | dot -T svg > docs/deps-graph.svg",
+    "changeset": "changeset",
+    "prepare": "lefthook install",
+    "lint:root": "eslint . --max-warnings 0",
+    "infra:up": "docker compose -f infra/docker/compose.yaml up -d --wait --wait-timeout 90 && docker compose -f infra/docker/compose.yaml run --rm storage-init",
+    "infra:up:kafka": "docker compose -f infra/docker/compose.yaml --profile kafka up -d --wait --wait-timeout 90 && docker compose -f infra/docker/compose.yaml run --rm storage-init",
+    "infra:down": "docker compose -f infra/docker/compose.yaml --profile kafka --profile init down",
+    "infra:reset": "sh -c 'printf \"Delete ALL local infra data (volumes)? [y/N] \"; read a; [ \"$a\" = y ] || { echo aborted; exit 1; }; docker compose -f infra/docker/compose.yaml --profile kafka --profile init down -v && pnpm infra:up'",
+    "infra:logs": "docker compose -f infra/docker/compose.yaml --profile kafka logs -f --tail=100",
+    "db:psql": "docker compose -f infra/docker/compose.yaml exec -e PGPASSWORD=wb_app postgres psql -U wb_app -h localhost -d wise_biz",
+    "env:check": "node scripts/check-env-example.mts",
+    "licenses:check": "node scripts/check-licenses.mts"
+  },
+  "devDependencies": {
+    "@changesets/cli": "3.0.3",
+    "@commitlint/cli": "21.2.4",
+    "@commitlint/config-conventional": "21.2.4",
+    "@types/node": "24.19.2",
+    "@wise-biz/config": "workspace:*",
+    "dependency-cruiser": "18.6.0",
+    "eslint": "10.13.0",
+    "lefthook": "2.2.2",
+    "prettier": "3.9.10",
+    "turbo": "2.11.9",
+    "typescript": "6.0.3"
+  }
+}
