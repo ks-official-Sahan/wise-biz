@@ -1,0 +1,10 @@
+{
+  "$defs": {
+    "Currency": {
+      "pattern": "^[A-Z]{3}$",
+      "type": "string"
+    }
+  },
+  "$ref": "#/$defs/Currency",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

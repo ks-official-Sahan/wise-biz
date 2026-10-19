@@ -16,7 +16,7 @@ describe("wiseBizVitest", () => {
     expect(config.test.include).toEqual(["src/**/*.test.ts", "test/**/*.test.ts"]);
     expect(config.test.passWithNoTests).toBe(true);
     expect(config.test.coverage.provider).toBe("v8");
-    expect(config.test.coverage.include).toEqual(["src/**"]);
+    expect(config.test.coverage.include).toEqual(["src/**/*.ts"]);
     expect(config.test.coverage.thresholds).toEqual({
       lines: 80,
       functions: 80,

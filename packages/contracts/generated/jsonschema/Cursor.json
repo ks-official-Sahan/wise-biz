@@ -1,0 +1,12 @@
+{
+  "$defs": {
+    "Cursor": {
+      "maxLength": 512,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_-]+$",
+      "type": "string"
+    }
+  },
+  "$ref": "#/$defs/Cursor",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

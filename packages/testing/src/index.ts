@@ -27,7 +27,8 @@ export function wiseBizVitest(options: WiseBizVitestOptions = {}): ViteUserConfi
       coverage: {
         provider: "v8",
         reporter: ["text", "lcov"],
-        include: ["src/**"],
+        include: ["src/**/*.ts"],
+        exclude: ["src/**/*.d.ts", "src/**/*.test.ts"],
         thresholds: {
           lines: coverage.lines ?? DEFAULT_THRESHOLD,
           functions: coverage.functions ?? DEFAULT_THRESHOLD,

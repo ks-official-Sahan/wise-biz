@@ -1,0 +1,25 @@
+{
+  "$defs": {
+    "Currency": {
+      "pattern": "^[A-Z]{3}$",
+      "type": "string"
+    },
+    "Money": {
+      "additionalProperties": false,
+      "properties": {
+        "currency": {
+          "$ref": "#/$defs/Currency"
+        },
+        "minor": {
+          "maximum": 9007199254740991,
+          "minimum": -9007199254740991,
+          "type": "integer"
+        }
+      },
+      "required": ["minor", "currency"],
+      "type": "object"
+    }
+  },
+  "$ref": "#/$defs/Money",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

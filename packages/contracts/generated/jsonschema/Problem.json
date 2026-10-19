@@ -1,0 +1,64 @@
+{
+  "$defs": {
+    "Problem": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "enum": [
+            "VALIDATION_FAILED",
+            "NOT_FOUND",
+            "UNAUTHENTICATED",
+            "CONFLICT",
+            "IDEMPOTENCY_MISMATCH",
+            "IDEMPOTENCY_IN_PROGRESS",
+            "STOCK_INSUFFICIENT",
+            "ENTITLEMENT_REQUIRED",
+            "RATE_LIMITED",
+            "CURRENCY_MISMATCH",
+            "PRECONDITION_FAILED",
+            "INTERNAL"
+          ],
+          "type": "string"
+        },
+        "detail": {
+          "type": "string"
+        },
+        "errors": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string"
+              }
+            },
+            "required": ["path", "message"],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "requestId": {
+          "type": "string"
+        },
+        "status": {
+          "maximum": 599,
+          "minimum": 400,
+          "type": "integer"
+        },
+        "title": {
+          "type": "string"
+        },
+        "type": {
+          "format": "uri",
+          "type": "string"
+        }
+      },
+      "required": ["type", "title", "status", "code", "detail", "requestId"],
+      "type": "object"
+    }
+  },
+  "$ref": "#/$defs/Problem",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

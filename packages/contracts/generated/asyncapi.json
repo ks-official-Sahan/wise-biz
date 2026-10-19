@@ -1,0 +1,129 @@
+{
+  "asyncapi": "3.0.0",
+  "channels": {
+    "platform_contracts_ping_v1": {
+      "address": "platform",
+      "messages": {
+        "platform_contracts_ping_v1": {
+          "$ref": "#/components/messages/platform_contracts_ping_v1"
+        }
+      }
+    }
+  },
+  "components": {
+    "messages": {
+      "platform_contracts_ping_v1": {
+        "contentType": "application/json",
+        "name": "platform.contracts.ping@v1",
+        "payload": {
+          "schema": {
+            "$defs": {
+              "Timestamp": {
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
+                "type": "string"
+              },
+              "Uuid7": {
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                "type": "string"
+              },
+              "platform.contracts.ping@v1": {
+                "additionalProperties": false,
+                "properties": {
+                  "actor": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "id": {
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "type": {
+                        "enum": ["user", "device", "system", "mcp"],
+                        "type": "string"
+                      }
+                    },
+                    "required": ["type", "id"],
+                    "type": "object"
+                  },
+                  "branchId": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/$defs/Uuid7"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "causationId": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "correlationId": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "data": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "note": {
+                        "type": "string"
+                      }
+                    },
+                    "required": ["note"],
+                    "type": "object"
+                  },
+                  "id": {
+                    "$ref": "#/$defs/Uuid7"
+                  },
+                  "source": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "subject": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "tenantId": {
+                    "$ref": "#/$defs/Uuid7"
+                  },
+                  "time": {
+                    "$ref": "#/$defs/Timestamp"
+                  },
+                  "type": {
+                    "const": "platform.contracts.ping",
+                    "type": "string"
+                  },
+                  "version": {
+                    "const": 1,
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "id",
+                  "type",
+                  "version",
+                  "source",
+                  "tenantId",
+                  "subject",
+                  "time",
+                  "correlationId",
+                  "actor",
+                  "data"
+                ],
+                "type": "object"
+              }
+            },
+            "$ref": "#/$defs/platform.contracts.ping@v1",
+            "$schema": "https://json-schema.org/draft/2020-12/schema"
+          },
+          "schemaFormat": "application/schema+json;version=draft-2020-12"
+        }
+      }
+    }
+  },
+  "info": {
+    "title": "wise-biz events",
+    "version": "1.0.0"
+  }
+}
