@@ -41,7 +41,8 @@ describe("uuidv7", () => {
       prev = next;
     }
     expect(ok).toBe(true);
-  });
+    // ~0.8 s uninstrumented; v8 coverage + a parallel turbo run can push it past the 5 s default.
+  }, 30_000);
 });
 
 describe("createUuidv7", () => {
