@@ -63,6 +63,19 @@ pnpm db:psql              # psql as wb_app (RLS applies; NOBYPASSRLS)
 
 Branch protection: required checks, 1 review, signed commits for release tags. Conventional commits → changesets for package versions.
 
+### Branch protection checklist (`master`)
+
+Set in GitHub → Settings → Rules → Rulesets (target: default branch):
+
+- [ ] Require a pull request; 1 approving review; dismiss stale approvals on push; CODEOWNERS review required.
+- [ ] Required status checks (strict, branch up to date): `CI / check`, `CI / actionlint`, `Security / audit`, `Security / gitleaks`, `Security / codeql`, `Security / licenses`, `Security / dependency-review`.
+- [ ] Require linear history (squash or rebase merge only; disable merge commits).
+- [ ] Block force pushes and deletion; no bypass list except the release bot.
+- [ ] Require signed commits on release tags (tag ruleset `v*`).
+- [ ] Actions settings: default `GITHUB_TOKEN` read-only; "Allow actions created by GitHub" + SHA-pinned third-party only; fork PR workflows need approval.
+
+Workflows pin every third-party action to a commit SHA (Renovate `helpers:pinGitHubActionDigests` keeps them current). No workflow uses `pull_request_target`.
+
 ## Database operations
 
 - Migrations: expand/contract only. Never drop or rename in the same release that stops using a column.
