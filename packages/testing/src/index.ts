@@ -12,6 +12,8 @@ export interface CoverageThresholds {
 export interface WiseBizVitestOptions {
   coverage?: CoverageThresholds;
   include?: string[];
+  /** Per-test timeout in ms (default 5000). Raise only for vector/property-heavy suites. */
+  testTimeout?: number;
 }
 
 const DEFAULT_INCLUDE = ["src/**/*.test.ts", "test/**/*.test.ts"];
@@ -24,6 +26,7 @@ export function wiseBizVitest(options: WiseBizVitestOptions = {}): ViteUserConfi
     test: {
       include: options.include ?? DEFAULT_INCLUDE,
       passWithNoTests: true,
+      testTimeout: options.testTimeout ?? 5_000,
       coverage: {
         provider: "v8",
         reporter: ["text", "lcov"],

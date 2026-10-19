@@ -11,6 +11,11 @@ function msgBytes(m: Bytes | string): Bytes {
   return typeof m === "string" ? utf8(m) : m;
 }
 
+/**
+ * Generates a fresh keypair from the platform CSPRNG (`crypto.getRandomValues`).
+ * On Hermes/React Native a `crypto.getRandomValues` polyfill (expo-crypto) must be installed
+ * before calling this (P1-01); without it key generation throws.
+ */
 export function generateKeyPair(): KeyPair {
   const secretKey = ed25519.utils.randomSecretKey();
   return { secretKey, publicKey: ed25519.getPublicKey(secretKey) };

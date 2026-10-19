@@ -47,7 +47,7 @@ export type VerifyFailure =
   "prev_mismatch" | "hash_mismatch" | "malformed" | "head_mismatch" | "length_mismatch";
 
 export type VerifyResult =
-  | { ok: true; head: ChainHash; length: number }
+  | { ok: true; head: ChainHash; length: number; anchored: boolean }
   | { ok: false; index: number; reason: VerifyFailure };
 
 /**
@@ -58,9 +58,16 @@ export type VerifyResult =
  * Tail truncation (deleting the last rows) leaves a perfectly valid shorter chain, so it
  * is only detectable against an external anchor: pass `expectedHead` / `expectedLength`.
  * Those failures report index = rows.length (the position where rows are missing/extra).
+ *
+ * The chain is UNKEYED by design: anyone who can write the table can recompute a consistent
+ * chain, so tamper evidence comes only from an external anchor (daily signed Merkle root in
+ * WORM storage, see security.md). Production verification MUST pass `expectedHead` /
+ * `expectedLength` taken from a signed anchor; jobs should assert `result.anchored === true`
+ * (true iff `expectedHead` was supplied).
  * An empty list is ok with head = startHash, length 0, subject to the anchors.
  */
 export function verifyChain(rows: readonly ChainRow[], opts: VerifyOptions = {}): VerifyResult {
+  if (!Array.isArray(rows)) return { ok: false, index: 0, reason: "malformed" };
   const start = opts.startHash ?? GENESIS_HASH;
   if (!isChainHash(start)) throw new TypeError("startHash must be 64 lowercase hex chars");
   let prev: string = start;
@@ -90,5 +97,10 @@ export function verifyChain(rows: readonly ChainRow[], opts: VerifyOptions = {})
   if (opts.expectedLength !== undefined && opts.expectedLength !== rows.length) {
     return { ok: false, index: rows.length, reason: "length_mismatch" };
   }
-  return { ok: true, head: prev as ChainHash, length: rows.length };
+  return {
+    ok: true,
+    head: prev as ChainHash,
+    length: rows.length,
+    anchored: opts.expectedHead !== undefined,
+  };
 }

@@ -39,11 +39,16 @@ describe("verifyChain", () => {
   const head = at(rows, 5).hash;
 
   it("verifies chains, including empty", () => {
-    expect(verifyChain(rows)).toEqual({ ok: true, head, length: 6 });
+    expect(verifyChain(rows)).toEqual({ ok: true, head, length: 6, anchored: false });
     expect(verifyChain(rows, { expectedHead: head, expectedLength: 6 }).ok).toBe(true);
-    expect(verifyChain([])).toEqual({ ok: true, head: GENESIS_HASH, length: 0 });
+    expect(verifyChain([])).toEqual({ ok: true, head: GENESIS_HASH, length: 0, anchored: false });
     const s = "1".repeat(64);
-    expect(verifyChain([], { startHash: s })).toEqual({ ok: true, head: s, length: 0 });
+    expect(verifyChain([], { startHash: s })).toEqual({
+      ok: true,
+      head: s,
+      length: 0,
+      anchored: false,
+    });
     expect(verifyChain([], { expectedHead: head })).toEqual({
       ok: false,
       index: 0,
@@ -129,3 +134,21 @@ function at<T>(a: readonly T[], i: number): T {
   if (v === undefined) throw new Error("index out of range");
   return v;
 }
+
+describe("verifyChain hardening", () => {
+  it("non-array rows are malformed", () => {
+    for (const bad of [null, undefined, {}, "x", 3]) {
+      expect(verifyChain(bad as ChainRow[])).toEqual({
+        ok: false,
+        index: 0,
+        reason: "malformed",
+      });
+    }
+  });
+  it("anchored is true iff expectedHead supplied", () => {
+    const rows = build(3);
+    const head = at(rows, 2).hash;
+    expect(verifyChain(rows, { expectedHead: head })).toMatchObject({ ok: true, anchored: true });
+    expect(verifyChain(rows, { expectedLength: 3 })).toMatchObject({ ok: true, anchored: false });
+  });
+});

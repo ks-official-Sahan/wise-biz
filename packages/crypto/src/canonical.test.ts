@@ -34,8 +34,7 @@ describe("canonicalize", () => {
 
   it("escapes strings like JSON.stringify", () => {
     expect(canonicalize('\u0000\u001f\n\t"\\')).toBe('"\\u0000\\u001f\\n\\t\\"\\\\"');
-    expect(canonicalize("  ")).toBe('"  "');
-    expect(canonicalize("\ud800")).toBe('"\\ud800"');
+    expect(canonicalize("  ")).toBe('"  "');
   });
 
   it("accepts null-prototype objects", () => {
@@ -88,5 +87,33 @@ describe("canonicalize", () => {
         expect(canonicalize(JSON.parse(c))).toBe(c);
       }),
     );
+  });
+});
+
+describe("canonicalize hardening", () => {
+  it("deep nesting throws CanonicalizeError, not RangeError", () => {
+    let v: unknown = 1;
+    for (let i = 0; i < 5000; i++) v = [v];
+    expect(() => canonicalize(v)).toThrow(CanonicalizeError);
+    let o: unknown = 1;
+    for (let i = 0; i < 5000; i++) o = { a: o };
+    expect(() => canonicalize(o)).toThrow(CanonicalizeError);
+  });
+  it("error messages leak no keys or values", () => {
+    for (const v of [{ secretKey: { ssn: undefined } }, { secretKey: [1n] }, { secretKey: NaN }]) {
+      try {
+        canonicalize(v);
+        expect.unreachable();
+      } catch (e) {
+        expect(e).toBeInstanceOf(CanonicalizeError);
+        expect((e as Error).message).not.toMatch(/secretKey|ssn/);
+      }
+    }
+  });
+  it("rejects lone surrogates in strings and keys", () => {
+    expect(() => canonicalize("\ud800")).toThrow(CanonicalizeError);
+    expect(() => canonicalize({ "\udc00x": 1 })).toThrow(CanonicalizeError);
+    expect(() => canonicalize(["a\ud83d"])).toThrow(CanonicalizeError);
+    expect(canonicalize("\ud83d\ude00")).toBe('"\u{1F600}"');
   });
 });

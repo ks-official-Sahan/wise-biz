@@ -6,6 +6,7 @@ interface Resolved {
   test: {
     include: string[];
     passWithNoTests: boolean;
+    testTimeout: number;
     coverage: { provider: string; thresholds: Record<string, number>; include: string[] };
   };
 }
@@ -15,6 +16,7 @@ describe("wiseBizVitest", () => {
     const config = wiseBizVitest() as unknown as Resolved;
     expect(config.test.include).toEqual(["src/**/*.test.ts", "test/**/*.test.ts"]);
     expect(config.test.passWithNoTests).toBe(true);
+    expect(config.test.testTimeout).toBe(5_000);
     expect(config.test.coverage.provider).toBe("v8");
     expect(config.test.coverage.include).toEqual(["src/**/*.ts"]);
     expect(config.test.coverage.thresholds).toEqual({
@@ -29,8 +31,10 @@ describe("wiseBizVitest", () => {
     const config = wiseBizVitest({
       include: ["test/**/*.spec.ts"],
       coverage: { lines: 90, branches: 50 },
+      testTimeout: 30_000,
     }) as unknown as Resolved;
     expect(config.test.include).toEqual(["test/**/*.spec.ts"]);
+    expect(config.test.testTimeout).toBe(30_000);
     expect(config.test.coverage.thresholds).toEqual({
       lines: 90,
       functions: 80,
