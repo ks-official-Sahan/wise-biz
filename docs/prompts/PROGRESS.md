@@ -9,7 +9,7 @@ Legend: ⬜ todo · 🟡 in progress · ✅ done · ⛔ blocked
 | Step | Status | Date | Commit | Notes / deviations |
 |---|---|---|---|---|
 | P0-01 Monorepo | ✅ | 2026-10-19 | 6c6d7e8 | Branch `cc/gracious-allen-044iq6` (harness) not `step/P0-01`. TS 6.0.3 not 7 (typescript-eslint <6.1). No eslint-plugin-react/jsx-a11y (no ESLint 10 support). Packages ship TS source (ADR 0008). Prose `.md` excluded from Prettier. Added `apps/ modules/ services/.gitkeep`, rule `modules-not-to-apps`, root `lint:root` task. |
-| P0-02 Local infra + env | ✅ | 2026-10-19 | HASH | MinIO images unpublished → RustFS 1.0.3 (S3 API) + aws-cli `storage-init` (profile `init`, run after `up --wait`, which fails on exited one-shots). Check script runs on plain `node` (no tsx). `env:check` added to `pnpm check`. Prod rejects `.env.example` placeholder secrets. Up ≈8 s. |
+| P0-02 Local infra + env | ✅ | 2026-10-19 | 05f2d35 | MinIO images unpublished → RustFS 1.0.3 (S3 API) + aws-cli `storage-init` (profile `init`, run after `up --wait`, which fails on exited one-shots). Check script runs on plain `node` (no tsx). `env:check` added to `pnpm check`. Prod rejects `.env.example` placeholder secrets. Up ≈8 s. |
 | P0-03 CI baseline | ⬜ | | | |
 | P0-04 Core packages | ⬜ | | | |
 | P0-05 Crypto, policy, audit-chain | ⬜ | | | |
