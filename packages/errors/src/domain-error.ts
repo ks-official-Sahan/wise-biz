@@ -3,21 +3,21 @@ import { ERROR_CODES } from "./codes.ts";
 import type { ErrorCode } from "./codes.ts";
 
 export interface FieldError {
-  path: string;
-  message: string;
+  readonly path: string;
+  readonly message: string;
 }
 
 export interface DomainErrorOptions {
   /** Internal context for logs. Never copied into the HTTP problem. */
   details?: unknown;
-  fieldErrors?: FieldError[];
+  fieldErrors?: readonly FieldError[];
   cause?: unknown;
 }
 
 export class DomainError extends Error {
   readonly code: ErrorCode;
   readonly details?: unknown;
-  readonly fieldErrors?: FieldError[];
+  readonly fieldErrors?: readonly FieldError[];
 
   constructor(code: ErrorCode, message: string, opts: DomainErrorOptions = {}) {
     super(message, opts.cause === undefined ? undefined : { cause: opts.cause });

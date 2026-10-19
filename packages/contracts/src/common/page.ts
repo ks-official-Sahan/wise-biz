@@ -8,7 +8,17 @@ export function pageOf<T extends z.ZodType>(item: T) {
 
 export const PageQuery = z
   .object({
-    limit: z.coerce.number().int().min(1).max(200).default(50),
+    // Only numeric strings are coerced; `true`, "", " 5", "1e1" are rejected.
+    limit: z
+      .union([
+        z.number(),
+        z
+          .string()
+          .regex(/^\d{1,6}$/)
+          .transform(Number),
+      ])
+      .pipe(z.number().int().min(1).max(200))
+      .default(50),
     after: Cursor.optional(),
   })
   .meta({ id: "PageQuery" });

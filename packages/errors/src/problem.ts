@@ -12,7 +12,7 @@ export interface ProblemDetails {
   code: ErrorCode;
   detail: string;
   requestId: string;
-  errors?: FieldError[];
+  errors?: readonly FieldError[] | undefined;
 }
 
 /**

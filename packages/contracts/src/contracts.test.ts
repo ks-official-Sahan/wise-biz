@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, expectTypeOf, it } from "vitest";
 import { z } from "zod";
 
 import {
@@ -16,6 +16,9 @@ import {
   pageOf,
   registerRoute,
 } from "./index.ts";
+
+import type { Uuid7 as Uuid7T } from "@wise-biz/ids";
+import type { Currency as CurrencyT, Money as MoneyT } from "@wise-biz/money";
 
 const ID = "0192f8c6-1234-7abc-8def-0123456789ab";
 
@@ -52,6 +55,13 @@ describe("common schemas", () => {
       ],
     );
   });
+  it("Money output is branded, frozen Money; Uuid7/Currency typed", () => {
+    const m = Money.parse({ minor: 5, currency: "USD" });
+    expectTypeOf(m).toEqualTypeOf<MoneyT>();
+    expect(Object.isFrozen(m)).toBe(true);
+    expectTypeOf(Uuid7.parse(ID)).toEqualTypeOf<Uuid7T>();
+    expectTypeOf(Currency.parse("USD")).toEqualTypeOf<CurrencyT>();
+  });
   it("Timestamp", () => {
     table(
       Timestamp,
@@ -76,7 +86,21 @@ describe("common schemas", () => {
   it("PageQuery", () => {
     expect(PageQuery.parse({})).toEqual({ limit: 50 });
     expect(PageQuery.parse({ limit: "200", after: "abc" })).toEqual({ limit: 200, after: "abc" });
-    table(PageQuery, [], [{ limit: 0 }, { limit: 201 }, { limit: 1.5 }, { after: "a b" }]);
+    table(
+      PageQuery,
+      [],
+      [
+        { limit: 0 },
+        { limit: 201 },
+        { limit: 1.5 },
+        { after: "a b" },
+        { limit: true },
+        { limit: "" },
+        { limit: " 5" },
+        { limit: "1e1" },
+        { limit: null },
+      ],
+    );
   });
   it("Problem", () => {
     const base = {
@@ -114,6 +138,19 @@ const envelope = {
 };
 
 describe("events", () => {
+  it("defineEvent keeps literal type/version and typed data", () => {
+    const e = defineEvent("platform.contracts.typed", 2, z.object({ n: z.number() }));
+    const out = e.parse({
+      ...envelope,
+      type: "platform.contracts.typed",
+      version: 2,
+      data: { n: 1 },
+    });
+    expectTypeOf(out.type).toEqualTypeOf<"platform.contracts.typed">();
+    expectTypeOf(out.version).toEqualTypeOf<2>();
+    expectTypeOf(out.data).toEqualTypeOf<{ n: number }>();
+    expectTypeOf(out.id).toEqualTypeOf<Uuid7T>();
+  });
   it("EventEnvelope accepts and rejects", () => {
     table(
       EventEnvelope,

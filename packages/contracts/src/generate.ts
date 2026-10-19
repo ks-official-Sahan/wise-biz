@@ -49,7 +49,7 @@ function pretty(v: unknown, indent: number, prefixLen: number): string {
 
 const json = (v: unknown): string => `${pretty(sortKeys(v), 0, 0)}\n`;
 const toSchema = (s: z.ZodType) =>
-  z.toJSONSchema(s, { target: "draft-2020-12", io: "output", unrepresentable: "any" });
+  z.toJSONSchema(s, { target: "draft-2020-12", io: "input", unrepresentable: "any" });
 
 /** Pure: returns file contents keyed by path relative to `generated/`. */
 export function generate(): Record<string, string> {

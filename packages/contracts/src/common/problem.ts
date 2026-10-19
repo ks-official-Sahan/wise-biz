@@ -12,6 +12,9 @@ export const Problem = z
     code: z.enum(Object.keys(ERROR_CODES) as [ErrorCode, ...ErrorCode[]]),
     detail: z.string(),
     requestId: z.string(),
-    errors: z.array(z.object({ path: z.string(), message: z.string() })).optional(),
+    errors: z
+      .array(z.object({ path: z.string(), message: z.string() }))
+      .readonly()
+      .optional(),
   })
   .meta({ id: "Problem" });

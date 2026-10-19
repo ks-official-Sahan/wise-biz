@@ -7,19 +7,22 @@
       "type": "string"
     },
     "PageQuery": {
-      "additionalProperties": false,
       "properties": {
         "after": {
           "$ref": "#/$defs/Cursor"
         },
         "limit": {
-          "default": 50,
-          "maximum": 200,
-          "minimum": 1,
-          "type": "integer"
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^\\d{1,6}$",
+              "type": "string"
+            }
+          ]
         }
       },
-      "required": ["limit"],
       "type": "object"
     }
   },

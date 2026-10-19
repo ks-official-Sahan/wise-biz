@@ -1,7 +1,6 @@
 {
   "$defs": {
     "Problem": {
-      "additionalProperties": false,
       "properties": {
         "code": {
           "enum": [
@@ -25,7 +24,6 @@
         },
         "errors": {
           "items": {
-            "additionalProperties": false,
             "properties": {
               "message": {
                 "type": "string"
@@ -37,6 +35,7 @@
             "required": ["path", "message"],
             "type": "object"
           },
+          "readOnly": true,
           "type": "array"
         },
         "requestId": {

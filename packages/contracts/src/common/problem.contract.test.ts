@@ -1,7 +1,10 @@
 import { DomainError, toProblem } from "@wise-biz/errors";
-import { describe, expect, it } from "vitest";
+import { describe, expect, expectTypeOf, it } from "vitest";
 
 import { Problem } from "./problem.ts";
+
+import type { ProblemDetails } from "@wise-biz/errors";
+import type { z } from "zod";
 
 describe("Problem ↔ @wise-biz/errors toProblem", () => {
   it("accepts every problem toProblem produces", () => {
@@ -15,5 +18,12 @@ describe("Problem ↔ @wise-biz/errors toProblem", () => {
   it("rejects codes outside the registry", () => {
     const problem = toProblem(new DomainError("NOT_FOUND", "x"), "req-3");
     expect(Problem.safeParse({ ...problem, code: "MADE_UP" }).success).toBe(false);
+  });
+});
+
+describe("Problem type link", () => {
+  it("z.output<Problem> and ProblemDetails are mutually assignable", () => {
+    expectTypeOf<z.output<typeof Problem>>().toExtend<ProblemDetails>();
+    expectTypeOf<ProblemDetails>().toExtend<z.output<typeof Problem>>();
   });
 });
