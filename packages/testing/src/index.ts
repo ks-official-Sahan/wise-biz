@@ -14,6 +14,8 @@ export interface WiseBizVitestOptions {
   include?: string[];
   /** Per-test timeout in ms (default 5000). Raise only for vector/property-heavy suites. */
   testTimeout?: number;
+  /** Vitest globalSetup files (e.g. a Postgres container started once per run). */
+  globalSetup?: string[];
 }
 
 const DEFAULT_INCLUDE = ["src/**/*.test.ts", "test/**/*.test.ts"];
@@ -27,6 +29,7 @@ export function wiseBizVitest(options: WiseBizVitestOptions = {}): ViteUserConfi
       include: options.include ?? DEFAULT_INCLUDE,
       passWithNoTests: true,
       testTimeout: options.testTimeout ?? 5_000,
+      ...(options.globalSetup ? { globalSetup: options.globalSetup } : {}),
       coverage: {
         provider: "v8",
         reporter: ["text", "lcov"],
