@@ -1,6 +1,7 @@
+import { sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { createPool, withPlatformTx, withTenantTx } from "../src/index.ts";
+import { createPool, withTenantTx } from "../src/index.ts";
 
 import { fixture, migratedDb, uuid7 } from "./helpers.ts";
 
@@ -80,26 +81,15 @@ describe("withTenantTx", () => {
     );
     expect(ok.rows[0]).toEqual({ one: 1 });
   });
-});
 
-describe("withPlatformTx", () => {
-  it("sets platform flag + reason, no tenant", async () => {
-    const res = await withPlatformTx(
-      pool,
-      { reason: "support ticket 1", requestId: "r", actorId: "a1" },
-      (tx) =>
-        tx.query(
-          "select current_setting('app.platform', true) p, current_setting('app.platform_reason', true) why, current_setting('app.actor_id', true) a, current_setting('app.tenant_id', true) t",
-        ),
+  it("handle is closed after the tx ends: db and query throw", async () => {
+    const t = uuid7();
+    const leaked = await withTenantTx(pool, { tenantId: t, requestId: "r" }, (tx) =>
+      Promise.resolve(tx),
     );
-    expect(res.rows[0]).toEqual({ p: "on", why: "support ticket 1", a: "a1", t: "" });
-    expect((await pool.query("select current_setting('app.platform', true) p")).rows[0]).toEqual({
-      p: "",
+    await expect(leaked.query("select 1")).rejects.toThrow(/closed/);
+    await expect(leaked.db.execute(sql`select 1`)).rejects.toMatchObject({
+      cause: { message: expect.stringMatching(/closed/) as unknown },
     });
-  });
-  it("requires a reason", async () => {
-    await expect(
-      withPlatformTx(pool, { reason: " ", requestId: "r", actorId: "a" }, () => Promise.resolve()),
-    ).rejects.toThrow(/reason/);
   });
 });

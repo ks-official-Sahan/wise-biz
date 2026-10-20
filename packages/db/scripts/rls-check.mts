@@ -15,7 +15,7 @@ await client.connect();
 try {
   const bad = await findTablesWithoutRls(
     client,
-    entries.map((e) => e.module.replace(/^_/, "").replaceAll("-", "_")),
+    entries.map((e) => e.module.replace(/^_/, "")),
   );
   if (bad.length > 0) {
     console.error(`Tables without enabled+forced RLS and a policy:\n${bad.join("\n")}`);

@@ -22,6 +22,7 @@ let migrator: pg.Client;
 let drop: () => Promise<void>;
 let badDrop: () => Promise<void>;
 let badClient: pg.Client;
+let badAdmin: pg.Client;
 
 beforeAll(async () => {
   const db = await migratedDb([fixture("good")]);
@@ -40,11 +41,14 @@ beforeAll(async () => {
   badDrop = () => bad.drop();
   badClient = new pg.Client({ connectionString: bad.url("migrator") });
   await badClient.connect();
+  badAdmin = new pg.Client({ connectionString: bad.url("admin") });
+  await badAdmin.connect();
 });
 afterAll(async () => {
   await pool.end();
   await migrator.end();
   await badClient.end();
+  await badAdmin.end();
   await drop();
   await badDrop();
 });
@@ -119,5 +123,83 @@ describe("findTablesWithoutRls", () => {
   });
   it("is empty for no schemas", async () => {
     expect(await findTablesWithoutRls(badClient, [])).toEqual([]);
+  });
+
+  const TENANT = `"tenant_id" = nullif(current_setting('app.tenant_id', true), '')::uuid`;
+  const rls = (t: string): string =>
+    `ALTER TABLE ${t} ENABLE ROW LEVEL SECURITY; ALTER TABLE ${t} FORCE ROW LEVEL SECURITY;`;
+  const policy = (t: string, expr = TENANT): string =>
+    `CREATE POLICY tenant_isolation ON ${t} USING (${expr}) WITH CHECK (${expr});`;
+  const mk = async (schema: string, sql: string): Promise<void> => {
+    await badClient.query(
+      `CREATE SCHEMA ${schema}; GRANT USAGE ON SCHEMA ${schema} TO wb_app; ${sql}`,
+    );
+  };
+
+  it("partitioned parent without RLS is flagged; partition needs its own RLS", async () => {
+    await mk(
+      "pt1",
+      `CREATE TABLE pt1.ev (id uuid NOT NULL DEFAULT uuidv7(), tenant_id uuid NOT NULL, at timestamptz NOT NULL)
+         PARTITION BY RANGE (at);
+       CREATE TABLE pt1.ev_2026 PARTITION OF pt1.ev FOR VALUES FROM ('2026-01-01') TO ('2027-01-01');`,
+    );
+    expect(await findTablesWithoutRls(badClient, ["pt1"])).toEqual(["pt1.ev", "pt1.ev_2026"]);
+    await badClient.query(`${rls("pt1.ev")} ${policy("pt1.ev")}`);
+    // parent compliant, partition still bare: a direct query on the partition ignores parent policies
+    expect(await findTablesWithoutRls(badClient, ["pt1"])).toEqual(["pt1.ev_2026"]);
+    await badClient.query(`${rls("pt1.ev_2026")} ${policy("pt1.ev_2026")}`);
+    expect(await findTablesWithoutRls(badClient, ["pt1"])).toEqual([]);
+  });
+
+  it("flags materialized views and foreign tables readable by wb_app", async () => {
+    await mk(
+      "mv1",
+      `CREATE TABLE mv1.base (tenant_id uuid NOT NULL); ${rls("mv1.base")} ${policy("mv1.base")}
+       CREATE MATERIALIZED VIEW mv1.agg AS SELECT tenant_id FROM mv1.base;
+       CREATE MATERIALIZED VIEW mv1.hidden AS SELECT tenant_id FROM mv1.base;
+       REVOKE ALL ON mv1.hidden FROM wb_app;`,
+    );
+    expect(await findTablesWithoutRls(badClient, ["mv1"])).toEqual(["mv1.agg"]);
+
+    await badAdmin.query(
+      `CREATE EXTENSION IF NOT EXISTS postgres_fdw;
+       CREATE SERVER IF NOT EXISTS wb_fs FOREIGN DATA WRAPPER postgres_fdw OPTIONS (host 'localhost');
+       GRANT USAGE ON FOREIGN DATA WRAPPER postgres_fdw TO wb_migrator;
+       GRANT USAGE ON FOREIGN SERVER wb_fs TO wb_migrator;`,
+    );
+    await mk("ft1", `CREATE FOREIGN TABLE ft1.remote (tenant_id uuid) SERVER wb_fs;`);
+    expect(await findTablesWithoutRls(badClient, ["ft1"])).toEqual(["ft1.remote"]);
+    await badClient.query("REVOKE ALL ON ft1.remote FROM wb_app");
+    expect(await findTablesWithoutRls(badClient, ["ft1"])).toEqual([]);
+  });
+
+  it("flags views without security_invoker=true", async () => {
+    await mk(
+      "vw1",
+      `CREATE TABLE vw1.base (tenant_id uuid NOT NULL); ${rls("vw1.base")} ${policy("vw1.base")}
+       CREATE VIEW vw1.leaky AS SELECT * FROM vw1.base;
+       CREATE VIEW vw1.safe WITH (security_invoker = true) AS SELECT * FROM vw1.base;`,
+    );
+    expect(await findTablesWithoutRls(badClient, ["vw1"])).toEqual(["vw1.leaky"]);
+  });
+
+  it("checks policy content: USING (true), wrong cmd, restrictive-only all fail", async () => {
+    await mk(
+      "pc1",
+      `CREATE TABLE pc1.open_t (tenant_id uuid NOT NULL); ${rls("pc1.open_t")} ${policy("pc1.open_t", "true")}
+       CREATE TABLE pc1.select_only (tenant_id uuid NOT NULL); ${rls("pc1.select_only")}
+         CREATE POLICY p ON pc1.select_only FOR SELECT USING (${TENANT});
+       CREATE TABLE pc1.restrictive (tenant_id uuid NOT NULL); ${rls("pc1.restrictive")}
+         CREATE POLICY p ON pc1.restrictive AS RESTRICTIVE USING (${TENANT}) WITH CHECK (${TENANT});
+       CREATE TABLE pc1.no_check (tenant_id uuid NOT NULL); ${rls("pc1.no_check")}
+         CREATE POLICY p ON pc1.no_check USING (${TENANT});
+       CREATE TABLE pc1.ok (tenant_id uuid NOT NULL); ${rls("pc1.ok")} ${policy("pc1.ok")}`,
+    );
+    expect(await findTablesWithoutRls(badClient, ["pc1"])).toEqual([
+      "pc1.no_check",
+      "pc1.open_t",
+      "pc1.restrictive",
+      "pc1.select_only",
+    ]);
   });
 });

@@ -72,6 +72,11 @@ export function attachPostgres(
         await c.query("SELECT pg_advisory_lock($1)", [CREATE_LOCK_KEY]);
         try {
           await c.query(sql);
+          // CREATE DATABASE does not copy the template's ACL: re-apply the DB-level grants from 002-extensions.sql.
+          const q = ident(name);
+          await c.query(
+            `REVOKE ALL ON DATABASE ${q} FROM PUBLIC; GRANT CONNECT ON DATABASE ${q} TO wb_app; REVOKE TEMPORARY ON DATABASE ${q} FROM wb_app`,
+          );
         } finally {
           await c.query("SELECT pg_advisory_unlock($1)", [CREATE_LOCK_KEY]);
         }

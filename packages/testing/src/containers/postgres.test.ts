@@ -64,6 +64,30 @@ describe("postgres harness", () => {
     expect(await query(db, "app", "SELECT id FROM ok")).toEqual([{ id: 1 }]);
   });
 
+  it("init SQL: role limits, no TEMPORARY, default privileges cover future schemas", async () => {
+    const role = await query<{ rolconnlimit: number; rolconfig: string[] }>(
+      "postgres",
+      "admin",
+      "SELECT rolconnlimit, rolconfig FROM pg_roles WHERE rolname = 'wb_app'",
+    );
+    expect(role[0]?.rolconnlimit).toBe(200);
+    expect(role[0]?.rolconfig).toEqual(
+      expect.arrayContaining(["statement_timeout=15s", "idle_in_transaction_session_timeout=30s"]),
+    );
+    expect(role[0]?.rolconfig.some((c) => c.startsWith("search_path"))).toBe(false);
+    const db = await clone();
+    await expect(query(db, "app", "CREATE TEMP TABLE x (id int)")).rejects.toThrow(
+      /permission denied/,
+    );
+    await query(
+      db,
+      "migrator",
+      "CREATE SCHEMA newmod; GRANT USAGE ON SCHEMA newmod TO wb_app; CREATE TABLE newmod.t (id serial PRIMARY KEY)",
+    );
+    await query(db, "app", "INSERT INTO newmod.t DEFAULT VALUES");
+    expect(await query(db, "app", "SELECT id FROM newmod.t")).toEqual([{ id: 1 }]);
+  });
+
   it("clones are isolated", async () => {
     const a = await clone();
     const b = await clone();

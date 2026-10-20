@@ -25,6 +25,9 @@ function textOf(arg: unknown): string | undefined {
 }
 
 /**
+ * TEST / DIAGNOSTICS ONLY. Recorded statements may contain inlined literals (PII, secrets), so never log
+ * or ship them in production.
+ *
  * Patch every client the pool creates (via its 'connect' event) so queries report to the active
  * countQueries scope, whether issued with pool.query, pool.connect() or drizzle.
  * Call right after createPool, before first use: clients that already exist are not patched.

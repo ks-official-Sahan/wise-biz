@@ -24,10 +24,8 @@ export function isUuidV7(value: string): boolean {
 
 const SETTINGS_SQL =
   "select set_config('app.tenant_id', $1, true), set_config('app.user_id', $2, true), set_config('app.request_id', $3, true)";
-const PLATFORM_SQL =
-  "select set_config('app.platform', 'on', true), set_config('app.platform_reason', $1, true), set_config('app.actor_id', $2, true), set_config('app.request_id', $3, true)";
-
-async function run<T>(
+/** Internal: shared by withTenantTx and the platform subpath. Not exported from the package root. */
+export async function run<T>(
   pool: pg.Pool,
   settingsSql: string,
   params: string[],
@@ -35,6 +33,7 @@ async function run<T>(
 ): Promise<T> {
   const client = await pool.connect();
   let releaseErr: Error | undefined;
+  let closed = false;
   // A backend killed mid-transaction emits 'error' on the checked-out client; surface it via query rejection only.
   const onError = (): void => undefined;
   client.on("error", onError);
@@ -42,11 +41,44 @@ async function run<T>(
     await client.query("BEGIN");
     // One round trip; is_local=true so settings die with the transaction (pool-safe).
     await client.query(settingsSql, params);
-    const tx: TxHandle = {
-      db: drizzle(client),
-      query: (sql, p) => client.query(sql, p),
+    // Handle dies with the tx: a leaked reference must not run on a client that is already back in the pool.
+    const assertOpen = (): void => {
+      if (closed)
+        throw new Error("transaction handle is closed (used after the transaction ended)");
     };
-    const result = await fn(tx);
+    const guarded = new Proxy(client, {
+      get(target, prop) {
+        if (prop === "query") {
+          return (...args: unknown[]) => {
+            try {
+              assertOpen();
+            } catch (e) {
+              return Promise.reject(e instanceof Error ? e : new Error(String(e)));
+            }
+            return (target.query as (...a: unknown[]) => unknown)(...args);
+          };
+        }
+        const v: unknown = Reflect.get(target, prop, target);
+        return typeof v === "function" ? (v as (...a: unknown[]) => unknown).bind(target) : v;
+      },
+    });
+    const tx: TxHandle = {
+      db: drizzle(guarded),
+      query: (sql, p) => {
+        try {
+          assertOpen();
+        } catch (e) {
+          return Promise.reject(e instanceof Error ? e : new Error(String(e)));
+        }
+        return client.query(sql, p);
+      },
+    };
+    let result: T;
+    try {
+      result = await fn(tx);
+    } finally {
+      closed = true;
+    }
     await client.query("COMMIT");
     return result;
   } catch (err) {
@@ -70,19 +102,4 @@ export async function withTenantTx<T>(
 ): Promise<T> {
   if (!isUuidV7(ctx.tenantId)) throw new Error("withTenantTx: tenantId must be a UUIDv7");
   return run(pool, SETTINGS_SQL, [ctx.tenantId, ctx.userId ?? "", ctx.requestId], fn);
-}
-
-/**
- * Platform-only access. Does NOT set app.tenant_id, so tenant tables return zero rows.
- * Platform tables use a separate policy keyed on `current_setting('app.platform', true) = 'on'`.
- * `reason` and `actorId` are exposed as app.platform_reason / app.actor_id for the audit row
- * the caller must write in the same transaction.
- */
-export async function withPlatformTx<T>(
-  pool: pg.Pool,
-  ctx: PlatformCtx,
-  fn: (tx: TxHandle) => Promise<T>,
-): Promise<T> {
-  if (ctx.reason.trim() === "") throw new Error("withPlatformTx: reason is required");
-  return run(pool, PLATFORM_SQL, [ctx.reason, ctx.actorId, ctx.requestId], fn);
 }

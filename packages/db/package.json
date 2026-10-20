@@ -7,7 +7,8 @@
     "runtime": "node"
   },
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./platform": "./src/platform.ts"
   },
   "scripts": {
     "lint": "eslint . --max-warnings 0",

@@ -23,19 +23,37 @@ export function rlsSql(
   ].join("\n");
 }
 
+// A policy counts only if it is PERMISSIVE, FOR ALL, and both USING and WITH CHECK reference app.tenant_id.
+// Text match on the deparsed expression: catches `USING (true)`, SELECT-only and RESTRICTIVE-only
+// policies; it is a lint, not a proof (a hand-written `true OR ...` would pass; review those).
 const FIND_SQL = `
 select n.nspname || '.' || c.relname as name
 from pg_class c
 join pg_namespace n on n.oid = c.relnamespace
-where c.relkind in ('r', 'p')
-  and not c.relispartition
-  and n.nspname = any($1::text[])
-  and (not c.relrowsecurity
-    or not c.relforcerowsecurity
-    or not exists (select 1 from pg_policies p where p.schemaname = n.nspname and p.tablename = c.relname))
+where n.nspname = any($1::text[])
+  and (
+    (c.relkind in ('r', 'p')
+      and (not c.relrowsecurity
+        or not c.relforcerowsecurity
+        or not exists (
+          select 1 from pg_policies p
+          where p.schemaname = n.nspname and p.tablename = c.relname
+            and p.permissive = 'PERMISSIVE' and p.cmd = 'ALL'
+            and p.qual like '%app.tenant_id%' and p.with_check like '%app.tenant_id%')))
+    or (c.relkind in ('m', 'f') and has_table_privilege('wb_app', c.oid, 'SELECT'))
+    or (c.relkind = 'v'
+      and not exists (
+        select 1 from unnest(coalesce(c.reloptions, '{}'::text[])) o
+        where o ~* '^security_invoker=(true|on|yes|1|t)$')))
 order by 1`;
 
-/** Tables in the given schemas lacking enabled+forced RLS or any policy. Partitions inherit from parent. */
+/**
+ * Relations in the given schemas that can leak across tenants:
+ * - tables and partitioned parents lacking enabled+forced RLS or a tenant-scoped PERMISSIVE ALL policy;
+ *   partitions are checked too (a direct query on a partition ignores the parent's policies);
+ * - materialized views and foreign tables wb_app can SELECT (RLS cannot protect them);
+ * - views without security_invoker=true (they would run with the owner's rights, bypassing RLS).
+ */
 export async function findTablesWithoutRls(
   client: Pick<pg.ClientBase, "query">,
   schemas: string[],
