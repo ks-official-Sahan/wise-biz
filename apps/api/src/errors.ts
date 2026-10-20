@@ -39,14 +39,28 @@ export function validationHook(result: {
   }
 }
 
+/** Static messages only: the HTTPException message may hold internals. 405 maps to 404 to avoid route probing. */
+function fromHttpException(err: HTTPException): DomainError {
+  switch (err.status) {
+    case 401:
+      return new DomainError("UNAUTHENTICATED", "Authentication required");
+    case 404:
+    case 405:
+      return new DomainError("NOT_FOUND", "Not found");
+    case 413:
+      return new DomainError("PAYLOAD_TOO_LARGE", "Payload too large");
+    default:
+      return err.status < 500
+        ? new DomainError("VALIDATION_FAILED", "Malformed request")
+        : new DomainError("INTERNAL", "Internal error");
+  }
+}
+
 export function createErrorHandler(rootLogger: Logger): ErrorHandler<AppEnv> {
   return (err, c) => {
     const requestId = c.get("requestId");
     const log = (c.get("logger") as Logger | undefined) ?? rootLogger;
-    let cause: unknown = err;
-    if (err instanceof HTTPException && err.status < 500) {
-      cause = new DomainError("VALIDATION_FAILED", "Malformed request");
-    }
+    const cause: unknown = err instanceof HTTPException ? fromHttpException(err) : err;
     if (!isDomainError(cause) || cause.code === "INTERNAL") {
       log.error({ err }, "unhandled error");
     }

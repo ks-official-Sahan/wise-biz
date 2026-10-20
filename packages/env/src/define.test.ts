@@ -32,7 +32,7 @@ describe("defineEnv", () => {
   });
 
   it("applies observability and storage defaults", () => {
-    const o = defineEnv(observabilityEnv, {});
+    const o = defineEnv(observabilityEnv, { NODE_ENV: "development" });
     expect(o.NODE_ENV).toBe("development");
     expect(o.LOG_LEVEL).toBe("info");
     const s = defineEnv(storageEnv, {
@@ -129,13 +129,29 @@ describe("assertProductionEnv", () => {
     }
   });
 
-  it("is a no-op outside production", () => {
+  it("is a no-op in development and test", () => {
     expect(() => {
       assertProductionEnv({ NODE_ENV: "development", AUTH_SECRET: "a" });
     }).not.toThrow();
     expect(() => {
-      assertProductionEnv({});
+      assertProductionEnv({ NODE_ENV: "test" });
     }).not.toThrow();
+  });
+
+  it("throws when NODE_ENV is missing or unknown", () => {
+    expect(() => {
+      assertProductionEnv({});
+    }).toThrow(EnvError);
+    expect(() => {
+      assertProductionEnv({ NODE_ENV: "" });
+    }).toThrow(/NODE_ENV/);
+    expect(() => {
+      assertProductionEnv({ NODE_ENV: "prod" });
+    }).toThrow(/NODE_ENV/);
+  });
+
+  it("NODE_ENV has no default", () => {
+    expect(() => defineEnv(observabilityEnv, {})).toThrow(/NODE_ENV: required/);
   });
 
   it("accepts a valid production env", () => {

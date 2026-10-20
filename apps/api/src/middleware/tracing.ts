@@ -15,6 +15,8 @@ export function tracing(): MiddlewareHandler<AppEnv> {
       async (span) => {
         try {
           await next();
+          // Hono catches handler errors itself; they surface on c.error, not as a throw.
+          if (c.error) span.recordException(c.error);
         } catch (err) {
           span.recordException(err instanceof Error ? err : new Error(String(err)));
           throw err;

@@ -96,6 +96,48 @@ describe("startServer", () => {
     await expect(fetch(`http://127.0.0.1:${String(port)}/health`)).rejects.toThrow();
   });
 
+  it("boots with an unreachable Redis: /health 200, /ready 503 within 2 s", async () => {
+    const port = await freePort();
+    const started = Date.now();
+    const server = await startServer({
+      NODE_ENV: "test",
+      LOG_LEVEL: "fatal",
+      DATABASE_URL: db.url("app"),
+      REDIS_URL: "redis://127.0.0.1:1",
+      PORT: String(port),
+    });
+    try {
+      const base = `http://127.0.0.1:${String(port)}`;
+      expect((await fetch(`${base}/health`)).status).toBe(200);
+      const ready = await fetch(`${base}/ready`);
+      expect(ready.status).toBe(503);
+      expect(await ready.json()).toEqual({
+        status: "unavailable",
+        checks: { db: "ok", redis: "fail" },
+      });
+      expect(Date.now() - started).toBeLessThan(2000);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("releases the pool and redis when listen fails", async () => {
+    const port = await freePort();
+    const base = {
+      NODE_ENV: "test",
+      LOG_LEVEL: "fatal",
+      DATABASE_URL: db.url("app"),
+      REDIS_URL: redis.url,
+      PORT: String(port),
+    };
+    const first = await startServer(base);
+    try {
+      await expect(startServer(base)).rejects.toThrow(/EADDRINUSE/);
+    } finally {
+      await first.close();
+    }
+  });
+
   it("refuses API_DEV_AUTH in production", async () => {
     await expect(
       startServer({

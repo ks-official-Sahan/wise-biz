@@ -16,6 +16,9 @@ function clean(source: EnvSource): Record<string, string> {
 }
 
 function kind(issue: z.core.$ZodIssue, present: boolean): string {
+  if (!present && (issue.code === "invalid_type" || issue.code === "invalid_value")) {
+    return "required";
+  }
   switch (issue.code) {
     case "invalid_type":
       return present ? "invalid type" : "required";
@@ -65,9 +68,15 @@ const DEV_PLACEHOLDER = /change-me|^dev-only|^wb-dev-/i;
 export function assertProductionEnv(source: EnvSource = process.env): void {
   const env = clean(source);
   const { NODE_ENV, AUTH_SECRET, EMAIL_PROVIDER, API_DEV_AUTH } = env;
-  if (NODE_ENV !== "production") return;
+  if (NODE_ENV === "development" || NODE_ENV === "test") return;
 
   const problems = new Map<string, string>();
+  if (NODE_ENV !== "production") {
+    // Never infer a safe environment from absence or a typo.
+    throw new EnvError(
+      new Map([["NODE_ENV", NODE_ENV === undefined ? "required" : "invalid value"]]),
+    );
+  }
   if (AUTH_SECRET === undefined) problems.set("AUTH_SECRET", "required");
   for (const [key, value] of Object.entries(env)) {
     if (key.endsWith("_SECRET") && value.length < MIN_SECRET) {

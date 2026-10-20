@@ -234,7 +234,12 @@ describe("/ready against a real Postgres that is stopped", () => {
 
         await pg.stop();
 
-        const down = await probeApp.request("/ready");
+        // /ready caches its result for 1 s (single-flight), so poll until the outage is visible.
+        let down = await probeApp.request("/ready");
+        for (const deadline = Date.now() + 5_000; down.status !== 503 && Date.now() < deadline;) {
+          await new Promise((resolve) => setTimeout(resolve, 250));
+          down = await probeApp.request("/ready");
+        }
         expect(down.status).toBe(503);
         const raw = await down.text();
         expect(JSON.parse(raw)).toEqual({

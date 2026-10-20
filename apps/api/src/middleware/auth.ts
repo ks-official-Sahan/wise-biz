@@ -19,7 +19,12 @@ const csv = (v: string): string[] =>
 
 /** Dev header auth is honoured only when explicitly enabled AND NODE_ENV is development/test. */
 export function devAuthEnabled(env: AuthEnv): boolean {
-  return env.API_DEV_AUTH && (env.NODE_ENV === "development" || env.NODE_ENV === "test");
+  return env.API_DEV_AUTH && isDevLike(env.NODE_ENV);
+}
+
+/** True only for exactly "development" or "test". Absence or any other value is treated as production. */
+export function isDevLike(nodeEnv: string | undefined): boolean {
+  return nodeEnv === "development" || nodeEnv === "test";
 }
 
 /** Placeholder until P0-08 (real sessions). Anonymous unless dev auth headers are valid. */

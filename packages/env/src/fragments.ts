@@ -55,7 +55,7 @@ export const emailEnv = {
 };
 
 export const observabilityEnv = {
-  NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
+  NODE_ENV: z.enum(["development", "test", "production"]),
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace"]).default("info"),
   OTEL_EXPORTER_OTLP_ENDPOINT: z.url().optional(),
   SENTRY_DSN: z.url().optional(),

@@ -104,3 +104,38 @@ describe("authorize", () => {
     expect((await build(user(["owner"]), false).request("/read")).status).toBe(500);
   });
 });
+
+describe("authorize responses never leak details", () => {
+  const leaks = ["t:sell", "maxAmount", "reason", "override", "approver", "manager", "details"];
+  const problemOf = (err: unknown): string => JSON.stringify(toProblem(err, "r"));
+
+  it("404 (not_granted) problem has no permission/reason", async () => {
+    let caught: unknown;
+    const app = build(user(["cashier"]));
+    app.onError((err, c) => {
+      caught = err;
+      return c.json({});
+    });
+    await app.request("/read");
+    await app.request("/branch");
+    expect(caught).toBeInstanceOf(DomainError);
+    const text = problemOf(caught);
+    expect(text).toContain("NOT_FOUND");
+    for (const l of ["t:read", "not_granted", "branch_out_of_scope", "reason"]) {
+      expect(text).not.toContain(l);
+    }
+  });
+
+  it("412 (condition) problem has no permission/reason/approver roles", async () => {
+    let caught: unknown;
+    const app = build(user(["cashier"]));
+    app.onError((err, c) => {
+      caught = err;
+      return c.json({});
+    });
+    await app.request("/sell/5000");
+    expect((caught as DomainError).code).toBe("PRECONDITION_FAILED");
+    const text = problemOf(caught);
+    for (const l of leaks) expect(text).not.toContain(l);
+  });
+});

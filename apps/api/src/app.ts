@@ -6,7 +6,7 @@ import { createCatalog, matrixFromRows } from "@wise-biz/policy";
 import { createErrorHandler, notFoundHandler, validationHook } from "./errors.ts";
 import { mountHealth } from "./health.ts";
 import { createLogger } from "./logger.ts";
-import { authContext } from "./middleware/auth.ts";
+import { authContext, isDevLike } from "./middleware/auth.ts";
 import { bodyLimit } from "./middleware/body-limit.ts";
 import { corsAllowlist } from "./middleware/cors.ts";
 import { requestLogger } from "./middleware/logger.ts";
@@ -42,7 +42,7 @@ export function mountableModules(
   modules: readonly WbModule[],
   nodeEnv: ApiEnv["NODE_ENV"],
 ): WbModule[] {
-  return modules.filter((m) => !(m.devOnly === true && nodeEnv === "production"));
+  return modules.filter((m) => !(m.devOnly === true && !isDevLike(nodeEnv)));
 }
 
 export function createApp(opts: CreateAppOptions): OpenAPIHono<AppEnv> {
@@ -62,8 +62,8 @@ export function createApp(opts: CreateAppOptions): OpenAPIHono<AppEnv> {
   app.use("*", requestLogger(logger, clock));
   app.use("*", tracing());
   app.use("*", securityHeaders());
-  app.use("*", bodyLimit(opts.bodyLimitBytes));
   app.use("*", corsAllowlist(env.CORS_ORIGINS));
+  app.use("*", bodyLimit(opts.bodyLimitBytes));
   app.use("*", authContext(env));
   app.use("*", tenantResolver());
   app.use("*", policyMiddleware(matrix, clock));
@@ -72,7 +72,7 @@ export function createApp(opts: CreateAppOptions): OpenAPIHono<AppEnv> {
   const deps = { pool, clock, ids: { uuidv7 } };
   for (const m of modules) m.routes(app, deps);
 
-  if (env.NODE_ENV !== "production") {
+  if (isDevLike(env.NODE_ENV)) {
     app.doc31("/openapi.json", openapiInfo);
   }
 

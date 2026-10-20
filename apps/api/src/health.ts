@@ -4,6 +4,9 @@ import type { OpenAPIHono } from "@hono/zod-openapi";
 import type { AppEnv } from "@wise-biz/module-kit";
 import type pg from "pg";
 
+/** How long a /ready result is reused. Bounds probe load to ~1 per second regardless of traffic. */
+const READY_CACHE_MS = 1000;
+
 export interface RedisLike {
   ping(): Promise<unknown>;
 }
@@ -61,19 +64,50 @@ const readyRoute = createRoute({
   },
 });
 
+/** pg honours `query_timeout` at runtime but @types/pg omits it from QueryConfig. */
+const readyQuery = (timeoutMs: number): pg.QueryConfig & { query_timeout: number } => ({
+  text: "select 1",
+  query_timeout: timeoutMs,
+});
+
+interface Checks {
+  db: "ok" | "fail";
+  redis: "ok" | "fail";
+}
+
 export function mountHealth(
   app: OpenAPIHono<AppEnv>,
   deps: { pool: Pick<pg.Pool, "query">; redis: RedisLike; timeoutMs?: number },
 ): void {
   const timeoutMs = deps.timeoutMs ?? CHECK_TIMEOUT_MS;
+  let cached: { at: number; checks: Checks } | undefined;
+  let inflight: Promise<Checks> | undefined;
+
+  // Single flight: concurrent callers share one probe; a fresh result is reused for READY_CACHE_MS.
+  const check = (): Promise<Checks> => {
+    if (cached !== undefined && Date.now() - cached.at < READY_CACHE_MS) {
+      return Promise.resolve(cached.checks);
+    }
+    inflight ??= Promise.all([
+      // query_timeout makes pg cancel the client-side wait; the redis client fails fast (no offline queue).
+      probe(() => deps.pool.query(readyQuery(timeoutMs)), timeoutMs),
+      probe(() => deps.redis.ping(), timeoutMs),
+    ])
+      .then(([db, redis]) => {
+        const checks = { db, redis };
+        cached = { at: Date.now(), checks };
+        return checks;
+      })
+      .finally(() => {
+        inflight = undefined;
+      });
+    return inflight;
+  };
+
   app.openapi(healthRoute, (c) => c.json({ status: "ok" as const }, 200));
   app.openapi(readyRoute, async (c) => {
-    const [db, redis] = await Promise.all([
-      probe(() => deps.pool.query("select 1"), timeoutMs),
-      probe(() => deps.redis.ping(), timeoutMs),
-    ]);
-    const checks = { db, redis };
-    return db === "ok" && redis === "ok"
+    const checks = await check();
+    return checks.db === "ok" && checks.redis === "ok"
       ? c.json({ status: "ready" as const, checks }, 200)
       : c.json({ status: "unavailable" as const, checks }, 503);
   });
