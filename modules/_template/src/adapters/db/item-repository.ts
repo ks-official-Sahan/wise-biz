@@ -1,5 +1,7 @@
 import { and, asc, eq, gt, sql } from "drizzle-orm";
 
+import { MAX_CHILDREN_LOOKUP } from "../../ports/item-repository.ts";
+
 import { itemChildren, items } from "./schema.ts";
 
 import type { Child } from "../../domain/item.ts";
@@ -7,7 +9,7 @@ import type { ItemRepository } from "../../ports/item-repository.ts";
 
 export const drizzleItemRepository: ItemRepository = {
   async list(tx, { tenantId, limit, after }) {
-    // Index: items_tenant_id_id_key (tenant_id, id) -> Index Scan, no sort.
+    // Index: items_pkey (tenant_id, id) -> Index Scan, no sort.
     const rows = await tx.db
       .select()
       .from(items)
@@ -24,6 +26,11 @@ export const drizzleItemRepository: ItemRepository = {
   async childrenFor(tx, tenantId, itemIds) {
     const out = new Map<string, Child[]>();
     if (itemIds.length === 0) return out;
+    if (itemIds.length > MAX_CHILDREN_LOOKUP) {
+      throw new RangeError(
+        `childrenFor: at most ${String(MAX_CHILDREN_LOOKUP)} item ids, got ${String(itemIds.length)}`,
+      );
+    }
     // Index: item_children_tenant_item_idx (tenant_id, item_id, id).
     const rows = await tx.db
       .select()
