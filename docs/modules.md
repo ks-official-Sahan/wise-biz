@@ -41,10 +41,22 @@ reporting, insights, search, loyalty, billing (metering) = event consumers only
 - P1 sale path: device writes locally → command `CompleteSale` → `sales` transaction inserts sale + lines + tenders and calls `InventoryPort.recordMovements` **in the same DB transaction** (one database while monolith). After extraction, inventory consumes `sales.sale.completed` instead. Balances are already a projection, so behavior holds.
 - Online orders call `InventoryPort.reserve` synchronously, then `commit` or `release`.
 
-## Adding a module (checklist)
+## Adding a module
 
-1. Create `modules/<name>/` with domain, application, ports, adapters.
-2. Add schema migration under `modules/<name>/migrations`. RLS policy on every table.
-3. Add contracts and event schemas to `@wise-biz/contracts`.
-4. Register routes in `apps/api`, permissions in `@wise-biz/policy`, entitlement key in `@wise-biz/entitlements`.
-5. Add a row to this table.
+Copy `modules/_template` (package `@wise-biz/module-template`, dev-only, never mounted in production). It is the reference for layout, RLS, keyset lists, `?include`, and tests.
+
+1. **Copy and rename.** `cp -r modules/_template modules/<name>`; set `name` in `package.json` (`@wise-biz/module-<name>`) and in `src/index.ts` (`defineModule({ name: "<name>", ... })`). Drop `devOnly`. Rename the Postgres schema (`template` -> `<name>`), the Drizzle `pgSchema(...)`, the route prefix (`/v1/<name>/...`), and the permissions (`definePermissions("<name>", [...])`).
+2. **Layout (hexagonal).** `domain/` pure rules (no IO, inject Clock/Ids); `application/` use cases (authorize -> validate -> idempotency -> one tx with audit + outbox); `ports/` interfaces; `adapters/db` (Drizzle only here) and `adapters/http` (Hono `createRoute`); `contracts.ts` re-exports the zod schemas.
+3. **Migration checklist** (`migrations/0001_init.sql`; never edit a merged migration, add the next number):
+   - `CREATE SCHEMA <name> AUTHORIZATION wb_migrator; GRANT USAGE ON SCHEMA <name> TO wb_app;`
+   - Every table: `id uuid PRIMARY KEY DEFAULT uuidv7()`, `tenant_id uuid NOT NULL`, `created_at timestamptz`.
+   - RLS on every table: paste the exact output of `rlsSql("<name>", "<table>")` from `@wise-biz/db` (enable + force + `tenant_isolation` policy).
+   - Indexes: `tenant_id` leads every index; unique `(tenant_id, id)` for keyset lists; an index on every FK (`(tenant_id, parent_id, id)`); partial indexes for hot filters.
+   - Child tables reference the parent with a composite FK `(tenant_id, parent_id) -> parent (tenant_id, id)` so a row can never point at another tenant's parent.
+   - Append-only tables: revoke UPDATE, DELETE and TRUNCATE from `wb_app`.
+   - Run `pnpm db:migrate && pnpm db:rls-check`; CI fails on a table without RLS.
+4. **Register.** Add the folder name to `modules/registry.json` and the module export to `apps/api/src/modules.ts`. Add the module's row to the table above.
+5. **Boundary.** Other modules import only `modules/<name>/contracts.ts` (depcruise `no-cross-module-internals`). Shared shapes and event schemas go to `@wise-biz/contracts`. Run `pnpm depcruise`.
+6. **Lists and writes.** Keyset `?limit&after` (cursor = base64url of the last id; repositories fetch `limit + 1`). `?include=` is an allowlist (others -> 422), one batched query per relation (`item_id = any($ids)`); repository methods take arrays, never loop per row. Every mutation: authorize first, validate with zod, idempotency key, then one `withTenantTx` with domain writes + audit row + outbox event.
+7. **Tests** (`test/*.test.ts`, Testcontainers Postgres via `@wise-biz/testing/containers`): create/list round trip; keyset pagination; **query-count test** with `countQueries` (list with `include` = exactly 2 queries for 50 rows, 1 without); RLS isolation (repository, raw SQL, missing tenant setting returns zero rows, cross-tenant FK rejected); `EXPLAIN` shows index scans, no `Seq Scan`.
+8. **Policy and entitlements.** Add permissions to `@wise-biz/policy` role matrices and the entitlement key to `@wise-biz/entitlements`.
