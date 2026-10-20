@@ -27,7 +27,10 @@
     "infra:logs": "docker compose -f infra/docker/compose.yaml --profile kafka logs -f --tail=100",
     "db:psql": "docker compose -f infra/docker/compose.yaml exec -e PGPASSWORD=wb_app postgres psql -U wb_app -h localhost -d wise_biz",
     "env:check": "node scripts/check-env-example.mts",
-    "licenses:check": "node scripts/check-licenses.mts"
+    "licenses:check": "node scripts/check-licenses.mts",
+    "db:migrate": "pnpm -F @wise-biz/db migrate",
+    "db:migration": "pnpm -F @wise-biz/db migration",
+    "db:rls-check": "pnpm -F @wise-biz/db rls-check"
   },
   "devDependencies": {
     "@changesets/cli": "3.0.3",
