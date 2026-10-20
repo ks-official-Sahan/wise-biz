@@ -60,3 +60,18 @@ export const observabilityEnv = {
   OTEL_EXPORTER_OTLP_ENDPOINT: z.url().optional(),
   SENTRY_DSN: z.url().optional(),
 };
+
+export const httpEnv = {
+  PORT: z.coerce.number().int().min(1).max(65535).default(3001),
+  CORS_ORIGINS: z
+    .string()
+    .default("")
+    .transform((v) =>
+      v
+        .split(",")
+        .map((o) => o.trim())
+        .filter((o) => o.length > 0),
+    ),
+  API_DEV_AUTH: z.stringbool().default(false),
+  TRUST_PROXY: z.stringbool().default(false),
+};

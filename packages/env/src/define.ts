@@ -64,7 +64,7 @@ const DEV_PLACEHOLDER = /change-me|^dev-only|^wb-dev-/i;
 /** Production-only guardrails. Pure: the secret source is a parameter. */
 export function assertProductionEnv(source: EnvSource = process.env): void {
   const env = clean(source);
-  const { NODE_ENV, AUTH_SECRET, EMAIL_PROVIDER } = env;
+  const { NODE_ENV, AUTH_SECRET, EMAIL_PROVIDER, API_DEV_AUTH } = env;
   if (NODE_ENV !== "production") return;
 
   const problems = new Map<string, string>();
@@ -78,6 +78,9 @@ export function assertProductionEnv(source: EnvSource = process.env): void {
   }
   if ((EMAIL_PROVIDER ?? "capture") === "capture") {
     problems.set("EMAIL_PROVIDER", "capture is not allowed in production");
+  }
+  if (API_DEV_AUTH !== undefined && /^(true|1|yes|on|y|enabled)$/i.test(API_DEV_AUTH)) {
+    problems.set("API_DEV_AUTH", "dev auth is not allowed in production");
   }
   if (problems.size > 0) throw new EnvError(problems);
 }

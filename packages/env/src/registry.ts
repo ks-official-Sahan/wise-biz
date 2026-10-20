@@ -2,6 +2,7 @@ import {
   authEnv,
   databaseEnv,
   emailEnv,
+  httpEnv,
   kafkaEnv,
   observabilityEnv,
   redisEnv,
@@ -20,6 +21,7 @@ export const ALL_ENV_FRAGMENTS = {
   storage: storageEnv,
   email: emailEnv,
   observability: observabilityEnv,
+  http: httpEnv,
 } as const satisfies Record<string, EnvShape>;
 
 export interface EnvKeyInfo {

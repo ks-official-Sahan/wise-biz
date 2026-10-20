@@ -12,6 +12,7 @@
             "IDEMPOTENCY_IN_PROGRESS",
             "STOCK_INSUFFICIENT",
             "ENTITLEMENT_REQUIRED",
+            "PAYLOAD_TOO_LARGE",
             "RATE_LIMITED",
             "CURRENCY_MISMATCH",
             "PRECONDITION_FAILED",

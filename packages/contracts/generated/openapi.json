@@ -1,0 +1,268 @@
+{
+  "components": {
+    "parameters": {},
+    "schemas": {
+      "Cursor": {
+        "maxLength": 512,
+        "minLength": 1,
+        "pattern": "^[A-Za-z0-9_-]+$",
+        "type": ["string", "null"]
+      },
+      "TemplateChild": {
+        "properties": {
+          "createdAt": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "id": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "label": {
+            "type": "string"
+          }
+        },
+        "required": ["id", "label", "createdAt"],
+        "type": "object"
+      },
+      "TemplateCreateItem": {
+        "properties": {
+          "children": {
+            "items": {
+              "maxLength": 1000,
+              "type": "string"
+            },
+            "maxItems": 20,
+            "type": "array"
+          },
+          "name": {
+            "maxLength": 1000,
+            "type": "string"
+          }
+        },
+        "required": ["name"],
+        "type": "object"
+      },
+      "TemplateItem": {
+        "properties": {
+          "children": {
+            "items": {
+              "$ref": "#/components/schemas/TemplateChild"
+            },
+            "type": "array"
+          },
+          "createdAt": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "id": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": ["id", "name", "createdAt"],
+        "type": "object"
+      },
+      "Timestamp": {
+        "format": "date-time",
+        "type": "string"
+      },
+      "Uuid7": {
+        "format": "uuid",
+        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+        "type": "string"
+      }
+    }
+  },
+  "info": {
+    "title": "wise-biz API",
+    "version": "1.0.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/health": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "enum": ["ok"],
+                      "type": "string"
+                    }
+                  },
+                  "required": ["status"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Process is up"
+          }
+        },
+        "summary": "Liveness"
+      }
+    },
+    "/ready": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "checks": {
+                      "properties": {
+                        "db": {
+                          "enum": ["ok", "fail"],
+                          "type": "string"
+                        },
+                        "redis": {
+                          "enum": ["ok", "fail"],
+                          "type": "string"
+                        }
+                      },
+                      "required": ["db", "redis"],
+                      "type": "object"
+                    },
+                    "status": {
+                      "enum": ["ready"],
+                      "type": "string"
+                    }
+                  },
+                  "required": ["status", "checks"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Dependencies reachable"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "checks": {
+                      "properties": {
+                        "db": {
+                          "enum": ["ok", "fail"],
+                          "type": "string"
+                        },
+                        "redis": {
+                          "enum": ["ok", "fail"],
+                          "type": "string"
+                        }
+                      },
+                      "required": ["db", "redis"],
+                      "type": "object"
+                    },
+                    "status": {
+                      "enum": ["unavailable"],
+                      "type": "string"
+                    }
+                  },
+                  "required": ["status", "checks"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "A dependency is unavailable"
+          }
+        },
+        "summary": "Readiness (database and redis)"
+      }
+    },
+    "/v1/template/items": {
+      "get": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "pattern": "^\\d{1,6}$",
+                  "type": "string"
+                }
+              ],
+              "default": 50
+            }
+          },
+          {
+            "in": "query",
+            "name": "after",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "include",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "items": {
+                      "items": {
+                        "$ref": "#/components/schemas/TemplateItem"
+                      },
+                      "type": "array"
+                    },
+                    "nextCursor": {
+                      "$ref": "#/components/schemas/Cursor"
+                    }
+                  },
+                  "required": ["items", "nextCursor"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Page of items"
+          }
+        },
+        "summary": "List items (keyset). ?include=children expands children in one batched query.",
+        "tags": ["template"]
+      },
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TemplateCreateItem"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TemplateItem"
+                }
+              }
+            },
+            "description": "Created"
+          }
+        },
+        "summary": "Create an item with optional children",
+        "tags": ["template"]
+      }
+    }
+  },
+  "webhooks": {}
+}

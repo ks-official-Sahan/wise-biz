@@ -26,6 +26,7 @@ export const ERROR_CODES = Object.freeze({
     title: "Plan upgrade required",
     slug: "entitlement-required",
   },
+  PAYLOAD_TOO_LARGE: { status: 413, title: "Payload too large", slug: "payload-too-large" },
   RATE_LIMITED: { status: 429, title: "Too many requests", slug: "rate-limited" },
   CURRENCY_MISMATCH: { status: 422, title: "Currency mismatch", slug: "money/currency-mismatch" },
   PRECONDITION_FAILED: { status: 412, title: "Precondition failed", slug: "precondition-failed" },

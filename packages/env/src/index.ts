@@ -7,6 +7,7 @@ export {
   authEnv,
   databaseEnv,
   emailEnv,
+  httpEnv,
   kafkaEnv,
   observabilityEnv,
   redisEnv,

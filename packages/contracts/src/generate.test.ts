@@ -3,11 +3,14 @@ import { describe, expect, it } from "vitest";
 import { generate } from "./generate.ts";
 
 // Committed generator output, keyed like generate(): path relative to generated/.
-const committed = import.meta.glob<string>("../generated/**/*.json", {
-  query: "?raw",
-  import: "default",
-  eager: true,
-});
+const committed = import.meta.glob<string>(
+  ["../generated/**/*.json", "!../generated/openapi.json"],
+  {
+    query: "?raw",
+    import: "default",
+    eager: true,
+  },
+);
 const onDisk = Object.fromEntries(
   Object.entries(committed).map(([p, c]) => [p.replace("../generated/", ""), c]),
 );

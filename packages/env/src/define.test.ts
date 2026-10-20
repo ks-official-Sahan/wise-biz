@@ -8,6 +8,7 @@ import {
   databaseEnv,
   defineEnv,
   emailEnv,
+  httpEnv,
   kafkaEnv,
   observabilityEnv,
   redisEnv,
@@ -166,6 +167,38 @@ describe("assertProductionEnv", () => {
     expect(() => {
       assertProductionEnv({ ...ok, EMAIL_PROVIDER: undefined });
     }).toThrow(/EMAIL_PROVIDER/);
+  });
+});
+
+describe("httpEnv", () => {
+  it("applies defaults and parses lists/bools", () => {
+    const d = defineEnv(httpEnv, {});
+    expect(d.PORT).toBe(3001);
+    expect(d.CORS_ORIGINS).toEqual([]);
+    expect(d.API_DEV_AUTH).toBe(false);
+    expect(d.TRUST_PROXY).toBe(false);
+    const e = defineEnv(httpEnv, {
+      PORT: "8080",
+      CORS_ORIGINS: "http://a.test, http://b.test",
+      API_DEV_AUTH: "true",
+    });
+    expect(e.PORT).toBe(8080);
+    expect(e.CORS_ORIGINS).toEqual(["http://a.test", "http://b.test"]);
+    expect(e.API_DEV_AUTH).toBe(true);
+  });
+
+  it("production rejects API_DEV_AUTH=true", () => {
+    const prod = {
+      NODE_ENV: "production",
+      AUTH_SECRET: "x".repeat(40),
+      EMAIL_PROVIDER: "smtp",
+    };
+    expect(() => {
+      assertProductionEnv({ ...prod, API_DEV_AUTH: "true" });
+    }).toThrow(/API_DEV_AUTH/);
+    expect(() => {
+      assertProductionEnv({ ...prod, API_DEV_AUTH: "false" });
+    }).not.toThrow();
   });
 });
 
