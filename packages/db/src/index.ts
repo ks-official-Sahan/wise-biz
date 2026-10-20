@@ -7,3 +7,13 @@ export { MIGRATE_LOCK_KEY, listMigrations, migrate } from "./migrator.ts";
 export type { AppliedMigration, ModuleEntry } from "./migrator.ts";
 export { loadRegistry } from "./registry.ts";
 export { countQueries, instrumentPool } from "./query-counter.ts";
+export { appendOutbox } from "./infra/outbox.ts";
+export type { OutboxEvent } from "./infra/outbox.ts";
+export {
+  bumpAttempts,
+  claimOutboxBatch,
+  markPublished,
+  recordDeadLetter,
+  recordProcessed,
+} from "./infra/relay.ts";
+export type { OutboxKey, OutboxRow } from "./infra/relay.ts";

@@ -1,1 +1,1 @@
-{ "modules": ["_template"] }
+{ "modules": ["infra", "_template"] }
