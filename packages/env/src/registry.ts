@@ -7,6 +7,7 @@ import {
   observabilityEnv,
   redisEnv,
   storageEnv,
+  workerEnv,
 } from "./fragments.ts";
 
 import type { z } from "zod";
@@ -22,6 +23,7 @@ export const ALL_ENV_FRAGMENTS = {
   email: emailEnv,
   observability: observabilityEnv,
   http: httpEnv,
+  worker: workerEnv,
 } as const satisfies Record<string, EnvShape>;
 
 export interface EnvKeyInfo {

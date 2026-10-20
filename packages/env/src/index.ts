@@ -12,6 +12,7 @@ export {
   observabilityEnv,
   redisEnv,
   storageEnv,
+  workerEnv,
 } from "./fragments.ts";
 export { ALL_ENV_FRAGMENTS, envKeys } from "./registry.ts";
 export type { EnvKeyInfo, EnvShape } from "./registry.ts";

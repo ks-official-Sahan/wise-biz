@@ -13,6 +13,7 @@ import {
   observabilityEnv,
   redisEnv,
   storageEnv,
+  workerEnv,
 } from "./index.ts";
 
 const SECRET = "sup3r-s3cret-value-that-must-never-leak";
@@ -215,6 +216,21 @@ describe("httpEnv", () => {
     expect(() => {
       assertProductionEnv({ ...prod, API_DEV_AUTH: "false" });
     }).not.toThrow();
+  });
+});
+
+describe("workerEnv", () => {
+  const url = "postgres://wb_worker:wb_worker@localhost:5432/wise_biz";
+  it("requires the worker URL and defaults tuning", () => {
+    expect(() => defineEnv(workerEnv, {})).toThrow(/DATABASE_WORKER_URL/);
+    const d = defineEnv(workerEnv, { DATABASE_WORKER_URL: url });
+    expect(d.WORKER_RELAY_BATCH).toBe(500);
+    expect(d.WORKER_IDLE_MS).toBe(250);
+  });
+  it("bounds tuning", () => {
+    expect(() =>
+      defineEnv(workerEnv, { DATABASE_WORKER_URL: url, WORKER_RELAY_BATCH: "0" }),
+    ).toThrow(/WORKER_RELAY_BATCH/);
   });
 });
 

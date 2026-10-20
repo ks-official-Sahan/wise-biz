@@ -75,3 +75,9 @@ export const httpEnv = {
   API_DEV_AUTH: z.stringbool().default(false),
   TRUST_PROXY: z.stringbool().default(false),
 };
+
+export const workerEnv = {
+  DATABASE_WORKER_URL: pgUrl,
+  WORKER_RELAY_BATCH: z.coerce.number().int().min(1).max(5000).default(500),
+  WORKER_IDLE_MS: z.coerce.number().int().min(10).max(60_000).default(250),
+};
