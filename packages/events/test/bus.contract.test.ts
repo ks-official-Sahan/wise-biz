@@ -200,7 +200,9 @@ describe.each(adapters)("EventBus contract: %s", (_name, make) => {
         },
       }),
     );
-    await bus.publish([bad, ok]);
+    const res = await bus.publish([bad, ok]);
+    expect(res.failed).toEqual([]);
+    expect(res.delivered.map((d) => d.id)).toEqual([bad.id, ok.id]); // parked = delivered
     expect(good).toEqual([bad.id, ok.id]);
     const dl = (await deadLetters()).filter((d) => d.consumer === name);
     expect(dl).toHaveLength(1);

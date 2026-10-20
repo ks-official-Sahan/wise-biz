@@ -4,7 +4,7 @@ import { ConsumerRouter } from "./router.ts";
 import type { EventBus } from "./bus.ts";
 import type { ConsumerContext, ConsumerDefinition } from "./consumer.ts";
 import type { BackoffOptions } from "./deliver.ts";
-import type { BusLogger, EventMessage, OnMetric } from "./message.ts";
+import type { BusLogger, EventMessage, EventRef, OnMetric, PublishResult } from "./message.ts";
 import type { PoolClient } from "pg";
 
 export type DeadLetter = Readonly<{
@@ -36,12 +36,13 @@ export function createMemoryBus(
   const processed = new Set<string>();
   const deadLetters: DeadLetter[] = [];
   let stopped = false;
-  const inflight = new Set<Promise<void>>();
+  const inflight = new Set<Promise<PublishResult>>();
 
-  async function run(event: EventMessage): Promise<void> {
+  async function run(event: EventMessage): Promise<boolean> {
+    let ok = true;
     for (const consumer of router.match(event.type, event.version)) {
       const pk = `${event.tenantId}\u0000${consumer.name}\u0000${event.id}`;
-      await deliver(
+      const r = await deliver(
         { logger, onMetric: opts.onMetric, backoff: opts.backoff },
         consumer,
         event,
@@ -63,7 +64,9 @@ export function createMemoryBus(
           return Promise.resolve();
         },
       );
+      if (r === "failed") ok = false;
     }
+    return ok;
   }
 
   return {
@@ -73,12 +76,17 @@ export function createMemoryBus(
     },
     publish: async (batch) => {
       if (stopped) throw new Error("event bus stopped");
-      const p = (async () => {
-        for (const e of batch) await run(e);
+      const p = (async (): Promise<PublishResult> => {
+        const delivered: EventRef[] = [];
+        const failed: EventRef[] = [];
+        for (const e of batch) {
+          ((await run(e)) ? delivered : failed).push({ tenantId: e.tenantId, id: e.id });
+        }
+        return { delivered, failed };
       })();
       inflight.add(p);
       try {
-        await p;
+        return await p;
       } finally {
         inflight.delete(p);
       }

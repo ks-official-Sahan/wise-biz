@@ -23,4 +23,19 @@ describe("logger", () => {
     expect(serializeErr("plain")).toBe("plain");
     expect(createLogger()).toBeDefined();
   });
+
+  it("redacts email and phone fields", () => {
+    let out = "";
+    const sink = new Writable({
+      write(chunk: Buffer, _enc, cb) {
+        out += chunk.toString();
+        cb();
+      },
+    });
+    createLogger("info", sink).info(
+      { email: "a@b.c", customer: { phone: "+15550001", phoneNumber: "+15550002" } },
+      "x",
+    );
+    expect(out).not.toMatch(/a@b\.c|\+1555000/);
+  });
 });

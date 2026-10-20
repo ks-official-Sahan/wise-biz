@@ -31,7 +31,12 @@ export function startWorker(
     applicationName: "wb-workers",
   });
   if (env.NODE_ENV !== "production") instrumentPool(pool);
-  const bus = createPgBus({ pool, logger, onMetric });
+  const bus = createPgBus({
+    pool,
+    logger,
+    onMetric,
+    handlerTimeoutMs: env.WORKER_HANDLER_TIMEOUT_MS,
+  });
   for (const c of consumers) bus.subscribe(c);
   const relay = createRelay({
     pool,
@@ -39,6 +44,8 @@ export function startWorker(
     logger,
     batchSize: env.WORKER_RELAY_BATCH,
     idleMs: env.WORKER_IDLE_MS,
+    leaseMs: env.WORKER_LEASE_MS,
+    maxAttempts: env.WORKER_MAX_ATTEMPTS,
     onMetric,
   });
   relay.start();

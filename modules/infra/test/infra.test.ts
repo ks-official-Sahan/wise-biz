@@ -45,14 +45,14 @@ describe("infra schema", () => {
     expect(r.rows[0]).toEqual({ rolsuper: false, rolbypassrls: false });
   });
 
-  it("claim query uses outbox_unpublished_idx with 10k published + 600 unpublished rows", async () => {
+  it("claim statement uses outbox_unpublished_idx with 300k published + 600 unpublished rows", async () => {
     const T = "0190a000-0000-7000-8000-000000000001";
     await migrator.query("select set_config('app.tenant_id', $1, false)", [T]);
     await migrator.query(
       `insert into infra.outbox (tenant_id,id,topic,key,type,version,payload,created_at,published_at)
-       select $1, uuidv7(), 't','k','t',1,'{}', now() - make_interval(secs => 20000 - g),
-              case when g <= 10000 then now() end
-         from generate_series(1, 10600) g`,
+       select $1, uuidv7(), 't','k','t',1,'{}', now() - make_interval(secs => 400000 - g),
+              case when g <= 300000 then now() end
+         from generate_series(1, 300600) g`,
       [T],
     );
     await migrator.query("analyze infra.outbox");
@@ -61,9 +61,13 @@ describe("infra schema", () => {
       await c.query("begin");
       const r = await c.query<{ "QUERY PLAN": { Plan: PlanNode }[] }>(
         `explain (analyze, buffers, format json)
-         select tenant_id, id, topic, key, type, version, payload, headers, created_at, attempts
-           from infra.outbox where published_at is null order by created_at, id limit 500
-           for update skip locked`,
+         update infra.outbox o
+            set claimed_until = now() + make_interval(secs => 300), claimed_by = 'w', attempts = o.attempts + 1
+           from (select tenant_id, id from infra.outbox
+                  where published_at is null and quarantined_at is null and attempts < 10
+                    and (claimed_until is null or claimed_until < now())
+                  order by created_at, id limit 500 for update skip locked) c
+          where o.tenant_id = c.tenant_id and o.id = c.id returning o.*`,
       );
       const plan = r.rows[0]?.["QUERY PLAN"][0]?.Plan;
       if (!plan) throw new Error("no plan");

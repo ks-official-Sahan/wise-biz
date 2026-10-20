@@ -24,7 +24,13 @@ export type MetricName =
   | "dead_letter"
   | "relay_batch"
   | "relay_lag_ms"
-  | "relay_error";
+  | "relay_error"
+  | "relay_quarantined"
+  | "relay_pruned_outbox"
+  | "relay_pruned_processed"
+  | "relay_maintenance_error"
+  | "relay_loop_error"
+  | "dead_letter_failed";
 export type OnMetric = (name: MetricName, value: number, labels: Labels) => void;
 
 /** Structural subset of a pino logger (pino's Logger satisfies it). */
@@ -33,3 +39,12 @@ export interface BusLogger {
   warn(obj: object, msg?: string): void;
   error(obj: object, msg?: string): void;
 }
+
+/** Identity of an event (the outbox primary key). */
+export type EventRef = Readonly<{ tenantId: string; id: string }>;
+
+/** Per-event outcome of `EventBus.publish`. `failed` events must be retried by the caller. */
+export type PublishResult = Readonly<{
+  delivered: readonly EventRef[];
+  failed: readonly EventRef[];
+}>;

@@ -10,10 +10,13 @@ export { countQueries, instrumentPool } from "./query-counter.ts";
 export { appendOutbox } from "./infra/outbox.ts";
 export type { OutboxEvent } from "./infra/outbox.ts";
 export {
-  bumpAttempts,
   claimOutboxBatch,
   markPublished,
+  pruneOutbox,
+  pruneProcessedEvents,
+  quarantineExhausted,
   recordDeadLetter,
   recordProcessed,
+  releaseClaims,
 } from "./infra/relay.ts";
 export type { OutboxKey, OutboxRow } from "./infra/relay.ts";

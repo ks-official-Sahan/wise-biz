@@ -130,6 +130,29 @@ describe("assertProductionEnv", () => {
     }
   });
 
+  it("rejects dev-default database passwords without echoing them", () => {
+    const urls = {
+      DATABASE_URL: "postgres://wb_app:wb_app@db:5432/x",
+      DATABASE_MIGRATOR_URL: "postgres://wb_migrator:wb_migrator@db:5432/x",
+      DATABASE_WORKER_URL: "postgres://wb_worker:wb_worker@db:5432/x",
+    };
+    try {
+      assertProductionEnv({ ...ok, ...urls });
+      expect.unreachable();
+    } catch (error) {
+      const keys = (error as EnvError).keys;
+      expect(keys).toEqual(Object.keys(urls).sort());
+      expect(String(error)).not.toMatch(/wb_app:wb_app|wb_worker:wb_worker/);
+    }
+    expect(() => {
+      assertProductionEnv({
+        ...ok,
+        DATABASE_URL: "postgres://wb_app:s3cr3t-prod-pw@db:5432/x",
+        DATABASE_WORKER_URL: "not a url",
+      });
+    }).not.toThrow();
+  });
+
   it("is a no-op in development and test", () => {
     expect(() => {
       assertProductionEnv({ NODE_ENV: "development", AUTH_SECRET: "a" });

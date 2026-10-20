@@ -64,6 +64,23 @@ export function defineEnv<S extends z.ZodRawShape>(
 /** Values shipped in .env.example; production must never run with them. */
 const DEV_PLACEHOLDER = /change-me|^dev-only|^wb-dev-/i;
 
+/** Dev-default role passwords from the local docker setup (password == role name). */
+const DEV_DB_PASSWORDS: Readonly<Record<string, string>> = {
+  DATABASE_URL: "wb_app",
+  DATABASE_MIGRATOR_URL: "wb_migrator",
+  DATABASE_WORKER_URL: "wb_worker",
+};
+
+function hasDevDbPassword(key: string, value: string): boolean {
+  const dev = DEV_DB_PASSWORDS[key];
+  if (dev === undefined) return false;
+  try {
+    return decodeURIComponent(new URL(value).password) === dev;
+  } catch {
+    return false; // unparseable: defineEnv reports the format error; never echo it
+  }
+}
+
 /** Production-only guardrails. Pure: the secret source is a parameter. */
 export function assertProductionEnv(source: EnvSource = process.env): void {
   const env = clean(source);
@@ -83,6 +100,11 @@ export function assertProductionEnv(source: EnvSource = process.env): void {
       problems.set(key, `too short (min ${String(MIN_SECRET)})`);
     } else if (/_SECRET|_KEY$|_PASSWORD$/.test(key) && DEV_PLACEHOLDER.test(value)) {
       problems.set(key, "dev placeholder from .env.example is not allowed in production");
+    }
+  }
+  for (const [key, value] of Object.entries(env)) {
+    if (hasDevDbPassword(key, value)) {
+      problems.set(key, "dev database password is not allowed in production");
     }
   }
   if ((EMAIL_PROVIDER ?? "capture") === "capture") {

@@ -16,6 +16,9 @@ const SECRET_KEYS = [
   "apiKey",
   "session",
   "otp",
+  "email",
+  "phone",
+  "phoneNumber",
 ];
 const PREFIXES = ["", "*.", "*.*.", "*.*.*."];
 

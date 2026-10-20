@@ -104,11 +104,47 @@ describe("appendOutbox", () => {
     }
   });
 
-  it("wb_worker may only update published_at and attempts", async () => {
+  it("rejects oversize payload/headers, bad header names and long fields client-side", async () => {
+    await withTenantTx(app, ctx(B), async (tx) => {
+      const big = { s: "x".repeat(262_144) };
+      await expect(appendOutbox(tx, [event({ payload: big })])).rejects.toThrow(TypeError);
+      await expect(appendOutbox(tx, [event({ headers: { h: "x".repeat(9000) } })])).rejects.toThrow(
+        TypeError,
+      );
+      for (const h of ["Upper", "tenant-id", "event-id", "a_b", "x".repeat(65)])
+        await expect(appendOutbox(tx, [event({ headers: { [h]: "v" } })])).rejects.toThrow(
+          TypeError,
+        );
+      await expect(appendOutbox(tx, [event({ topic: "t".repeat(201) })])).rejects.toThrow(
+        TypeError,
+      );
+      await expect(appendOutbox(tx, [event({ key: "k".repeat(501) })])).rejects.toThrow(TypeError);
+    });
+  });
+
+  it("DB CHECKs reject oversize rows that bypass the client", async () => {
+    const ins = (col: string, v: string) =>
+      withTenantTx(app, ctx(B), (tx) =>
+        tx.query(
+          `insert into infra.outbox (tenant_id,id,topic,key,type,version,payload,headers)
+           values (nullif(current_setting('app.tenant_id', true), '')::uuid,$1,'t','k','t',1,
+                   ${col === "payload" ? "$2::jsonb" : "'{}'"}, ${col === "headers" ? "$2::jsonb" : "'{}'"})`,
+          [uuid7(), v],
+        ),
+      );
+    // random-ish content so TOAST compression cannot shrink it below the limit
+    const noise = Array.from({ length: 40_000 }, (_, i) => (i * 2654435761).toString(36)).join("");
+    await expect(ins("payload", JSON.stringify({ s: noise }))).rejects.toThrow(/check constraint/);
+    await expect(ins("headers", JSON.stringify({ s: noise.slice(0, 20_000) }))).rejects.toThrow(
+      /check constraint/,
+    );
+  });
+
+  it("wb_worker may only update relay columns, may delete, never insert", async () => {
     await expect(worker.query("update infra.outbox set topic = 'x'")).rejects.toThrow(
       /permission denied/,
     );
-    await expect(worker.query("delete from infra.outbox")).rejects.toThrow(/permission denied/);
+    await expect(worker.query("delete from infra.outbox where false")).resolves.toBeDefined();
     await expect(
       worker.query(
         "insert into infra.outbox (tenant_id,id,topic,key,type,version,payload) values ($1,$2,'t','k','t',1,'{}')",

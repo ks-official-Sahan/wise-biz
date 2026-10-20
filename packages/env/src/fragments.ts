@@ -80,4 +80,7 @@ export const workerEnv = {
   DATABASE_WORKER_URL: pgUrl,
   WORKER_RELAY_BATCH: z.coerce.number().int().min(1).max(5000).default(500),
   WORKER_IDLE_MS: z.coerce.number().int().min(10).max(60_000).default(250),
+  WORKER_LEASE_MS: z.coerce.number().int().min(1000).max(3_600_000).default(300_000),
+  WORKER_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(1000).default(10),
+  WORKER_HANDLER_TIMEOUT_MS: z.coerce.number().int().min(100).max(600_000).default(30_000),
 };

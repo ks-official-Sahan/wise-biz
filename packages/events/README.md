@@ -7,7 +7,11 @@
   (false = duplicate, skip) -> handler (same tx via `ctx.client`) -> `COMMIT`. Throw -> `ROLLBACK`, retry with
   exponential backoff (100 ms x2, jittered, `maxAttempts` total, default 3), then `infra.dead_letters`
   (message only, 1000 chars) and carry on with the rest of the batch. If the dead-letter write itself fails,
-  `publish` throws so the relay retries the batch (idempotency makes that safe).
+  that event is reported in `publish(...).failed` (the relay releases it and retries; idempotency makes that safe).
+  Each tx sets `app.tenant_id` / `app.request_id` (consumers run as wb_worker but tenant-scoped), `statement_timeout`
+  and a hard timer (`handlerTimeoutMs`, default 30 s; a timed-out connection is destroyed). COMMIT is verified:
+  an aborted tx (handler swallowed a SQL error) counts as a failed attempt.
+- `publish` returns `{ delivered, failed }` (event refs). Log/metric hooks are wrapped so they can never change delivery.
 - Metrics: `onMetric(name, value, labels)` for `processed | duplicate | retry | dead_letter` (+ relay metrics).
 
 ## Writing a consumer
