@@ -194,7 +194,8 @@ describe("loadRegistry", () => {
     }
     const outside = await mkdtemp(join(tmpdir(), "wbout-"));
     await mkdir(join(root, "modules", "evil"));
-    await symlink(outside, join(root, "modules", "evil", "migrations"));
+    // "junction" works on Windows without admin/Developer Mode; ignored on POSIX.
+    await symlink(outside, join(root, "modules", "evil", "migrations"), "junction");
     await reg(["evil"]);
     await expect(loadRegistry(root)).rejects.toThrow(/outside/);
     // a real dir inside is fine
