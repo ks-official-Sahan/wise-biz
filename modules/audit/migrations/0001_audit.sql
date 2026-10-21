@@ -1,7 +1,8 @@
--- audit: append-only, hash-chained audit log (security.md "Audit", ADR 0008 async chaining).
+-- audit: append-only, hash-chained audit log (security.md "Audit", ADR 0009 async chaining).
 --
 -- Roles
---   wb_app      INSERT only, inside the mutation transaction (no SELECT/UPDATE/DELETE/TRUNCATE).
+--   wb_app      INSERT only, inside the mutation transaction (no SELECT/UPDATE/DELETE/TRUNCATE). The grant is
+--               column-level and EXCLUDES id, at, chain_seq, prev_hash, hash (identity/default/server-filled only).
 --   wb_chainer  (apps/workers audit-chainer, NOBYPASSRLS) reads across tenants through `chainer_*` policies and may
 --               fill chain_seq/prev_hash/hash exactly once per row (column grant + trigger). Never DELETE.
 --   wb_migrator owns everything; partition DDL (create/detach/drop) is owner-only.
@@ -14,6 +15,15 @@
 --   { id: text(identity id), publicId: uuid text, tenantId: uuid text, actorType, actorId, action, entity,
 --     entityId|null, before|null, after|null, reason|null, ip|null (host(ip), no mask), deviceId|null (uuid text),
 --     requestId, at: UTC ISO-8601 with microseconds "YYYY-MM-DDTHH24:MI:SS.USZ" }
+--
+-- Server time: a BEFORE INSERT trigger rejects pre-set chain columns and forces `at := now()` (transaction start, i.e.
+-- the same instant as the column default), so no role can backdate or forge a row. A superuser that must load history
+-- (restore, test seeding) does so with `SET session_replication_role = replica`, which skips the trigger.
+--
+-- Partitions: monthly, attached via ATTACH PARTITION (SHARE UPDATE EXCLUSIVE on the parent, so concurrent INSERTs are
+-- not blocked). There is deliberately NO DEFAULT partition: it would be scanned/locked on every ATTACH, would block
+-- DETACH ... CONCURRENTLY of old months, and would silently absorb rows when the partition job is down, hiding the
+-- gap. A missing partition fails the INSERT loudly instead; audit.partition_horizon_months() feeds a worker gauge.
 --
 -- Rule exceptions: the PK includes the partition key (`at`), so (tenant_id, chain_seq) cannot be a unique index on a
 -- partitioned table; uniqueness of chain_seq per tenant is guaranteed by the chainer (single writer per tenant under
@@ -64,11 +74,27 @@ BEGIN
   IF NEW.hash IS NULL OR NEW.chain_seq IS NULL OR NEW.prev_hash IS NULL THEN
     RAISE EXCEPTION 'audit.audit_log is append-only: UPDATE may only set chain_seq, prev_hash and hash' USING ERRCODE = 'insufficient_privilege';
   END IF;
-  IF (to_jsonb(NEW) - '{chain_seq,prev_hash,hash}'::text[]) IS DISTINCT FROM (to_jsonb(OLD) - '{chain_seq,prev_hash,hash}'::text[]) THEN
+  IF NOT (ROW(OLD.id, OLD.public_id, OLD.tenant_id, OLD.actor_type, OLD.actor_id, OLD.action, OLD.entity, OLD.entity_id,
+              OLD.before, OLD.after, OLD.reason, OLD.ip, OLD.device_id, OLD.request_id, OLD.at)
+          IS NOT DISTINCT FROM
+          ROW(NEW.id, NEW.public_id, NEW.tenant_id, NEW.actor_type, NEW.actor_id, NEW.action, NEW.entity, NEW.entity_id,
+              NEW.before, NEW.after, NEW.reason, NEW.ip, NEW.device_id, NEW.request_id, NEW.at)) THEN
     RAISE EXCEPTION 'audit.audit_log is append-only: only chain_seq, prev_hash and hash may change' USING ERRCODE = 'insufficient_privilege';
   END IF;
   RETURN NEW;
 END $$;
+
+-- Insert guard: chain columns are chainer-owned and `at` is server time.
+CREATE FUNCTION audit.audit_log_insert_guard() RETURNS trigger LANGUAGE plpgsql SET search_path = pg_catalog AS $$
+BEGIN
+  IF NEW.chain_seq IS NOT NULL OR NEW.prev_hash IS NOT NULL OR NEW.hash IS NOT NULL THEN
+    RAISE EXCEPTION 'audit.audit_log: chain_seq, prev_hash and hash must not be supplied on INSERT' USING ERRCODE = 'insufficient_privilege';
+  END IF;
+  NEW.at := now();
+  RETURN NEW;
+END $$;
+CREATE TRIGGER audit_log_insert_guard BEFORE INSERT ON audit.audit_log
+  FOR EACH ROW EXECUTE FUNCTION audit.audit_log_insert_guard();
 
 -- Row trigger on the partitioned parent is cloned onto every partition (including future ones).
 CREATE TRIGGER audit_log_guard BEFORE UPDATE OR DELETE ON audit.audit_log
@@ -81,14 +107,17 @@ CREATE POLICY chainer_select ON audit.audit_log FOR SELECT TO wb_chainer USING (
 CREATE POLICY chainer_update ON audit.audit_log FOR UPDATE TO wb_chainer USING (true) WITH CHECK (true);
 
 REVOKE ALL ON audit.audit_log FROM PUBLIC, wb_app, wb_chainer;
-GRANT INSERT ON audit.audit_log TO wb_app;
+GRANT INSERT (tenant_id, public_id, actor_type, actor_id, action, entity, entity_id, before, after, reason, ip, device_id, request_id) ON audit.audit_log TO wb_app;
 GRANT SELECT ON audit.audit_log TO wb_chainer;
 GRANT UPDATE (chain_seq, prev_hash, hash) ON audit.audit_log TO wb_chainer;
 
 -- Partition maintenance. SECURITY DEFINER (owner wb_migrator) so the chainer role can create partitions without
 -- owning the table. Idempotent; returns how many partitions it created. Months are UTC.
+-- Each month is built standalone (LIKE parent) and then ATTACHed: ATTACH takes only SHARE UPDATE EXCLUSIVE on the
+-- parent (CREATE ... PARTITION OF takes ACCESS EXCLUSIVE and would stall every audit INSERT). The attach creates the
+-- parent's indexes on the (empty) partition and clones the row triggers; lock_timeout bounds any wait.
 CREATE FUNCTION audit.ensure_partitions(months_ahead int) RETURNS int
-LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, pg_temp SET lock_timeout = '5s' AS $$
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS $$
 DECLARE
   i int;
   lo timestamptz;
@@ -100,14 +129,14 @@ BEGIN
   IF months_ahead IS NULL OR months_ahead < 0 OR months_ahead > 24 THEN
     RAISE EXCEPTION 'ensure_partitions: months_ahead must be between 0 and 24';
   END IF;
+  SET LOCAL lock_timeout = '5s';
   PERFORM pg_advisory_xact_lock(hashtextextended('audit.ensure_partitions', 0));
   FOR i IN 0..months_ahead LOOP
     lo := (date_trunc('month', timezone('UTC', now())) + make_interval(months => i)) AT TIME ZONE 'UTC';
     hi := (date_trunc('month', timezone('UTC', now())) + make_interval(months => i + 1)) AT TIME ZONE 'UTC';
     part := 'audit_log_' || to_char(timezone('UTC', lo), '"y"YYYY"m"MM');
     IF to_regclass(format('audit.%I', part)) IS NULL THEN
-      EXECUTE format('CREATE TABLE audit.%I PARTITION OF audit.audit_log FOR VALUES FROM (%L) TO (%L)',
-        part, to_char(timezone('UTC', lo), 'YYYY-MM-DD HH24:MI:SS') || '+00', to_char(timezone('UTC', hi), 'YYYY-MM-DD HH24:MI:SS') || '+00');
+      EXECUTE format('CREATE TABLE audit.%I (LIKE audit.audit_log INCLUDING DEFAULTS INCLUDING CONSTRAINTS)', part);
       -- A direct query on a partition ignores the parent's policies: each partition carries its own.
       EXECUTE format('ALTER TABLE audit.%I ENABLE ROW LEVEL SECURITY', part);
       EXECUTE format('ALTER TABLE audit.%I FORCE ROW LEVEL SECURITY', part);
@@ -115,9 +144,11 @@ BEGIN
       EXECUTE format('CREATE POLICY chainer_select ON audit.%I FOR SELECT TO wb_chainer USING (true)', part);
       EXECUTE format('CREATE POLICY chainer_update ON audit.%I FOR UPDATE TO wb_chainer USING (true) WITH CHECK (true)', part);
       EXECUTE format('REVOKE ALL ON audit.%I FROM PUBLIC, wb_app, wb_chainer', part);
-      EXECUTE format('GRANT INSERT ON audit.%I TO wb_app', part);
+      EXECUTE format('GRANT INSERT (tenant_id, public_id, actor_type, actor_id, action, entity, entity_id, before, after, reason, ip, device_id, request_id) ON audit.%I TO wb_app', part);
       EXECUTE format('GRANT SELECT ON audit.%I TO wb_chainer', part);
       EXECUTE format('GRANT UPDATE (chain_seq, prev_hash, hash) ON audit.%I TO wb_chainer', part);
+      EXECUTE format('ALTER TABLE audit.audit_log ATTACH PARTITION audit.%I FOR VALUES FROM (%L) TO (%L)',
+        part, to_char(timezone('UTC', lo), 'YYYY-MM-DD HH24:MI:SS') || '+00', to_char(timezone('UTC', hi), 'YYYY-MM-DD HH24:MI:SS') || '+00');
       created := created + 1;
     END IF;
   END LOOP;
@@ -126,7 +157,23 @@ END $$;
 REVOKE ALL ON FUNCTION audit.ensure_partitions(int) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION audit.ensure_partitions(int) TO wb_chainer;
 
-SELECT audit.ensure_partitions(3);
+-- Consecutive full future months (starting next month) that already have a partition. STABLE, invoker rights; export
+-- as a gauge and alert when it drops below the job's months_ahead minus a month or two.
+CREATE FUNCTION audit.partition_horizon_months() RETURNS int
+LANGUAGE plpgsql STABLE SET search_path = pg_catalog, pg_temp AS $$
+DECLARE
+  n int := 0;
+BEGIN
+  WHILE n < 120 AND to_regclass(format('audit.%I',
+      'audit_log_' || to_char(date_trunc('month', timezone('UTC', now())) + make_interval(months => n + 1), '"y"YYYY"m"MM'))) IS NOT NULL LOOP
+    n := n + 1;
+  END LOOP;
+  RETURN n;
+END $$;
+REVOKE ALL ON FUNCTION audit.partition_horizon_months() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION audit.partition_horizon_months() TO wb_chainer;
+
+SELECT audit.ensure_partitions(6);
 
 -- Chainer cursor: last assigned chain_seq and head hash per tenant. Row lock = per-tenant chainer mutex.
 CREATE TABLE audit.chain_heads (

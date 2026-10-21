@@ -17,7 +17,7 @@ CREATE TABLE infra.idempotency_keys (
   created_at timestamptz NOT NULL DEFAULT now(),
   expires_at timestamptz NOT NULL,
   CONSTRAINT idempotency_keys_pkey PRIMARY KEY (tenant_id, key)
-);
+) WITH (autovacuum_vacuum_scale_factor = 0.02); -- high churn: vacuum at 2% dead rows, not 20%
 CREATE INDEX idempotency_keys_expires_idx ON infra.idempotency_keys (expires_at);
 
 ALTER TABLE "infra"."idempotency_keys" ENABLE ROW LEVEL SECURITY;

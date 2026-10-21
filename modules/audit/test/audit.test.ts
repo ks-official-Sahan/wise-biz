@@ -99,6 +99,59 @@ describe("chainer loop", () => {
   });
 });
 
+describe("chainer starvation", () => {
+  it("60 failing + 5 healthy tenants: healthy ones are chained within 2 passes", async () => {
+    const all = Array.from({ length: 65 }, () => uuidv7()).sort();
+    const failing = all.slice(0, 60);
+    const healthy = all.slice(60);
+    await db.admin
+      .query(`create or replace function audit.test_boom2() returns trigger language plpgsql as
+      $$ begin if new.tenant_id = any('{${failing.join(",")}}'::uuid[]) then raise exception 'boom'; end if; return new; end $$`);
+    await db.admin.query(
+      "create trigger zz_test_boom2 before update on audit.audit_log for each row execute function audit.test_boom2()",
+    );
+    try {
+      for (const t of all) await seedAudit(db.app, t, 1);
+      const chainer = createAuditChainer({ pool: db.chainer, logger: silentLogger });
+      await chainer.tick();
+      await chainer.tick();
+      for (const t of healthy) expect(await unchained(db.admin, t)).toBe(0);
+      for (const t of failing) expect(await unchained(db.admin, t)).toBe(1);
+    } finally {
+      await db.admin.query("drop trigger zz_test_boom2 on audit.audit_log");
+    }
+  });
+
+  it("a failing tenant backs off: not retried until the backoff elapses", async () => {
+    const bad = uuidv7();
+    await db.admin
+      .query(`create or replace function audit.test_boom3() returns trigger language plpgsql as
+      $$ begin if new.tenant_id = '${bad}' then raise exception 'boom'; end if; return new; end $$`);
+    await db.admin.query(
+      "create trigger zz_test_boom3 before update on audit.audit_log for each row execute function audit.test_boom3()",
+    );
+    try {
+      await seedAudit(db.app, bad, 1);
+      const clock = fakeClock(Date.now());
+      const errors: string[] = [];
+      const chainer = createAuditChainer({
+        pool: db.chainer,
+        logger: silentLogger,
+        clock,
+        onMetric: (n) => errors.push(n),
+      });
+      await chainer.tick();
+      await chainer.tick();
+      expect(errors.filter((n) => n === "audit_chain_tenant_error")).toHaveLength(1);
+      clock.set(clock.now() + 301_000);
+      await chainer.tick();
+      expect(errors.filter((n) => n === "audit_chain_tenant_error")).toHaveLength(2);
+    } finally {
+      await db.admin.query("drop trigger zz_test_boom3 on audit.audit_log");
+    }
+  });
+});
+
 describe("verifyAuditChain", () => {
   it("passes against the anchor, anchored === true", async () => {
     const t = await anchoredTenant(4);
@@ -144,7 +197,15 @@ describe("anchor job", () => {
     await createAuditChainer({ pool: db.chainer, logger: silentLogger }).tick();
     const midnight = Math.floor(Date.now() / DAY) * DAY + DAY;
     const clock = fakeClock(midnight + 60_000);
-    const job = createAnchorJob({ pool: db.chainer, logger: silentLogger, clock });
+    const failedTenants: string[] = [];
+    const job = createAnchorJob({
+      pool: db.chainer,
+      logger: silentLogger,
+      clock,
+      onMetric: (n, _v, l) => {
+        if (n === "audit_verify_failed" && l.tenantId !== undefined) failedTenants.push(l.tenantId);
+      },
+    });
     expect(dueDay(midnight + 60_000, 5)).toBeUndefined();
     expect((await job.runDue()).day).toBeUndefined();
 
@@ -152,7 +213,7 @@ describe("anchor job", () => {
     const first = await job.runDue();
     expect(first.day).toBe(utcDay(midnight - 1));
     expect(first.created).toBeGreaterThanOrEqual(1);
-    expect(first.verifyFailed).toBe(0);
+    expect(failedTenants).not.toContain(t); // other tests tamper with their own tenants
     expect((await job.runDue()).day).toBeUndefined(); // done in this process
 
     const fresh = createAnchorJob({ pool: db.chainer, logger: silentLogger, clock });
@@ -167,8 +228,79 @@ describe("anchor job", () => {
   });
 });
 
+describe("anchor job hardening", () => {
+  it("pending: metric every run, ERROR log once after 6 h", async () => {
+    const t = uuidv7();
+    await seedAudit(db.app, t, 2);
+    await createAuditChainer({ pool: db.chainer, logger: silentLogger }).tick();
+    await seedAudit(db.app, t, 1); // stays unchained
+    const dayStart = Math.floor(Date.now() / DAY) * DAY;
+    const errs: object[] = [];
+    const metrics: string[] = [];
+    const logger = { ...silentLogger, error: (o: object) => errs.push(o) };
+    const mk = (now: number) =>
+      createAnchorJob({
+        pool: db.chainer,
+        logger,
+        clock: fakeClock(now),
+        onMetric: (n) => metrics.push(n),
+      });
+    await mk(dayStart + DAY + 60 * 60_000).runDue(); // 1 h after day end: no error
+    expect(metrics).toContain("audit_anchor_pending");
+    const mine = (): object[] => errs.filter((e) => (e as { tenantId?: string }).tenantId === t);
+    expect(mine()).toHaveLength(0);
+    const job = mk(dayStart + DAY + 7 * 3_600_000);
+    expect((await job.runDue()).pending).toBeGreaterThanOrEqual(1);
+    await job.runDue();
+    expect(mine()).toHaveLength(1);
+  });
+
+  it("verifies when the anchor already exists (retry path)", async () => {
+    const t = await anchoredTenant(3);
+    await asSuperuserNoTriggers(
+      db.admin,
+      `update audit.audit_log set "after" = '{"evil":true}' where tenant_id = $1 and chain_seq = 2`,
+      [t],
+    );
+    const day = Math.floor(Date.now() / DAY) * DAY;
+    const job = createAnchorJob({
+      pool: db.chainer,
+      logger: silentLogger,
+      clock: fakeClock(day + DAY + 6 * 60_000),
+    });
+    const r = await job.runDue();
+    expect(r.exists).toBeGreaterThanOrEqual(1);
+    expect(r.verifyFailed).toBeGreaterThanOrEqual(1);
+  });
+
+  it("backfills missed days from the last anchor day", async () => {
+    const t = uuidv7();
+    await seedAudit(db.app, t, 2);
+    await createAuditChainer({ pool: db.chainer, logger: silentLogger }).tick();
+    const day = Math.floor(Date.now() / DAY) * DAY;
+    // an old anchor two days before the rows; the job was down since
+    await db.admin.query(
+      `insert into audit.anchors (tenant_id, day, chain_seq_from, chain_seq_to, row_count, merkle_root, head_hash)
+       values ($1, $2::date, 1, 1, 1, repeat('a', 64), repeat('a', 64))`,
+      [t, utcDay(day - 2 * DAY)],
+    );
+    const job = createAnchorJob({
+      pool: db.chainer,
+      logger: silentLogger,
+      clock: fakeClock(day + 2 * DAY + 6 * 60_000), // yesterday = day+1; rows are on `day`
+      verify: false,
+    });
+    await job.runDue();
+    const n = await db.admin.query(
+      "select count(*)::int n from audit.anchors where tenant_id = $1 and day = $2::date",
+      [t, utcDay(day)],
+    );
+    expect(n.rows[0]).toEqual({ n: 1 });
+  });
+});
+
 describe("partition job", () => {
-  it("recreates a missing future partition (current + 3 months)", async () => {
+  it("recreates a missing future partition (current + 6 months)", async () => {
     const children = async (): Promise<string[]> =>
       (
         await db.admin.query<{ relname: string }>(
@@ -185,6 +317,7 @@ describe("partition job", () => {
     const job = createPartitionJob({
       pool: db.chainer,
       logger: silentLogger,
+      monthsAhead: 6, // the migration pre-creates current + 6
       onMetric: (name, v) => {
         if (name === "audit_partitions_created") created.push(v);
       },

@@ -15,6 +15,7 @@ import { redisIdempotencyCache } from "./idempotency-cache.ts";
 import { createLogger } from "./logger.ts";
 import { modules } from "./modules.ts";
 
+import type { CacheOnMetric } from "./idempotency-cache.ts";
 import type { EnvSource } from "@wise-biz/env";
 import type { AddressInfo } from "node:net";
 
@@ -29,7 +30,10 @@ export interface RunningServer {
 }
 
 /** Validate env, build dependencies, listen. `source` is a parameter so tests never touch process.env. */
-export async function startServer(source: EnvSource = process.env): Promise<RunningServer> {
+export async function startServer(
+  source: EnvSource = process.env,
+  hooks: { onMetric?: CacheOnMetric } = {},
+): Promise<RunningServer> {
   assertProductionEnv(source);
   const env = defineEnv(API_ENV, source);
   const logger = createLogger(env.LOG_LEVEL);
@@ -37,6 +41,9 @@ export async function startServer(source: EnvSource = process.env): Promise<Runn
   const pool = createPool(env.DATABASE_URL, {
     max: env.DATABASE_POOL_MAX,
     applicationName: "wb-api",
+    onError: (err) => {
+      logger.warn({ err }, "idle postgres client error");
+    },
   });
   if (env.NODE_ENV !== "production") instrumentPool(pool);
   // Fail fast instead of retrying forever silently: readiness reports Redis, the API still serves.
@@ -74,7 +81,7 @@ export async function startServer(source: EnvSource = process.env): Promise<Runn
       redis,
       env,
       logger,
-      idempotencyCache: redisIdempotencyCache(redis, logger),
+      idempotencyCache: redisIdempotencyCache(redis, logger, { onMetric: hooks.onMetric }),
     });
     const server = serve({ fetch: app.fetch, port: env.PORT }, (info: AddressInfo) => {
       logger.info({ port: info.port }, "api listening");

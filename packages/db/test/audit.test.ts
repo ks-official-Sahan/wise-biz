@@ -5,6 +5,7 @@ import {
   appendAudit,
   buildDailyAnchor,
   chainTenant,
+  auditPartitionHorizon,
   ensureAuditPartitions,
   findTablesWithoutRls,
   listTenantsWithUnchained,
@@ -137,6 +138,47 @@ describe("privileges and trigger", () => {
     );
     expect(code).toBe("42501");
     expect(await sqlState(app.query("select audit.ensure_partitions(1)"))).toBe(INSUFFICIENT);
+  });
+
+  it("wb_app cannot forge chain columns or id/at (column grant); trigger rejects them for everyone else", async () => {
+    const base = `insert into audit.audit_log (tenant_id, actor_type, actor_id, action, entity, request_id`;
+    for (const [cols, vals] of [
+      [", hash, chain_seq, prev_hash", ", repeat('a',64), 1, repeat('b',64)"],
+      [", at", ", now() - interval '1 second'"],
+      [", id", ", 1"],
+    ] as const)
+      expect(
+        await sqlState(
+          withTenantTx(app, ctx(T), (tx) =>
+            tx.query(`${base}${cols}) values ($1, 'user', 'u', 'a', 'e', 'r'${vals})`, [T]),
+          ),
+        ),
+      ).toMatch(/^(42501|428C9)$/);
+    await expect(
+      admin.query(
+        `${base}, chain_seq, prev_hash, hash) values ($1, 'user', 'u', 'a', 'e', 'r', 1, repeat('b',64), repeat('a',64))`,
+        [T],
+      ),
+    ).rejects.toThrow(/must not be supplied/);
+    await expect(
+      admin.query(`${base}, hash) values ($1, 'user', 'u', 'a', 'e', 'r', repeat('a',64))`, [T]),
+    ).rejects.toThrow(/./); // half-chained: trigger or constraint, either way rejected
+  });
+
+  it("a supplied `at` is overwritten with server time", async () => {
+    const c = await admin.connect();
+    try {
+      await c.query("begin");
+      const r = await c.query<{ ok: boolean }>(
+        `insert into audit.audit_log (tenant_id, actor_type, actor_id, action, entity, request_id, at)
+         values ($1, 'user', 'u', 'a', 'e', 'r', now() - interval '1 millisecond') returning at = now() as ok`,
+        [T],
+      );
+      expect(r.rows[0]?.ok).toBe(true);
+      await c.query("rollback");
+    } finally {
+      c.release();
+    }
   });
 
   it("chainer cannot change non-hash columns, rehash a chained row, or delete", async () => {
@@ -387,9 +429,11 @@ describe("partitions and RLS lint", () => {
     const before = await admin.query<{ n: string }>(
       "select count(*) n from pg_inherits where inhparent = 'audit.audit_log'::regclass",
     );
-    expect(Number(before.rows[0]?.n)).toBe(4); // migration: current + 3
-    expect(await ensureAuditPartitions(chainer, 3)).toBe(0);
-    expect(await ensureAuditPartitions(chainer, 5)).toBe(2);
+    expect(Number(before.rows[0]?.n)).toBe(7); // migration: current + 6
+    expect(await ensureAuditPartitions(chainer, 6)).toBe(0);
+    expect(await auditPartitionHorizon(chainer)).toBe(6);
+    expect(await ensureAuditPartitions(chainer, 8)).toBe(2);
+    expect(await auditPartitionHorizon(chainer)).toBe(8);
     expect(await ensureAuditPartitions(chainer)).toBe(0);
     await expect(ensureAuditPartitions(chainer, 99)).rejects.toThrow(/monthsAhead/);
     const parts = await admin.query<{ relname: string; relforcerowsecurity: boolean; n: string }>(
@@ -398,7 +442,7 @@ describe("partitions and RLS lint", () => {
        from pg_inherits i join pg_class c on c.oid = i.inhrelid where i.inhparent = 'audit.audit_log'::regclass
        order by c.relname`,
     );
-    expect(parts.rows).toHaveLength(6);
+    expect(parts.rows).toHaveLength(9);
     expect(parts.rows.every((r) => r.relforcerowsecurity && Number(r.n) === 3)).toBe(true);
     expect(parts.rows[0]?.relname).toMatch(/^audit_log_y\d{4}m\d{2}$/);
     expect(await findTablesWithoutRls(admin, ["audit", "infra"])).toEqual([]);
@@ -406,16 +450,39 @@ describe("partitions and RLS lint", () => {
 
   it("a row for a far-future month without a partition fails loudly", async () => {
     const T = uuid7();
-    const code = await sqlState(
-      withTenantTx(app, ctx(T), (tx) =>
-        tx.query(
+    const c = await admin.connect();
+    try {
+      await c.query("set session_replication_role = replica"); // bypass the server-time trigger
+      const code = await sqlState(
+        c.query(
           `insert into audit.audit_log (tenant_id, actor_type, actor_id, action, entity, request_id, at)
            values ($1, 'user', 'u', 'a', 'e', 'r', now() + interval '5 years')`,
           [T],
         ),
-      ),
+      );
+      expect(code).toBe("23514"); // no partition of relation found for row
+    } finally {
+      c.release();
+    }
+  });
+
+  it("partition_horizon_months counts consecutive full future months; helper wraps it", async () => {
+    expect(await auditPartitionHorizon(chainer)).toBe(await auditPartitionHorizon(chainer));
+    expect(await auditPartitionHorizon(chainer)).toBeGreaterThanOrEqual(6);
+    expect(await sqlState(app.query("select audit.partition_horizon_months()"))).toBe(INSUFFICIENT);
+  });
+
+  it("attaches pre-built partitions (no DEFAULT partition) with indexes and column-limited grants", async () => {
+    const r = await admin.query<{ n: string; d: string }>(
+      `select count(*)::text n, count(*) filter (where pg_get_expr(c.relpartbound, c.oid) = 'DEFAULT')::text d
+       from pg_inherits i join pg_class c on c.oid = i.inhrelid where i.inhparent = 'audit.audit_log'::regclass`,
     );
-    expect(code).toBe("23514"); // no partition of relation found for row
+    expect(r.rows[0]?.d).toBe("0");
+    const idx = await admin.query<{ n: string }>(
+      `select count(*)::text n from pg_indexes where schemaname = 'audit' and tablename = $1`,
+      [currentPartition],
+    );
+    expect(Number(idx.rows[0]?.n)).toBe(4); // pkey + chain + unchained + entity
   });
 });
 
@@ -434,12 +501,19 @@ describe("query plans on seeded data", () => {
   const SMALL = uuid7();
   beforeAll(async () => {
     // 100k chained rows (history) + 40 unchained + a second tenant with unchained rows.
-    await admin.query(
-      `insert into audit.audit_log (tenant_id, actor_type, actor_id, action, entity, entity_id, request_id, at, chain_seq, prev_hash, hash)
-       select $1, 'user', 'u', 'sale.create', 'sale', 's' || g, 'r' || g, now() - (g || ' seconds')::interval, g,
-              repeat('a', 64), repeat('b', 64) from generate_series(1, 100000) g`,
-      [BIG],
-    );
+    // History seeding needs pre-chained, backdated rows: only a superuser with triggers off may do that.
+    const seed = await admin.connect();
+    try {
+      await seed.query("set session_replication_role = replica");
+      await seed.query(
+        `insert into audit.audit_log (tenant_id, actor_type, actor_id, action, entity, entity_id, request_id, at, chain_seq, prev_hash, hash)
+         select $1, 'user', 'u', 'sale.create', 'sale', 's' || g, 'r' || g, now() - (g || ' seconds')::interval, g,
+                repeat('a', 64), repeat('b', 64) from generate_series(1, 100000) g`,
+        [BIG],
+      );
+    } finally {
+      seed.release();
+    }
     await admin.query(
       `insert into audit.audit_log (tenant_id, actor_type, actor_id, action, entity, request_id)
        select t, 'user', 'u', 'x', 'e', 'r' from unnest($1::uuid[]) t, generate_series(1, 20)`,
@@ -504,18 +578,27 @@ describe("query plans on seeded data", () => {
       [BIG, 1000, 2000],
     );
     expect(nodes.some((n) => (n["Index Name"] ?? "").endsWith("_chain_seq_idx"))).toBe(true);
-    expect(nodes.some((n) => n["Node Type"] === "Seq Scan")).toBe(false);
+    // Never-analyzed empty future partitions may seq-scan (0 pages); the populated one must not.
+    expect(
+      nodes.some((n) => n["Node Type"] === "Seq Scan" && n["Relation Name"] === currentPartition),
+    ).toBe(false);
   });
 
-  it("chain update by (tenant, at, id) join uses the primary key", async () => {
+  it("chain update by (tenant, at, id) join uses the primary key and prunes partitions", async () => {
+    const nowIso = new Date().toISOString();
     const nodes = await plan(
       `update audit.audit_log a set chain_seq = v.seq, prev_hash = v.prev, hash = v.hash
        from unnest($2::bigint[], $3::timestamptz[], $4::bigint[], $5::text[], $6::text[]) as v(id, at, seq, prev, hash)
-       where a.tenant_id = $1 and a.at = v.at and a.id = v.id and a.hash is null`,
-      [BIG, ["1"], ["2000-01-01T00:00:00Z"], ["1"], ["a".repeat(64)], ["b".repeat(64)]],
+       where a.tenant_id = $1 and a.at = v.at and a.id = v.id and a.hash is null and a.at between $7 and $8`,
+      [BIG, ["1"], [nowIso], ["1"], ["a".repeat(64)], ["b".repeat(64)], nowIso, nowIso],
     );
     expect(
       nodes.some((n) => n["Node Type"] === "Seq Scan" && n["Relation Name"] === currentPartition),
     ).toBe(false);
+    // min/max `at` prune the update to the single relevant partition
+    const parts = new Set(
+      nodes.map((n) => n["Relation Name"]).filter((r) => r?.startsWith("audit_log_y") === true),
+    );
+    expect([...parts]).toEqual([currentPartition]);
   });
 });

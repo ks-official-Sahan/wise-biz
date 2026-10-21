@@ -41,7 +41,10 @@ export interface CommandResult {
   body: unknown;
   /** Required and non-empty: every mutation is audited in its own transaction (AGENTS.md rule 5). */
   audit: readonly AuditDraft[];
-  events: readonly OutboxEvent[];
+  /** Non-empty unless `noEvents: true`: a silent mutation must be a deliberate choice. */
+  events?: readonly OutboxEvent[];
+  /** Explicitly declare that this mutation emits no domain event (then `events` must be empty/absent). */
+  noEvents?: boolean;
 }
 
 export interface CommandOptions<I> {
@@ -57,13 +60,19 @@ interface StoredResponse {
   status: number;
   /** Serialized once; the first response and every replay send exactly these bytes. */
   bodyText: string;
+  /** Stored for compatibility only; never replayed (a poisoned cache must not set response headers). */
   headers: Record<string, string>;
 }
 
+/** Largest response body accepted from / written to the Redis cache. */
+const MAX_CACHED_BODY_BYTES = 256 * 1024;
+const MAX_KEY_LENGTH = 255;
+
 const JSON_TYPE = "application/json; charset=UTF-8";
 
+/** Only content-type (+ Idempotency-Replayed on replay) are sent; stored headers are ignored by design. */
 function send(c: Context<AppEnv>, r: StoredResponse, extra: Record<string, string> = {}): Response {
-  return c.body(r.bodyText, r.status as 200, { ...r.headers, ...extra, "content-type": JSON_TYPE });
+  return c.body(r.bodyText, r.status as 200, { ...extra, "content-type": JSON_TYPE });
 }
 
 /** RFC 8785-style stable form (sorted keys) so key order never changes the request hash. */
@@ -80,9 +89,10 @@ function stable(v: unknown): unknown {
   return v;
 }
 
-export function requestHash(method: string, path: string, body: unknown): string {
+/** `search` is the raw query string (with "?" or empty); it is part of the request identity. */
+export function requestHash(method: string, path: string, body: unknown, search = ""): string {
   return createHash("sha256")
-    .update(JSON.stringify(stable({ method, path, body })))
+    .update(JSON.stringify(stable({ method, path, search, body })))
     .digest("hex");
 }
 
@@ -93,15 +103,30 @@ function replay(c: Context<AppEnv>, r: StoredResponse): Response {
 const mismatch = (): DomainError =>
   new DomainError("IDEMPOTENCY_MISMATCH", "Idempotency-Key was used with a different request");
 
+/**
+ * Strict shape check of a Redis entry. Headers are dropped; status is 200|201 only; body is a bounded string.
+ * Follow-up: HMAC the stored value (key from env) so a Redis writer cannot forge replays.
+ */
 function parseCached(raw: string): { requestHash: string; response: StoredResponse } | undefined {
+  if (raw.length > MAX_CACHED_BODY_BYTES * 2) return undefined;
   try {
-    const v = JSON.parse(raw) as { requestHash?: unknown; response?: StoredResponse };
+    const v = JSON.parse(raw) as {
+      requestHash?: unknown;
+      response?: Record<string, unknown> | null;
+    };
+    const r = v.response;
     if (
       typeof v.requestHash === "string" &&
-      typeof v.response?.status === "number" &&
-      typeof v.response.bodyText === "string"
+      r !== undefined &&
+      r !== null &&
+      (r.status === 200 || r.status === 201) &&
+      typeof r.bodyText === "string" &&
+      r.bodyText.length <= MAX_CACHED_BODY_BYTES
     ) {
-      return { requestHash: v.requestHash, response: v.response };
+      return {
+        requestHash: v.requestHash,
+        response: { status: r.status, bodyText: r.bodyText, headers: {} },
+      };
     }
   } catch {
     // corrupt entry: ignore, Postgres decides
@@ -122,7 +147,7 @@ type Outcome =
  * - Postgres decides idempotency (advisory xact lock in lockIdempotencyKey: concurrent duplicates wait, then
  *   replay). Redis only short-circuits already-completed keys and may be absent or down.
  * - Any throw rolls back domain rows, audit, outbox and the key together.
- * - The handler must return at least one audit entry; an empty list is an INTERNAL error (programming bug).
+ * - The handler must return at least one audit entry and at least one event (or `noEvents: true`); violating either is an INTERNAL error (programming bug).
  */
 export async function runCommand<I>(
   c: Context<AppEnv>,
@@ -161,8 +186,17 @@ export async function runCommand<I>(
       `${IDEMPOTENCY_HEADER} must be 8-255 characters of [A-Za-z0-9_-]`,
     );
   }
-  const key = header;
-  const hash = key === undefined ? "" : requestHash(c.req.method, c.req.path, raw);
+  // Scope the key to the actor so another user of the same tenant can never replay (or probe) your response.
+  const userId = tenant.userId ?? "";
+  const key = header === undefined ? undefined : `${userId}:${header}`;
+  if (key !== undefined && key.length > MAX_KEY_LENGTH) {
+    throw new DomainError(
+      "VALIDATION_FAILED",
+      `${IDEMPOTENCY_HEADER} is too long (actor-scoped key must be at most ${String(MAX_KEY_LENGTH)} characters)`,
+    );
+  }
+  const hash =
+    key === undefined ? "" : requestHash(c.req.method, c.req.path, raw, new URL(c.req.url).search);
   const ttlMs = deps.idempotencyTtlMs ?? DEFAULT_IDEMPOTENCY_TTL_MS;
   const cacheKey = key === undefined ? "" : `idem:${tenant.tenantId}:${key}`;
   const log = c.get("logger") as AppEnv["Variables"]["logger"] | undefined;
@@ -183,7 +217,6 @@ export async function runCommand<I>(
   }
 
   // 5. transaction
-  const userId = tenant.userId ?? "";
   const ctx: CommandContext = {
     tenant,
     userId,
@@ -201,6 +234,15 @@ export async function runCommand<I>(
     if (result.audit.length === 0) {
       throw new DomainError("INTERNAL", "command returned no audit entry");
     }
+    const events = result.events ?? [];
+    if (result.noEvents === true ? events.length > 0 : events.length === 0) {
+      throw new DomainError(
+        "INTERNAL",
+        result.noEvents === true
+          ? "command set noEvents but returned events"
+          : "command returned no events (set noEvents: true to emit none deliberately)",
+      );
+    }
     await appendAudit(
       tx,
       result.audit.map((a) => ({
@@ -210,7 +252,7 @@ export async function runCommand<I>(
         requestId: a.requestId ?? ctx.requestId,
       })),
     );
-    await appendOutbox(tx, result.events);
+    await appendOutbox(tx, events);
     const response: StoredResponse = {
       status: result.status ?? 201,
       bodyText: JSON.stringify(result.body ?? null),
@@ -226,7 +268,11 @@ export async function runCommand<I>(
   if (outcome.kind === "replay") return replay(c, outcome.response);
 
   // 6. best-effort cache after commit
-  if (outcome.cache && deps.idempotencyCache) {
+  if (
+    outcome.cache &&
+    deps.idempotencyCache &&
+    outcome.response.bodyText.length <= MAX_CACHED_BODY_BYTES
+  ) {
     try {
       await deps.idempotencyCache.set(
         cacheKey,

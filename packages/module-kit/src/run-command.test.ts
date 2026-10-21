@@ -110,7 +110,7 @@ beforeEach(() => {
   m.lock.mockResolvedValue({ state: "new" } satisfies Lock);
   handler = vi
     .fn()
-    .mockResolvedValue({ body: { ok: 1 }, audit: [{ action: "a", entity: "e" }], events: [] });
+    .mockResolvedValue({ body: { ok: 1 }, audit: [{ action: "a", entity: "e" }], noEvents: true });
 });
 
 describe("runCommand", () => {
@@ -141,13 +141,91 @@ describe("runCommand", () => {
       { action: "a", entity: "e", actorType: "user", actorId: U, requestId: "req-12345678" },
     ]);
     expect(m.save).toHaveBeenCalledTimes(1);
-    expect(cache.has(`idem:${T}:${KEY}`)).toBe(true);
+    expect(cache.has(`idem:${T}:${U}:${KEY}`)).toBe(true);
   });
 
   it("empty audit is INTERNAL", async () => {
-    handler.mockResolvedValue({ body: {}, audit: [], events: [] });
+    handler.mockResolvedValue({ body: {}, audit: [], noEvents: true });
     expect((await call(build(["w"]), '{"name":"a"}')).status).toBe(500);
     expect(m.save).not.toHaveBeenCalled();
+  });
+
+  it("events must be non-empty unless noEvents is explicit", async () => {
+    handler.mockResolvedValue({ body: {}, audit: [{ action: "a", entity: "e" }], events: [] });
+    expect((await call(build(["w"]), '{"name":"a"}')).status).toBe(500);
+    handler.mockResolvedValue({ body: {}, audit: [{ action: "a", entity: "e" }] });
+    expect((await call(build(["w"]), '{"name":"a"}')).status).toBe(500);
+    handler.mockResolvedValue({
+      body: {},
+      audit: [{ action: "a", entity: "e" }],
+      events: [{ topic: "t" }],
+      noEvents: true,
+    });
+    expect((await call(build(["w"]), '{"name":"a"}')).status).toBe(500);
+    expect(m.save).not.toHaveBeenCalled();
+    handler.mockResolvedValue({
+      body: {},
+      audit: [{ action: "a", entity: "e" }],
+      events: [{ topic: "t" }],
+    });
+    expect((await call(build(["w"]), '{"name":"a"}')).status).toBe(201);
+  });
+
+  it("scopes the idempotency key to the actor", async () => {
+    await call(build(["w"]), '{"name":"a"}');
+    expect(m.lock.mock.calls[0]?.[1]).toMatchObject({ key: `${U}:${KEY}` });
+    expect([...cache.keys()]).toEqual([`idem:${T}:${U}:${KEY}`]);
+  });
+
+  it("rejects a key whose actor-scoped form exceeds 255 chars", async () => {
+    const res = await call(build(["w"]), '{"name":"a"}', "k".repeat(240));
+    expect(res.status).toBe(422);
+    expect(m.tx).not.toHaveBeenCalled();
+  });
+
+  it("request hash covers the query string", async () => {
+    const app = build(["w"]);
+    await app.request("/x?a=1", {
+      method: "POST",
+      headers: { "content-type": "application/json", "idempotency-key": KEY },
+      body: '{"name":"a"}',
+    });
+    const res = await app.request("/x?a=2", {
+      method: "POST",
+      headers: { "content-type": "application/json", "idempotency-key": KEY },
+      body: '{"name":"a"}',
+    });
+    expect(res.status).toBe(422);
+    expect(requestHash("POST", "/x", { a: 1 }, "?a=1")).not.toBe(
+      requestHash("POST", "/x", { a: 1 }, "?a=2"),
+    );
+  });
+
+  it("ignores cached headers and rejects malformed cached shapes", async () => {
+    const app = build(["w"]);
+    const k = `idem:${T}:${U}:${KEY}`;
+    const hash = requestHash("POST", "/x", { name: "a" }, "");
+    const entry = (response: unknown): string => JSON.stringify({ requestHash: hash, response });
+    cache.set(
+      k,
+      entry({ status: 201, bodyText: '{"c":1}', headers: { "set-cookie": "evil=1", "x-a": "b" } }),
+    );
+    const hit = await call(app, '{"name":"a"}');
+    expect(await hit.json()).toEqual({ c: 1 });
+    expect(hit.headers.get("set-cookie")).toBeNull();
+    expect(hit.headers.get("x-a")).toBeNull();
+    expect(hit.headers.get("idempotency-replayed")).toBe("true");
+    for (const bad of [
+      { status: 302, bodyText: "{}" },
+      { status: 201, bodyText: 5 },
+      { status: 201, bodyText: "x".repeat(256 * 1024 + 1) },
+    ]) {
+      cache.set(k, entry(bad));
+      handler.mockClear();
+      const res = await call(app, '{"name":"a"}');
+      expect(res.headers.get("idempotency-replayed")).toBeNull();
+      expect(handler).toHaveBeenCalledTimes(1);
+    }
   });
 
   it("replays from Redis (same hash) and rejects a different hash", async () => {
@@ -178,7 +256,7 @@ describe("runCommand", () => {
   });
 
   it("survives a broken or throwing cache", async () => {
-    cache.set(`idem:${T}:${KEY}`, "not json");
+    cache.set(`idem:${T}:${U}:${KEY}`, "not json");
     expect((await call(build(["w"]), '{"name":"a"}')).status).toBe(201);
     deps.idempotencyCache = {
       get: () => Promise.reject(new Error("down")),

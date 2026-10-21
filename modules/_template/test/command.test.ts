@@ -58,13 +58,15 @@ const depsWith = (cache?: IdempotencyCache): ModuleDeps => ({
   ...(cache && { idempotencyCache: cache }),
 });
 
+const ACTOR = uuidv7();
+
 function appFor(tenantId: string, role: string, deps: ModuleDeps, failAfterInsert = false) {
   const app = new OpenAPIHono<AppEnv>();
   app.use("*", async (c, next) => {
     c.set("requestId", "req-12345678");
     c.set("auth", {
       kind: "user",
-      userId: uuidv7(),
+      userId: ACTOR, // keys are actor-scoped: one user per app
       tenantId,
       roles: [role],
       branchScope: "all",

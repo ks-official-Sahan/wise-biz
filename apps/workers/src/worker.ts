@@ -1,4 +1,9 @@
-import { createPool, instrumentPool, pruneIdempotencyKeys } from "@wise-biz/db";
+import {
+  auditPartitionHorizon,
+  createPool,
+  instrumentPool,
+  pruneIdempotencyKeys,
+} from "@wise-biz/db";
 import {
   assertProductionEnv,
   chainerEnv,
@@ -16,11 +21,14 @@ import {
 
 import { consumers as defaultConsumers } from "./consumers.ts";
 import { createLogger } from "./logger.ts";
+import { OLDEST_UNCHAINED_SQL, createMetrics } from "./metrics.ts";
 import { createRelay } from "./relay.ts";
+import { settleSteps } from "./shutdown.ts";
 
 import type { EnvSource } from "@wise-biz/env";
 import type { ConsumerDefinition, OnMetric } from "@wise-biz/events";
 import type { AuditOnMetric } from "@wise-biz/module-audit";
+import type { Logger } from "pino";
 
 export const WORKER_ENV = { ...observabilityEnv, ...workerEnv, ...chainerEnv };
 const POOL_MAX = 10;
@@ -29,6 +37,7 @@ const HOUR_MS = 3_600_000;
 const PRUNE_BATCH = 1000;
 
 export interface RunningWorker {
+  logger: Logger;
   /** Finish the in-flight batch, stop the bus, close the pool. */
   stop(): Promise<void>;
 }
@@ -37,17 +46,39 @@ export interface RunningWorker {
 export function startWorker(
   source: EnvSource = process.env,
   consumers: readonly ConsumerDefinition[] = defaultConsumers,
-  onMetric?: OnMetric,
-  onAuditMetric?: AuditOnMetric,
+  onMetricOverride?: OnMetric,
+  onAuditMetricOverride?: AuditOnMetric,
 ): RunningWorker {
   assertProductionEnv(source);
   const env = defineEnv(WORKER_ENV, source);
   const logger = createLogger(env.LOG_LEVEL);
+  const poolError = (name: string) => (err: Error) => {
+    logger.warn({ err, pool: name }, "idle postgres client error");
+  };
   const pool = createPool(env.DATABASE_WORKER_URL, {
     max: POOL_MAX,
     applicationName: "wb-workers",
+    onError: poolError("worker"),
   });
   if (env.NODE_ENV !== "production") instrumentPool(pool);
+  // Audit: separate least-privilege pool (wb_chainer), never shared with the relay pool.
+  const chainerPool = createPool(env.DATABASE_CHAINER_URL, {
+    max: CHAINER_POOL_MAX,
+    applicationName: "wb-audit-chainer",
+    onError: poolError("chainer"),
+  });
+  // Real sink by default (tests may override): counters/gauges flushed as a structured log line every 60 s.
+  const metrics = createMetrics({
+    logger,
+    oldestUnchainedAgeMs: async () => {
+      const r = await chainerPool.query<{ age_ms: string | null }>(OLDEST_UNCHAINED_SQL);
+      const v = r.rows[0]?.age_ms;
+      return v === null || v === undefined ? null : Number(v);
+    },
+    partitionHorizonMonths: () => auditPartitionHorizon(chainerPool),
+  });
+  const onMetric = onMetricOverride ?? metrics.onMetric;
+  const onAuditMetric = onAuditMetricOverride ?? metrics.onAuditMetric;
   const bus = createPgBus({
     pool,
     logger,
@@ -67,11 +98,6 @@ export function startWorker(
   });
   relay.start();
 
-  // Audit: separate least-privilege pool (wb_chainer), never shared with the relay pool.
-  const chainerPool = createPool(env.DATABASE_CHAINER_URL, {
-    max: CHAINER_POOL_MAX,
-    applicationName: "wb-audit-chainer",
-  });
   const chainer = createAuditChainer({
     pool: chainerPool,
     logger,
@@ -94,13 +120,32 @@ export function startWorker(
   });
   const loops = [chainer, anchorJob, partitionJob, pruneJob];
   for (const l of loops) l.start();
+  metrics.start();
   logger.info({ consumers: consumers.map((c) => c.name) }, "worker started");
   return {
+    logger,
     stop: async () => {
-      await Promise.all([relay.stop(), ...loops.map((l) => l.stop())]);
-      await bus.stop();
-      await Promise.all([pool.end(), chainerPool.end()]);
-      logger.info({}, "worker stopped");
+      // Every step runs even if an earlier one failed; the bus and both pools are ALWAYS closed.
+      const failed = [
+        ...(await settleSteps(
+          [
+            { name: "relay", run: () => relay.stop() },
+            ...loops.map((l, i) => ({ name: `loop-${String(i)}`, run: () => l.stop() })),
+          ],
+          logger,
+        )),
+        ...(await settleSteps([{ name: "metrics", run: () => metrics.stop() }], logger)),
+        ...(await settleSteps([{ name: "bus", run: () => bus.stop() }], logger)),
+        ...(await settleSteps(
+          [
+            { name: "pool", run: () => pool.end() },
+            { name: "chainer-pool", run: () => chainerPool.end() },
+          ],
+          logger,
+        )),
+      ];
+      logger.info({ failed }, "worker stopped");
+      if (failed.length > 0) throw new Error(`worker stop failed: ${failed.join(", ")}`);
     },
   };
 }

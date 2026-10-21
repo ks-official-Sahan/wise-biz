@@ -30,7 +30,7 @@ export type {
   AuditChainRow,
   TenantVerifyResult,
 } from "./audit/verify.ts";
-export { ensureAuditPartitions } from "./audit/partitions.ts";
+export { auditPartitionHorizon, ensureAuditPartitions } from "./audit/partitions.ts";
 export {
   lockIdempotencyKey,
   pruneIdempotencyKeys,

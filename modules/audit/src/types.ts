@@ -10,6 +10,7 @@ export type AuditMetricName =
   | "audit_chain_loop_error"
   | "audit_anchor_created"
   | "audit_anchor_error"
+  | "audit_anchor_pending"
   | "audit_verify_failed"
   | "audit_partitions_created"
   | "audit_job_error";

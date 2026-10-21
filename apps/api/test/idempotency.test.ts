@@ -75,9 +75,10 @@ afterAll(async () => {
   await db.drop();
 });
 
+const ACTOR = uuidv7();
 const hdrs = (tenant: string, key: string): Record<string, string> => ({
   "x-wb-dev-tenant": tenant,
-  "x-wb-dev-user": uuidv7(),
+  "x-wb-dev-user": ACTOR, // idempotency keys are actor-scoped
   "content-type": "application/json",
   "idempotency-key": key,
 });
@@ -96,14 +97,29 @@ const countItems = (tenant: string): Promise<number> =>
   );
 
 describe("idempotency with real Redis + Postgres", () => {
+  it("a different user of the same tenant never replays your response", async () => {
+    const t = uuidv7();
+    const key = `k-${uuidv7()}`;
+    const a = await post(app, t, key, { name: "Mine" });
+    const other = await app.request(ITEMS, {
+      method: "POST",
+      headers: { ...hdrs(t, key), "x-wb-dev-user": uuidv7() },
+      body: JSON.stringify({ name: "Mine" }),
+    });
+    expect(a.status).toBe(201);
+    expect(other.status).toBe(201);
+    expect(other.headers.get("idempotency-replayed")).toBeNull();
+    expect(await countItems(t)).toBe(2);
+  });
+
   it("caches the completed response and replays it from Redis", async () => {
     const t = uuidv7();
     const key = `k-${uuidv7()}`;
     const a = await post(app, t, key, { name: "Mug" });
     expect(a.status).toBe(201);
-    const cached = await redis.get(`idem:${t}:${key}`);
+    const cached = await redis.get(`idem:${t}:${ACTOR}:${key}`);
     expect(cached).not.toBeNull();
-    const ttl = await redis.pTTL(`idem:${t}:${key}`);
+    const ttl = await redis.pTTL(`idem:${t}:${ACTOR}:${key}`);
     expect(ttl).toBeGreaterThan(23 * 3600 * 1000);
 
     // Remove the durable key: only Redis can answer now, and nothing new is written.
@@ -138,7 +154,7 @@ describe("idempotency with real Redis + Postgres", () => {
     const t = uuidv7();
     const key = `k-${uuidv7()}`;
     const first = await post(app, t, key, { name: "Exact" });
-    await redis.del(`idem:${t}:${key}`); // force the Postgres path
+    await redis.del(`idem:${t}:${ACTOR}:${key}`); // force the Postgres path
     const again = await post(app, t, key, { name: "Exact" });
     expect(again.headers.get("idempotency-replayed")).toBe("true");
     expect(await again.text()).toBe(await first.text());
@@ -169,5 +185,23 @@ describe("redisIdempotencyCache", () => {
     await cache.set("k", "v", 1000);
     expect(cache.errors()).toBe(102);
     expect(warn).toHaveBeenCalledTimes(2);
+  });
+
+  it("times out a hung redis command (200 ms) and reports it via the metrics hook", async () => {
+    const hang = (): Promise<never> => new Promise(() => undefined);
+    const hung: RedisKv = { get: hang, set: hang };
+    const metrics: [string, number, Record<string, string>][] = [];
+    const cache = redisIdempotencyCache(hung, { warn: vi.fn() } as never, {
+      onMetric: (name, value, labels) => metrics.push([name, value, labels]),
+    });
+    const t0 = Date.now();
+    expect(await cache.get("k")).toBeNull();
+    await cache.set("k", "v", 1000);
+    expect(Date.now() - t0).toBeLessThan(1000);
+    expect(cache.errors()).toBe(2);
+    expect(metrics).toEqual([
+      ["idempotency_cache_error", 1, { op: "get" }],
+      ["idempotency_cache_error", 1, { op: "set" }],
+    ]);
   });
 });

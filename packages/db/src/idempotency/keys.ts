@@ -107,7 +107,7 @@ export async function pruneIdempotencyKeys(
   const batch = opts.batch ?? 1000;
   if (!Number.isInteger(batch) || batch < 1) throw new Error("batch must be an integer >= 1");
   const res = await pool.query(
-    `delete from infra.idempotency_keys where ctid = any(array(
+    `delete from infra.idempotency_keys where expires_at <= now() and ctid = any(array(
          select ctid from infra.idempotency_keys where expires_at <= now() order by expires_at limit $1))`,
     [batch],
   );

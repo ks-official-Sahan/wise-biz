@@ -16,6 +16,8 @@ export interface PoolOptions {
   ssl?: pg.PoolConfig["ssl"];
   /** Override production detection (default: NODE_ENV === "production"). Mainly for tests. */
   production?: boolean;
+  /** Called when an idle client errors (failover, terminate). Default: ignored. Pass a logger.warn wrapper. */
+  onError?: (err: Error) => void;
 }
 
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
@@ -64,7 +66,9 @@ export function createPool(url: string, opts: PoolOptions = {}): pg.Pool {
     options: `-c statement_timeout=${statement} -c idle_in_transaction_session_timeout=${idleTx}`,
   });
   // Idle clients can die (failover, terminate); without a listener Node would crash. pg evicts them.
-  pool.on("error", () => undefined);
+  pool.on("error", (err: Error) => {
+    opts.onError?.(err);
+  });
   return pool;
 }
 

@@ -15,3 +15,12 @@ export async function ensureAuditPartitions(
   ]);
   return res.rows[0]?.n ?? 0;
 }
+
+/**
+ * Consecutive full future months (from next month) that already have an audit_log partition. Export as a gauge; alert
+ * when it falls below the partition job's `monthsAhead` minus slack. Takes a wb_chainer pool.
+ */
+export async function auditPartitionHorizon(pool: Pick<pg.Pool, "query">): Promise<number> {
+  const res = await pool.query<{ n: number }>("select audit.partition_horizon_months() as n");
+  return res.rows[0]?.n ?? 0;
+}

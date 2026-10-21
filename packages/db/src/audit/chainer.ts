@@ -94,12 +94,17 @@ export async function chainTenant(
       hashes.push(hash);
       prev = hash;
     }
+    // Rendered `at` strings share one fixed-width UTC format, so lexicographic min/max == chronological min/max.
+    // The BETWEEN bounds let the planner prune the UPDATE to the partitions the batch actually touches.
+    const minAt = ats.reduce((m, x) => (x < m ? x : m));
+    const maxAt = ats.reduce((m, x) => (x > m ? x : m));
     // `at` is part of the join so the update prunes to the right partitions and uses the (tenant_id, at, id) PK.
     const upd = await tx.query(
       `update audit.audit_log a set chain_seq = v.seq, prev_hash = v.prev, hash = v.hash
        from unnest($2::bigint[], $3::timestamptz[], $4::bigint[], $5::text[], $6::text[]) as v(id, at, seq, prev, hash)
-       where a.tenant_id = $1 and a.at = v.at and a.id = v.id and a.hash is null`,
-      [tenantId, ids, ats, seqs, prevs, hashes],
+       where a.tenant_id = $1 and a.at = v.at and a.id = v.id and a.hash is null
+         and a.at between $7::timestamptz and $8::timestamptz`,
+      [tenantId, ids, ats, seqs, prevs, hashes, minAt, maxAt],
     );
     if (upd.rowCount !== todo.rows.length)
       throw new Error("chainTenant: updated row count mismatch");
