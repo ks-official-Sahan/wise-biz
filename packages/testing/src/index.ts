@@ -24,11 +24,14 @@ const DEFAULT_THRESHOLD = 80;
 /** Shared Vitest config for wise-biz packages. Overrides tune thresholds and test includes. */
 export function wiseBizVitest(options: WiseBizVitestOptions = {}): ViteUserConfig {
   const { coverage = {} } = options;
+  const testTimeout = options.testTimeout ?? 5_000;
   return defineConfig({
     test: {
       include: options.include ?? DEFAULT_INCLUDE,
       passWithNoTests: true,
-      testTimeout: options.testTimeout ?? 5_000,
+      testTimeout,
+      // beforeAll/afterAll create, migrate and drop databases: give hooks the same budget as tests.
+      hookTimeout: Math.max(testTimeout, 10_000),
       ...(options.globalSetup ? { globalSetup: options.globalSetup } : {}),
       coverage: {
         provider: "v8",

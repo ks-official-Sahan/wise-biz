@@ -134,6 +134,9 @@ export async function startPostgres(): Promise<PgHarness> {
       "synchronous_commit=off",
       "-c",
       "full_page_writes=off",
+      // Autovacuum on wb_base makes CREATE DATABASE ... TEMPLATE fail ("being accessed by other users") under load.
+      "-c",
+      "autovacuum=off",
     ])
     .withCopyFilesToContainer([
       {
