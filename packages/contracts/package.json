@@ -1,0 +1,31 @@
+{
+  "name": "@wise-biz/contracts",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "wiseBiz": {
+    "runtime": "universal"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "lint": "eslint . --max-warnings 0",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --coverage",
+    "gen": "node scripts/gen.mts"
+  },
+  "dependencies": {
+    "@wise-biz/errors": "workspace:*",
+    "@wise-biz/ids": "workspace:*",
+    "@wise-biz/money": "workspace:*",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@wise-biz/config": "workspace:*",
+    "@wise-biz/testing": "workspace:*",
+    "eslint": "10.13.0",
+    "typescript": "6.0.3",
+    "vitest": "5.0.5"
+  }
+}

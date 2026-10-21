@@ -16,6 +16,9 @@ function clean(source: EnvSource): Record<string, string> {
 }
 
 function kind(issue: z.core.$ZodIssue, present: boolean): string {
+  if (!present && (issue.code === "invalid_type" || issue.code === "invalid_value")) {
+    return "required";
+  }
   switch (issue.code) {
     case "invalid_type":
       return present ? "invalid type" : "required";
@@ -61,13 +64,37 @@ export function defineEnv<S extends z.ZodRawShape>(
 /** Values shipped in .env.example; production must never run with them. */
 const DEV_PLACEHOLDER = /change-me|^dev-only|^wb-dev-/i;
 
+/** Dev-default role passwords from the local docker setup (password == role name). */
+const DEV_DB_PASSWORDS: Readonly<Record<string, string>> = {
+  DATABASE_URL: "wb_app",
+  DATABASE_MIGRATOR_URL: "wb_migrator",
+  DATABASE_WORKER_URL: "wb_worker",
+  DATABASE_CHAINER_URL: "wb_chainer",
+};
+
+function hasDevDbPassword(key: string, value: string): boolean {
+  const dev = DEV_DB_PASSWORDS[key];
+  if (dev === undefined) return false;
+  try {
+    return decodeURIComponent(new URL(value).password) === dev;
+  } catch {
+    return false; // unparseable: defineEnv reports the format error; never echo it
+  }
+}
+
 /** Production-only guardrails. Pure: the secret source is a parameter. */
 export function assertProductionEnv(source: EnvSource = process.env): void {
   const env = clean(source);
-  const { NODE_ENV, AUTH_SECRET, EMAIL_PROVIDER } = env;
-  if (NODE_ENV !== "production") return;
+  const { NODE_ENV, AUTH_SECRET, EMAIL_PROVIDER, API_DEV_AUTH } = env;
+  if (NODE_ENV === "development" || NODE_ENV === "test") return;
 
   const problems = new Map<string, string>();
+  if (NODE_ENV !== "production") {
+    // Never infer a safe environment from absence or a typo.
+    throw new EnvError(
+      new Map([["NODE_ENV", NODE_ENV === undefined ? "required" : "invalid value"]]),
+    );
+  }
   if (AUTH_SECRET === undefined) problems.set("AUTH_SECRET", "required");
   for (const [key, value] of Object.entries(env)) {
     if (key.endsWith("_SECRET") && value.length < MIN_SECRET) {
@@ -76,8 +103,16 @@ export function assertProductionEnv(source: EnvSource = process.env): void {
       problems.set(key, "dev placeholder from .env.example is not allowed in production");
     }
   }
+  for (const [key, value] of Object.entries(env)) {
+    if (hasDevDbPassword(key, value)) {
+      problems.set(key, "dev database password is not allowed in production");
+    }
+  }
   if ((EMAIL_PROVIDER ?? "capture") === "capture") {
     problems.set("EMAIL_PROVIDER", "capture is not allowed in production");
+  }
+  if (API_DEV_AUTH !== undefined && /^(true|1|yes|on|y|enabled)$/i.test(API_DEV_AUTH)) {
+    problems.set("API_DEV_AUTH", "dev auth is not allowed in production");
   }
   if (problems.size > 0) throw new EnvError(problems);
 }

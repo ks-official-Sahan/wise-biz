@@ -43,7 +43,7 @@ Overrides: when an operator lacks permission (edit qty after add, price override
 
 - `audit.audit_log(id, tenant_id, actor, action, entity, entity_id, before jsonb, after jsonb, reason, ip, device_id, request_id, prev_hash, hash, at)`, partitioned monthly, **append-only** (DB role has no UPDATE/DELETE).
 - Written inside the same transaction as the change (Sahan rule).
-- Hash chain per tenant; verification job nightly.
+- Hash chain per tenant, sealed asynchronously by the `audit-chainer` worker (chain order = `chain_seq`; ADR 0009); daily Merkle anchor per tenant; verification always checks against the anchor.
 - Read in console with filters; export signed CSV.
 - Every operation is logged: views of sensitive data (customer PII export, reports export) included.
 

@@ -1,11 +1,14 @@
 import {
   authEnv,
+  chainerEnv,
   databaseEnv,
   emailEnv,
+  httpEnv,
   kafkaEnv,
   observabilityEnv,
   redisEnv,
   storageEnv,
+  workerEnv,
 } from "./fragments.ts";
 
 import type { z } from "zod";
@@ -20,6 +23,9 @@ export const ALL_ENV_FRAGMENTS = {
   storage: storageEnv,
   email: emailEnv,
   observability: observabilityEnv,
+  http: httpEnv,
+  worker: workerEnv,
+  chainer: chainerEnv,
 } as const satisfies Record<string, EnvShape>;
 
 export interface EnvKeyInfo {

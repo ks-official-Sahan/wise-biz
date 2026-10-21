@@ -1,0 +1,48 @@
+{
+  "name": "@wise-biz/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "wiseBiz": {
+    "runtime": "node"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "lint": "eslint . --max-warnings 0",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --coverage",
+    "dev": "node --watch src/main.ts",
+    "start": "node src/main.ts",
+    "openapi": "node scripts/openapi.mts"
+  },
+  "dependencies": {
+    "@hono/node-server": "2.1.5",
+    "@hono/zod-openapi": "1.6.3",
+    "@opentelemetry/api": "1.9.1",
+    "@opentelemetry/sdk-node": "0.223.0",
+    "@wise-biz/contracts": "workspace:*",
+    "@wise-biz/db": "workspace:*",
+    "@wise-biz/env": "workspace:*",
+    "@wise-biz/errors": "workspace:*",
+    "@wise-biz/ids": "workspace:*",
+    "@wise-biz/module-kit": "workspace:*",
+    "@wise-biz/module-template": "workspace:*",
+    "@wise-biz/policy": "workspace:*",
+    "hono": "4.13.13",
+    "pg": "8.23.1",
+    "pino": "10.4.0",
+    "redis": "6.3.0",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "@types/pg": "8.23.1",
+    "@wise-biz/config": "workspace:*",
+    "@wise-biz/testing": "workspace:*",
+    "eslint": "10.13.0",
+    "typescript": "6.0.3",
+    "vitest": "5.0.5"
+  }
+}

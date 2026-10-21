@@ -9,6 +9,11 @@ linkWorkspacePackages: true
 allowBuilds:
   lefthook: true
   unrs-resolver: true
+  # Pulled in via testcontainers (docker-modem/ssh2, grpc): optional native crypto addons and a
+  # postinstall version check; none is needed to talk to Docker over the local socket.
+  cpu-features: false
+  protobufjs: false
+  ssh2: false
 
 # commitlint 21.2.4 was younger than pnpm's minimumReleaseAge at install (2026-10-19).
 # Remove this list once it ages out (after ~2026-10-21).

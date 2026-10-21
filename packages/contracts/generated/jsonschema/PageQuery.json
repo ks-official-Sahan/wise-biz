@@ -1,0 +1,31 @@
+{
+  "$defs": {
+    "Cursor": {
+      "maxLength": 512,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_-]+$",
+      "type": "string"
+    },
+    "PageQuery": {
+      "properties": {
+        "after": {
+          "$ref": "#/$defs/Cursor"
+        },
+        "limit": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^\\d{1,6}$",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "type": "object"
+    }
+  },
+  "$ref": "#/$defs/PageQuery",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

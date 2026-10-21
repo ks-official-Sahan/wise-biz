@@ -27,7 +27,11 @@
     "infra:logs": "docker compose -f infra/docker/compose.yaml --profile kafka logs -f --tail=100",
     "db:psql": "docker compose -f infra/docker/compose.yaml exec -e PGPASSWORD=wb_app postgres psql -U wb_app -h localhost -d wise_biz",
     "env:check": "node scripts/check-env-example.mts",
-    "licenses:check": "node scripts/check-licenses.mts"
+    "licenses:check": "node scripts/check-licenses.mts",
+    "db:migrate": "pnpm -F @wise-biz/db migrate",
+    "db:migration": "pnpm -F @wise-biz/db migration",
+    "db:rls-check": "pnpm -F @wise-biz/db rls-check",
+    "load:template": "node scripts/load/template-create.mjs"
   },
   "devDependencies": {
     "@changesets/cli": "3.0.3",
@@ -35,9 +39,11 @@
     "@commitlint/config-conventional": "21.2.4",
     "@types/node": "24.19.2",
     "@wise-biz/config": "workspace:*",
+    "autocannon": "8.0.0",
     "dependency-cruiser": "18.6.0",
     "eslint": "10.13.0",
     "lefthook": "2.2.2",
+    "pg": "8.23.1",
     "prettier": "3.9.10",
     "turbo": "2.11.9",
     "typescript": "6.0.3"

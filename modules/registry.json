@@ -1,0 +1,1 @@
+{ "modules": ["infra", "audit", "_template"] }

@@ -1,0 +1,38 @@
+{
+  "name": "@wise-biz/workers",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "wiseBiz": {
+    "runtime": "node"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "lint": "eslint . --max-warnings 0",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --coverage",
+    "dev": "node --watch src/main.ts",
+    "start": "node src/main.ts"
+  },
+  "dependencies": {
+    "@wise-biz/contracts": "workspace:*",
+    "@wise-biz/db": "workspace:*",
+    "@wise-biz/env": "workspace:*",
+    "@wise-biz/events": "workspace:*",
+    "@wise-biz/ids": "workspace:*",
+    "@wise-biz/module-audit": "workspace:*",
+    "pg": "8.23.1",
+    "pino": "10.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "@types/pg": "8.23.1",
+    "@wise-biz/config": "workspace:*",
+    "@wise-biz/testing": "workspace:*",
+    "eslint": "10.13.0",
+    "typescript": "6.0.3",
+    "vitest": "5.0.5"
+  }
+}

@@ -12,6 +12,10 @@ export interface CoverageThresholds {
 export interface WiseBizVitestOptions {
   coverage?: CoverageThresholds;
   include?: string[];
+  /** Per-test timeout in ms (default 5000). Raise only for vector/property-heavy suites. */
+  testTimeout?: number;
+  /** Vitest globalSetup files (e.g. a Postgres container started once per run). */
+  globalSetup?: string[];
 }
 
 const DEFAULT_INCLUDE = ["src/**/*.test.ts", "test/**/*.test.ts"];
@@ -24,10 +28,13 @@ export function wiseBizVitest(options: WiseBizVitestOptions = {}): ViteUserConfi
     test: {
       include: options.include ?? DEFAULT_INCLUDE,
       passWithNoTests: true,
+      testTimeout: options.testTimeout ?? 5_000,
+      ...(options.globalSetup ? { globalSetup: options.globalSetup } : {}),
       coverage: {
         provider: "v8",
         reporter: ["text", "lcov"],
-        include: ["src/**"],
+        include: ["src/**/*.ts"],
+        exclude: ["src/**/*.d.ts", "src/**/*.test.ts"],
         thresholds: {
           lines: coverage.lines ?? DEFAULT_THRESHOLD,
           functions: coverage.functions ?? DEFAULT_THRESHOLD,

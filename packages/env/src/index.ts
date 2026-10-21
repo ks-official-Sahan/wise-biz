@@ -5,12 +5,15 @@ export { diffEnvExample } from "./example.ts";
 export type { EnvExampleDiff } from "./example.ts";
 export {
   authEnv,
+  chainerEnv,
   databaseEnv,
   emailEnv,
+  httpEnv,
   kafkaEnv,
   observabilityEnv,
   redisEnv,
   storageEnv,
+  workerEnv,
 } from "./fragments.ts";
 export { ALL_ENV_FRAGMENTS, envKeys } from "./registry.ts";
 export type { EnvKeyInfo, EnvShape } from "./registry.ts";

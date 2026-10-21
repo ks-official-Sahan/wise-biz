@@ -7,7 +7,7 @@ use case tx ──► outbox (same DB tx) ──► relay ──► Kafka topic 
 ```
 
 - **Outbox** table per database: `outbox(id uuid, tenant_id, topic, key, type, version, payload jsonb, headers jsonb, created_at, published_at)`.
-- **Relay** (`apps/workers`): reads unpublished rows with `for update skip locked` in batches of 500, publishes, marks `published_at`. Multiple relay replicas are safe. Postgres logical decoding (Debezium) is the upgrade path at high volume.
+- **Relay** (`apps/workers`): claims up to 500 unpublished rows with a **lease** (`claimed_until`, short tx, `for update skip locked`), publishes with no transaction open, then marks only delivered rows `published_at`. Failed rows release their lease; rows past `max_attempts` are quarantined; published rows are pruned. Multiple relay replicas are safe (per-key ordering across replicas comes with the Kafka adapter). Postgres logical decoding (Debezium) is the upgrade path at high volume.
 - Delivery is **at-least-once**. Every consumer is idempotent: `processed_events(consumer, event_id)` unique, inserted in the consumer's own transaction.
 - Dev/test: Redpanda in compose. A `memory` broker adapter runs unit tests. Small self-hosted installs can run with `pg` broker (consumers poll outbox) — same interface (`@wise-biz/contracts` `EventBus` port).
 
