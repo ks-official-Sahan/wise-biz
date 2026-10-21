@@ -22,6 +22,7 @@
     "@wise-biz/env": "workspace:*",
     "@wise-biz/events": "workspace:*",
     "@wise-biz/ids": "workspace:*",
+    "@wise-biz/module-audit": "workspace:*",
     "pg": "8.23.1",
     "pino": "10.4.0"
   },

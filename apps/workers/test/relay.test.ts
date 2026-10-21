@@ -1,3 +1,4 @@
+import { appendAudit, withTenantTx } from "@wise-biz/db";
 import { createMemoryBus, createPgBus, defineConsumer } from "@wise-biz/events";
 import { uuidv7 } from "@wise-biz/ids";
 import pg from "pg";
@@ -444,6 +445,8 @@ describe("startWorker", () => {
         NODE_ENV: "test",
         LOG_LEVEL: "fatal",
         DATABASE_WORKER_URL: db.workerUrl,
+        DATABASE_CHAINER_URL: db.chainerUrl,
+        AUDIT_CHAIN_INTERVAL_MS: "100",
         WORKER_IDLE_MS: "10",
       },
       [consumer],
@@ -453,5 +456,40 @@ describe("startWorker", () => {
     await w.stop();
     expect(counts.size).toBe(2);
     expect(metrics).toEqual(expect.arrayContaining(["processed", "relay_batch", "relay_lag_ms"]));
+  });
+
+  it("chains audit rows within 5 s and stops all loops", async () => {
+    const tenant = uuidv7();
+    await withTenantTx(db.app, { tenantId: tenant, requestId: "t" }, (tx) =>
+      appendAudit(tx, [
+        { actorType: "system", actorId: "w", action: "x.y", entity: "x", requestId: "t" },
+      ]),
+    );
+    const w = startWorker(
+      {
+        NODE_ENV: "test",
+        LOG_LEVEL: "fatal",
+        DATABASE_WORKER_URL: db.workerUrl,
+        DATABASE_CHAINER_URL: db.chainerUrl,
+        AUDIT_CHAIN_INTERVAL_MS: "100",
+      },
+      [],
+    );
+    await until(async () => {
+      const r = await db.admin.query(
+        "select 1 from audit.audit_log where tenant_id = $1 and hash is not null",
+        [tenant],
+      );
+      return r.rowCount === 1;
+    }, 5000);
+    const t0 = Date.now();
+    await w.stop();
+    expect(Date.now() - t0).toBeLessThan(2000);
+  });
+
+  it("rejects startup without DATABASE_CHAINER_URL", () => {
+    expect(() => startWorker({ NODE_ENV: "test", DATABASE_WORKER_URL: db.workerUrl }, [])).toThrow(
+      /DATABASE_CHAINER_URL/,
+    );
   });
 });

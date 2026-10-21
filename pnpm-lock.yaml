@@ -293,6 +293,9 @@ importers:
       '@wise-biz/ids':
         specifier: workspace:*
         version: link:../../packages/ids
+      '@wise-biz/module-audit':
+        specifier: workspace:*
+        version: link:../../modules/audit
       pg:
         specifier: 8.23.1
         version: 8.23.1
@@ -357,6 +360,49 @@ importers:
       zod:
         specifier: 4.6.7
         version: 4.6.7
+    devDependencies:
+      '@types/node':
+        specifier: 24.19.2
+        version: 24.19.2
+      '@types/pg':
+        specifier: 8.23.1
+        version: 8.23.1
+      '@wise-biz/config':
+        specifier: workspace:*
+        version: link:../../packages/config
+      '@wise-biz/testing':
+        specifier: workspace:*
+        version: link:../../packages/testing
+      eslint:
+        specifier: 10.13.0
+        version: 10.13.0(jiti@2.7.0)(supports-color@7.2.0)
+      typescript:
+        specifier: 6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: 5.0.5
+        version: 5.0.5(@edge-runtime/vm@5.0.0)(@opentelemetry/api@1.9.1)(@types/node@24.19.2)(@vitest/coverage-v8@5.0.5)(vite@8.3.4(@types/node@24.19.2)(jiti@2.7.0)(yaml@2.9.1))
+
+  modules/audit:
+    dependencies:
+      '@wise-biz/audit-chain':
+        specifier: workspace:*
+        version: link:../../packages/audit-chain
+      '@wise-biz/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@wise-biz/crypto':
+        specifier: workspace:*
+        version: link:../../packages/crypto
+      '@wise-biz/db':
+        specifier: workspace:*
+        version: link:../../packages/db
+      '@wise-biz/ids':
+        specifier: workspace:*
+        version: link:../../packages/ids
+      pg:
+        specifier: 8.23.1
+        version: 8.23.1
     devDependencies:
       '@types/node':
         specifier: 24.19.2
@@ -549,6 +595,9 @@ importers:
 
   packages/db:
     dependencies:
+      '@wise-biz/audit-chain':
+        specifier: workspace:*
+        version: link:../audit-chain
       drizzle-orm:
         specifier: 0.45.4
         version: 0.45.4(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(pg@8.23.1)
@@ -708,6 +757,9 @@ importers:
       pino:
         specifier: 10.4.0
         version: 10.4.0
+      redis:
+        specifier: 6.3.0
+        version: 6.3.0(@opentelemetry/api@1.9.1)
       zod:
         specifier: 4.6.7
         version: 4.6.7

@@ -7,18 +7,23 @@ import { testDatabase } from "@wise-biz/testing/containers";
 import type pg from "pg";
 
 const infraMigrations = join(import.meta.dirname, "../../../modules/infra/migrations");
+const auditMigrations = join(import.meta.dirname, "../../../modules/audit/migrations");
 
 export interface Db {
   app: pg.Pool;
   worker: pg.Pool;
   admin: pg.Pool;
   workerUrl: string;
+  chainerUrl: string;
   drop: () => Promise<void>;
 }
 
 export async function setupDb(): Promise<Db> {
   const db = await testDatabase();
-  await migrate(db.url("migrator"), [{ module: "infra", dir: infraMigrations }]);
+  await migrate(db.url("migrator"), [
+    { module: "infra", dir: infraMigrations },
+    { module: "audit", dir: auditMigrations },
+  ]);
   const app = createPool(db.url("app"), { max: 4 });
   const worker = createPool(db.url("worker"), { max: 16 });
   const admin = createPool(db.url("admin"), { max: 2 });
@@ -27,6 +32,7 @@ export async function setupDb(): Promise<Db> {
     worker,
     admin,
     workerUrl: db.url("worker"),
+    chainerUrl: db.url("chainer"),
     drop: async () => {
       await Promise.all([app.end(), worker.end(), admin.end()]);
       await db.drop();

@@ -5,6 +5,7 @@ export { diffEnvExample } from "./example.ts";
 export type { EnvExampleDiff } from "./example.ts";
 export {
   authEnv,
+  chainerEnv,
   databaseEnv,
   emailEnv,
   httpEnv,

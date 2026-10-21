@@ -23,10 +23,25 @@ export interface AppEnv {
   };
 }
 
+/**
+ * Optional fast-path cache for COMPLETED idempotent responses. Postgres stays the source of truth;
+ * implementations must be best effort (a failing cache never fails a request).
+ */
+export interface IdempotencyCache {
+  get(key: string): Promise<string | null>;
+  set(key: string, value: string, ttlMs: number): Promise<void>;
+}
+
+/** Default retention of idempotency keys and cached responses: 24 h (api-conventions.md). */
+export const DEFAULT_IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1000;
+
 export interface ModuleDeps {
   pool: pg.Pool;
   clock: { now(): number };
   ids: { uuidv7(): string };
+  idempotencyCache?: IdempotencyCache;
+  /** Defaults to DEFAULT_IDEMPOTENCY_TTL_MS. */
+  idempotencyTtlMs?: number;
 }
 
 export interface WbModule {

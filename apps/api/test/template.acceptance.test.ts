@@ -1,3 +1,5 @@
+import { join } from "node:path";
+
 import { createPool, instrumentPool, migrate, countQueries } from "@wise-biz/db";
 import { uuidv7 } from "@wise-biz/ids";
 import { templateModule } from "@wise-biz/module-template";
@@ -24,7 +26,17 @@ let app: OpenAPIHono<AppEnv>;
 
 beforeAll(async () => {
   db = await testDatabase();
-  await migrate(db.url("migrator"), [{ module: "_template", dir: templateModule.migrationsDir }]);
+  await migrate(db.url("migrator"), [
+    {
+      module: "infra",
+      dir: join(import.meta.dirname, "..", "..", "..", "modules", "infra", "migrations"),
+    },
+    {
+      module: "audit",
+      dir: join(import.meta.dirname, "..", "..", "..", "modules", "audit", "migrations"),
+    },
+    { module: "_template", dir: templateModule.migrationsDir },
+  ]);
   pool = createPool(db.url("app"), { max: 5 });
   instrumentPool(pool);
   app = createApp({
@@ -53,6 +65,7 @@ const devHeaders = (tenant: string, roles?: string): Record<string, string> => (
 const jsonHeaders = (tenant: string): Record<string, string> => ({
   ...devHeaders(tenant),
   "content-type": "application/json",
+  "idempotency-key": `k-${uuidv7()}`,
 });
 
 interface ItemDto {

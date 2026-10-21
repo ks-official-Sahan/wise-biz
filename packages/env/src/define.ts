@@ -69,6 +69,7 @@ const DEV_DB_PASSWORDS: Readonly<Record<string, string>> = {
   DATABASE_URL: "wb_app",
   DATABASE_MIGRATOR_URL: "wb_migrator",
   DATABASE_WORKER_URL: "wb_worker",
+  DATABASE_CHAINER_URL: "wb_chainer",
 };
 
 function hasDevDbPassword(key: string, value: string): boolean {

@@ -11,6 +11,7 @@ import {
 import { createClient } from "redis";
 
 import { createApp } from "./app.ts";
+import { redisIdempotencyCache } from "./idempotency-cache.ts";
 import { createLogger } from "./logger.ts";
 import { modules } from "./modules.ts";
 
@@ -67,7 +68,14 @@ export async function startServer(source: EnvSource = process.env): Promise<Runn
       logger.error({ err }, "redis connect failed");
     });
 
-    const app = createApp({ modules, pool, redis, env, logger });
+    const app = createApp({
+      modules,
+      pool,
+      redis,
+      env,
+      logger,
+      idempotencyCache: redisIdempotencyCache(redis, logger),
+    });
     const server = serve({ fetch: app.fetch, port: env.PORT }, (info: AddressInfo) => {
       logger.info({ port: info.port }, "api listening");
     });

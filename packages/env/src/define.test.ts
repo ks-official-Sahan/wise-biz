@@ -5,6 +5,7 @@ import {
   EnvError,
   assertProductionEnv,
   authEnv,
+  chainerEnv,
   databaseEnv,
   defineEnv,
   emailEnv,
@@ -135,6 +136,7 @@ describe("assertProductionEnv", () => {
       DATABASE_URL: "postgres://wb_app:wb_app@db:5432/x",
       DATABASE_MIGRATOR_URL: "postgres://wb_migrator:wb_migrator@db:5432/x",
       DATABASE_WORKER_URL: "postgres://wb_worker:wb_worker@db:5432/x",
+      DATABASE_CHAINER_URL: "postgres://wb_chainer:wb_chainer@db:5432/x",
     };
     try {
       assertProductionEnv({ ...ok, ...urls });
@@ -254,6 +256,19 @@ describe("workerEnv", () => {
     expect(() =>
       defineEnv(workerEnv, { DATABASE_WORKER_URL: url, WORKER_RELAY_BATCH: "0" }),
     ).toThrow(/WORKER_RELAY_BATCH/);
+  });
+});
+
+describe("chainerEnv", () => {
+  const url = "postgres://wb_chainer:wb_chainer@localhost:5432/wise_biz";
+  it("requires the chainer URL and defaults the interval", () => {
+    expect(() => defineEnv(chainerEnv, {})).toThrow(/DATABASE_CHAINER_URL/);
+    expect(defineEnv(chainerEnv, { DATABASE_CHAINER_URL: url }).AUDIT_CHAIN_INTERVAL_MS).toBe(2000);
+  });
+  it("bounds the interval", () => {
+    expect(() =>
+      defineEnv(chainerEnv, { DATABASE_CHAINER_URL: url, AUDIT_CHAIN_INTERVAL_MS: "5" }),
+    ).toThrow(/AUDIT_CHAIN_INTERVAL_MS/);
   });
 });
 

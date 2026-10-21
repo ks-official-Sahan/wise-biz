@@ -11,6 +11,8 @@ import type { Clock, Ids } from "../src/ports/item-repository.ts";
 import type pg from "pg";
 
 export const migrationsDir = join(import.meta.dirname, "..", "migrations");
+export const infraDir = join(import.meta.dirname, "..", "..", "infra", "migrations");
+export const auditDir = join(import.meta.dirname, "..", "..", "audit", "migrations");
 export const repo = drizzleItemRepository;
 export const clock: Clock = { now: () => Date.UTC(2026, 0, 1) };
 export const ids: Ids = { uuidv7 };
@@ -22,7 +24,11 @@ export async function setup(): Promise<{
   drop: () => Promise<void>;
 }> {
   const db = await testDatabase();
-  await migrate(db.url("migrator"), [{ module: "_template", dir: migrationsDir }]);
+  await migrate(db.url("migrator"), [
+    { module: "infra", dir: infraDir },
+    { module: "audit", dir: auditDir },
+    { module: "_template", dir: migrationsDir },
+  ]);
   const pool = createPool(db.url("app"));
   instrumentPool(pool);
   const migrator = createPool(db.url("migrator"));

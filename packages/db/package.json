@@ -19,6 +19,7 @@
     "rls-check": "node scripts/rls-check.mts"
   },
   "dependencies": {
+    "@wise-biz/audit-chain": "workspace:*",
     "drizzle-orm": "0.45.4",
     "pg": "8.23.1"
   },

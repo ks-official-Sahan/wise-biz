@@ -11,7 +11,7 @@ export const ERROR_CODES = Object.freeze({
   UNAUTHENTICATED: { status: 401, title: "Authentication required", slug: "unauthenticated" },
   CONFLICT: { status: 409, title: "Conflict", slug: "conflict" },
   IDEMPOTENCY_MISMATCH: {
-    status: 409,
+    status: 422,
     title: "Idempotency key reused with a different request",
     slug: "idempotency/mismatch",
   },

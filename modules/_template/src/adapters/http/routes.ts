@@ -1,8 +1,8 @@
 import { createRoute } from "@hono/zod-openapi";
 import { withTenantTx } from "@wise-biz/db";
-import { authorize, requireTenant } from "@wise-biz/module-kit";
+import { authorize, requireTenant, runCommand } from "@wise-biz/module-kit";
 
-import { createItem, listItems } from "../../application/items.ts";
+import { createItemCommand, listItems } from "../../application/items.ts";
 import { CreateItemSchema, ItemPageSchema, ItemSchema, ListItemsQuery } from "../../schemas.ts";
 import { drizzleItemRepository } from "../db/item-repository.ts";
 
@@ -60,11 +60,13 @@ export function mountRoutes(app: OpenAPIHono<AppEnv>, deps: ModuleDeps): void {
   });
 
   app.openapi(createRoute_, async (c) => {
-    const tenant = requireTenant(c);
-    const body = c.req.valid("json");
-    const created = await withTenantTx(deps.pool, tenant, (tx) =>
-      createItem({ repo, clock: deps.clock, ids: deps.ids }, tx, tenant.tenantId, body),
-    );
-    return c.json(created, 201);
+    // runCommand: authorize -> validate -> Idempotency-Key -> one tx (insert + audit + outbox + key) -> cache.
+    const res = await runCommand(c, deps, {
+      permission: "template:write",
+      input: CreateItemSchema,
+      handler: (tx, body, ctx) =>
+        createItemCommand({ repo, clock: deps.clock, ids: deps.ids }, tx, ctx, body),
+    });
+    return res as never;
   });
 }

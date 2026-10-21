@@ -1,5 +1,6 @@
 import {
   authEnv,
+  chainerEnv,
   databaseEnv,
   emailEnv,
   httpEnv,
@@ -24,6 +25,7 @@ export const ALL_ENV_FRAGMENTS = {
   observability: observabilityEnv,
   http: httpEnv,
   worker: workerEnv,
+  chainer: chainerEnv,
 } as const satisfies Record<string, EnvShape>;
 
 export interface EnvKeyInfo {

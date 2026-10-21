@@ -17,7 +17,7 @@ import { tracing } from "./middleware/tracing.ts";
 
 import type { RedisLike } from "./health.ts";
 import type { AuthEnv } from "./middleware/auth.ts";
-import type { AppEnv, WbModule } from "@wise-biz/module-kit";
+import type { AppEnv, IdempotencyCache, ModuleDeps, WbModule } from "@wise-biz/module-kit";
 import type pg from "pg";
 import type { Logger } from "pino";
 
@@ -32,6 +32,9 @@ export interface CreateAppOptions {
   redis: RedisLike;
   env: ApiEnv;
   logger?: Logger;
+  /** Redis-backed (or any) cache of completed idempotent responses; omit to rely on Postgres alone. */
+  idempotencyCache?: IdempotencyCache;
+  idempotencyTtlMs?: number;
   clock?: { now(): number };
   /** Max request body in bytes (default 1 MiB). */
   bodyLimitBytes?: number;
@@ -69,7 +72,13 @@ export function createApp(opts: CreateAppOptions): OpenAPIHono<AppEnv> {
   app.use("*", policyMiddleware(matrix, clock));
 
   mountHealth(app, { pool, redis });
-  const deps = { pool, clock, ids: { uuidv7 } };
+  const deps: ModuleDeps = {
+    pool,
+    clock,
+    ids: { uuidv7 },
+    ...(opts.idempotencyCache && { idempotencyCache: opts.idempotencyCache }),
+    ...(opts.idempotencyTtlMs !== undefined && { idempotencyTtlMs: opts.idempotencyTtlMs }),
+  };
   for (const m of modules) m.routes(app, deps);
 
   if (isDevLike(env.NODE_ENV)) {

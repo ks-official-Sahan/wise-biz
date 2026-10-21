@@ -60,7 +60,7 @@ afterAll(async () => {
 const post = (app: OpenAPIHono<AppEnv>, body: unknown) =>
   app.request("/v1/template/items", {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", "idempotency-key": `k-${uuidv7()}` },
     body: JSON.stringify(body),
   });
 

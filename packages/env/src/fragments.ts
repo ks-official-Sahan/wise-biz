@@ -84,3 +84,8 @@ export const workerEnv = {
   WORKER_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(1000).default(10),
   WORKER_HANDLER_TIMEOUT_MS: z.coerce.number().int().min(100).max(600_000).default(30_000),
 };
+
+export const chainerEnv = {
+  DATABASE_CHAINER_URL: pgUrl,
+  AUDIT_CHAIN_INTERVAL_MS: z.coerce.number().int().min(100).max(300_000).default(2000),
+};

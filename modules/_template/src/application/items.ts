@@ -1,8 +1,8 @@
 import { toUuid7 } from "@wise-biz/ids";
 
 import { newItem } from "../domain/item.ts";
+import { TEMPLATE_ITEM_TOPIC, TemplateItemCreatedV1 } from "../events.ts";
 
-import { afterWrite } from "./after-write.ts";
 import { decodeCursor, encodeCursor } from "./cursor.ts";
 
 import type { Child, Item } from "../domain/item.ts";
@@ -63,6 +63,61 @@ export async function createItem(
     now: new Date(deps.clock.now()),
   });
   await deps.repo.create(tx, item, children);
-  await afterWrite(tx, tenantId, item);
   return toDto(item, children);
+}
+
+export interface CreateItemCommandCtx {
+  tenant: { tenantId: string };
+  userId: string;
+  requestId: string;
+  now: Date;
+}
+
+/**
+ * Create + audit entry + outbox event, for runCommand (which appends audit/outbox and the idempotency
+ * key in the SAME transaction). Statements: 1 item insert, 1 children insert (only when children exist).
+ */
+export async function createItemCommand(
+  deps: { repo: ItemRepository; clock: Clock; ids: Ids },
+  tx: Tx,
+  ctx: CreateItemCommandCtx,
+  input: { name: string; children?: readonly string[] | undefined },
+) {
+  const tenantId = ctx.tenant.tenantId;
+  const dto = await createItem(deps, tx, tenantId, input);
+  const childCount = dto.children?.length ?? 0;
+  const event = TemplateItemCreatedV1.parse({
+    id: deps.ids.uuidv7(),
+    type: TemplateItemCreatedV1.type,
+    version: TemplateItemCreatedV1.version,
+    source: "api/template",
+    tenantId,
+    subject: `item/${dto.id}`,
+    time: ctx.now.toISOString(),
+    correlationId: ctx.requestId,
+    actor: { type: "user", id: ctx.userId },
+    data: { itemId: dto.id, name: dto.name, childCount },
+  });
+  return {
+    status: 201 as const,
+    body: dto,
+    audit: [
+      {
+        action: "template.item.created",
+        entity: "template.item",
+        entityId: dto.id,
+        after: dto,
+      },
+    ],
+    events: [
+      {
+        id: event.id,
+        topic: TEMPLATE_ITEM_TOPIC,
+        key: dto.id,
+        type: event.type,
+        version: event.version,
+        payload: event,
+      },
+    ],
+  };
 }

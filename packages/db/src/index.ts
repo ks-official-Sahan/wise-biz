@@ -20,3 +20,20 @@ export {
   releaseClaims,
 } from "./infra/relay.ts";
 export type { OutboxKey, OutboxRow } from "./infra/relay.ts";
+export { appendAudit } from "./audit/append.ts";
+export type { AuditActorType, AuditEntry } from "./audit/append.ts";
+export { chainTenant, listTenantsWithUnchained } from "./audit/chainer.ts";
+export { buildDailyAnchor, loadChain, verifyTenantChain } from "./audit/verify.ts";
+export type {
+  AnchorResult,
+  AuditAnchor,
+  AuditChainRow,
+  TenantVerifyResult,
+} from "./audit/verify.ts";
+export { ensureAuditPartitions } from "./audit/partitions.ts";
+export {
+  lockIdempotencyKey,
+  pruneIdempotencyKeys,
+  saveIdempotencyResponse,
+} from "./idempotency/keys.ts";
+export type { IdempotencyLock, StoredResponse } from "./idempotency/keys.ts";
