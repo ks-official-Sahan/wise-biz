@@ -38,7 +38,7 @@ vi.mock("@wise-biz/db", () => ({
 
 const T = "01900000-0000-7000-8000-000000000001";
 const U = "01900000-0000-7000-8000-000000000002";
-const KEY = "key-12345678";
+const IDEM = "idem-12345678";
 const matrix = matrixFromRows(createCatalog(["t:write"]), [{ role: "w", permission: "t:write" }]);
 const Body = z.object({ name: z.string().min(1) });
 
@@ -80,7 +80,7 @@ function build(
   return app;
 }
 
-const call = (app: OpenAPIHono<AppEnv>, body: string, key: string | null = KEY) =>
+const call = (app: OpenAPIHono<AppEnv>, body: string, key: string | null = IDEM) =>
   app.request("/x", {
     method: "POST",
     headers: {
@@ -141,7 +141,7 @@ describe("runCommand", () => {
       { action: "a", entity: "e", actorType: "user", actorId: U, requestId: "req-12345678" },
     ]);
     expect(m.save).toHaveBeenCalledTimes(1);
-    expect(cache.has(`idem:${T}:${U}:${KEY}`)).toBe(true);
+    expect(cache.has(`idem:${T}:${U}:${IDEM}`)).toBe(true);
   });
 
   it("empty audit is INTERNAL", async () => {
@@ -173,8 +173,8 @@ describe("runCommand", () => {
 
   it("scopes the idempotency key to the actor", async () => {
     await call(build(["w"]), '{"name":"a"}');
-    expect(m.lock.mock.calls[0]?.[1]).toMatchObject({ key: `${U}:${KEY}` });
-    expect([...cache.keys()]).toEqual([`idem:${T}:${U}:${KEY}`]);
+    expect(m.lock.mock.calls[0]?.[1]).toMatchObject({ key: `${U}:${IDEM}` });
+    expect([...cache.keys()]).toEqual([`idem:${T}:${U}:${IDEM}`]);
   });
 
   it("rejects a key whose actor-scoped form exceeds 255 chars", async () => {
@@ -187,12 +187,12 @@ describe("runCommand", () => {
     const app = build(["w"]);
     await app.request("/x?a=1", {
       method: "POST",
-      headers: { "content-type": "application/json", "idempotency-key": KEY },
+      headers: { "content-type": "application/json", "idempotency-key": IDEM },
       body: '{"name":"a"}',
     });
     const res = await app.request("/x?a=2", {
       method: "POST",
-      headers: { "content-type": "application/json", "idempotency-key": KEY },
+      headers: { "content-type": "application/json", "idempotency-key": IDEM },
       body: '{"name":"a"}',
     });
     expect(res.status).toBe(422);
@@ -203,7 +203,7 @@ describe("runCommand", () => {
 
   it("ignores cached headers and rejects malformed cached shapes", async () => {
     const app = build(["w"]);
-    const k = `idem:${T}:${U}:${KEY}`;
+    const k = `idem:${T}:${U}:${IDEM}`;
     const hash = requestHash("POST", "/x", { name: "a" }, "");
     const entry = (response: unknown): string => JSON.stringify({ requestHash: hash, response });
     cache.set(
@@ -256,7 +256,7 @@ describe("runCommand", () => {
   });
 
   it("survives a broken or throwing cache", async () => {
-    cache.set(`idem:${T}:${U}:${KEY}`, "not json");
+    cache.set(`idem:${T}:${U}:${IDEM}`, "not json");
     expect((await call(build(["w"]), '{"name":"a"}')).status).toBe(201);
     deps.idempotencyCache = {
       get: () => Promise.reject(new Error("down")),
