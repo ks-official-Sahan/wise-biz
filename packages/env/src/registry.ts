@@ -4,6 +4,7 @@ import {
   databaseEnv,
   emailEnv,
   httpEnv,
+  identityDbEnv,
   kafkaEnv,
   observabilityEnv,
   redisEnv,
@@ -26,6 +27,7 @@ export const ALL_ENV_FRAGMENTS = {
   http: httpEnv,
   worker: workerEnv,
   chainer: chainerEnv,
+  identityDb: identityDbEnv,
 } as const satisfies Record<string, EnvShape>;
 
 export interface EnvKeyInfo {

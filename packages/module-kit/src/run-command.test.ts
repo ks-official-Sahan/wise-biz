@@ -30,6 +30,8 @@ vi.mock("@wise-biz/db", () => ({
     _ctx: unknown,
     fn: (tx: unknown) => Promise<unknown>,
   ): Promise<unknown> => m.tx(fn) as Promise<unknown>,
+  isUuidV7: (v: string) =>
+    /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v),
   lockIdempotencyKey: m.lock,
   saveIdempotencyResponse: m.save,
   appendAudit: m.audit,
@@ -57,9 +59,11 @@ function build(
     c.set("auth", {
       kind: "user",
       userId: U,
+      sessionId: "01900000-0000-7000-8000-0000000000aa",
       tenantId: T,
       roles,
       branchScope: over.resource ? ["other"] : "all",
+      permissionsVersion: 1,
     });
     await next();
   });
@@ -277,6 +281,53 @@ describe("runCommand", () => {
   it("handler error propagates", async () => {
     handler.mockRejectedValue(new DomainError("CONFLICT", "dup"));
     expect((await call(build(["w"]), '{"name":"a"}')).status).toBe(409);
+  });
+});
+
+describe("runCommand bootstrap (no active tenant)", () => {
+  const NEW_TENANT = "01900000-0000-7000-8000-0000000000c1";
+  const BootBody = z.object({ tenantId: z.string() });
+  function boot(auth: AppEnv["Variables"]["auth"]): OpenAPIHono<AppEnv> {
+    const app = new OpenAPIHono<AppEnv>();
+    app.use("*", async (c, next) => {
+      c.set("requestId", "req-12345678");
+      c.set("auth", auth);
+      await next();
+    });
+    app.post("/x", (c) =>
+      runCommand(c, deps, {
+        input: BootBody,
+        bootstrapTenantId: (i) => i.tenantId,
+        handler: handler as never,
+      }),
+    );
+    app.onError((err, c) => {
+      const p = toProblem(err, "r");
+      return c.json(p, p.status as 404);
+    });
+    return app;
+  }
+  const noTenantUser = {
+    kind: "user",
+    userId: U,
+    sessionId: "s",
+    tenantId: null,
+    roles: [],
+    branchScope: [],
+    permissionsVersion: 0,
+  } as const;
+
+  it("uses the validated body tenant for a signed-in user without a tenant", async () => {
+    const res = await call(boot(noTenantUser), JSON.stringify({ tenantId: NEW_TENANT }));
+    expect(res.status).toBe(201);
+    expect(m.lock).toHaveBeenCalled();
+  });
+
+  it("anonymous is 401 before anything runs; a non-UUIDv7 tenant is 422", async () => {
+    expect((await call(boot({ kind: "anonymous" }), "{}")).status).toBe(401);
+    const bad = await call(boot(noTenantUser), JSON.stringify({ tenantId: "nope" }));
+    expect(bad.status).toBe(422);
+    expect(m.tx).not.toHaveBeenCalled();
   });
 });
 

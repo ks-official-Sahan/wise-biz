@@ -1,12 +1,25 @@
+import { getConnInfo } from "@hono/node-server/conninfo";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { uuidv7 } from "@wise-biz/ids";
-import { policyMiddleware } from "@wise-biz/module-kit";
+import { CLIENT_IP_HEADER } from "@wise-biz/module-identity";
+import { setPolicy } from "@wise-biz/module-kit";
 import { createCatalog, matrixFromRows } from "@wise-biz/policy";
 
+import { isDevLike } from "./env-mode.ts";
 import { createErrorHandler, notFoundHandler, validationHook } from "./errors.ts";
 import { mountHealth } from "./health.ts";
+import {
+  LIMITS,
+  bodyEmail,
+  clientIp,
+  createPolicyMatrixCache,
+  emailDigest,
+  ipBucket,
+  originGuard,
+  rateLimit,
+  sha256Hex,
+} from "./kernel/auth/index.ts";
 import { createLogger } from "./logger.ts";
-import { authContext, isDevLike } from "./middleware/auth.ts";
 import { bodyLimit } from "./middleware/body-limit.ts";
 import { corsAllowlist } from "./middleware/cors.ts";
 import { requestLogger } from "./middleware/logger.ts";
@@ -16,14 +29,29 @@ import { tenantResolver } from "./middleware/tenant.ts";
 import { tracing } from "./middleware/tracing.ts";
 
 import type { RedisLike } from "./health.ts";
-import type { AuthEnv } from "./middleware/auth.ts";
-import type { AppEnv, IdempotencyCache, ModuleDeps, WbModule } from "@wise-biz/module-kit";
+import type { AuthResolver, KernelRedis, PolicyRowsLoader } from "./kernel/auth/index.ts";
+import type {
+  AppEnv,
+  AuthContext,
+  IdempotencyCache,
+  ModuleDeps,
+  WbModule,
+} from "@wise-biz/module-kit";
+import type { Context, MiddlewareHandler } from "hono";
 import type pg from "pg";
 import type { Logger } from "pino";
 
-export interface ApiEnv extends AuthEnv {
+export interface ApiEnv {
+  readonly NODE_ENV: "development" | "test" | "production";
   readonly CORS_ORIGINS: readonly string[];
   readonly LOG_LEVEL?: string;
+  /** Trusted reverse-proxy hops (client IP for rate limits and sessions.ip_address). 0 = socket peer only. */
+  readonly TRUST_PROXY_HOPS?: number;
+}
+
+/** The slice of the identity port the app mounts at /v1/auth/*. */
+export interface AuthHandler {
+  handler(req: Request): Promise<Response>;
 }
 
 export interface CreateAppOptions {
@@ -31,6 +59,14 @@ export interface CreateAppOptions {
   pool: pg.Pool;
   redis: RedisLike;
   env: ApiEnv;
+  /** Resolves the caller. Production: `sessionResolver`; tests inject a header-based resolver. Required. */
+  auth: AuthResolver;
+  /** Tenancy policy rows for the per-request matrix (cached by tenant + permissions version). Default: no rows. */
+  policyRows?: PolicyRowsLoader;
+  /** Redis for the policy cache (read-through) and the sign-in/sign-up/create-business rate limiter (fail closed). */
+  kernelRedis?: KernelRedis;
+  /** Identity (Better Auth) handler, mounted at /v1/auth/*. Omit to leave /v1/auth unmounted. */
+  identity?: AuthHandler;
   logger?: Logger;
   /** Redis-backed (or any) cache of completed idempotent responses; omit to rely on Postgres alone. */
   idempotencyCache?: IdempotencyCache;
@@ -38,6 +74,17 @@ export interface CreateAppOptions {
   clock?: { now(): number };
   /** Max request body in bytes (default 1 MiB). */
   bodyLimitBytes?: number;
+}
+
+const ANON: AuthContext = Object.freeze({ kind: "anonymous" });
+
+/** Socket peer address when running under @hono/node-server; undefined in tests (app.request). */
+function socketIp(c: Context<AppEnv>): string | undefined {
+  try {
+    return getConnInfo(c).remote.address;
+  } catch {
+    return undefined;
+  }
 }
 
 /** Modules that may run in this environment (devOnly ones are skipped in production). */
@@ -54,9 +101,18 @@ export function createApp(opts: CreateAppOptions): OpenAPIHono<AppEnv> {
   const logger = opts.logger ?? createLogger(env.LOG_LEVEL);
   const modules = mountableModules(opts.modules, env.NODE_ENV);
 
-  // Owner gets every registered module permission; P0-08 replaces this with stored policy rows.
+  // Owner gets every registered module permission; other roles come from stored tenancy grants (per tenant).
   const catalog = createCatalog(...modules.map((m) => m.permissions));
-  const matrix = matrixFromRows(catalog, []);
+  const noGrants = matrixFromRows(catalog, []);
+  const policy = createPolicyMatrixCache({
+    catalog,
+    loadRows: opts.policyRows ?? (() => Promise.resolve([])),
+    redis: opts.kernelRedis,
+    logger,
+  });
+  const hops = env.TRUST_PROXY_HOPS ?? 0;
+  const trustedIp = (c: Context<AppEnv>): string => clientIp(c, hops, socketIp(c));
+  const ipOf = (c: Context<AppEnv>): string => ipBucket(trustedIp(c));
 
   const app = new OpenAPIHono<AppEnv>({ defaultHook: validationHook });
 
@@ -67,9 +123,100 @@ export function createApp(opts: CreateAppOptions): OpenAPIHono<AppEnv> {
   app.use("*", securityHeaders());
   app.use("*", corsAllowlist(env.CORS_ORIGINS));
   app.use("*", bodyLimit(opts.bodyLimitBytes));
-  app.use("*", authContext(env));
+  app.use("*", originGuard(env.CORS_ORIGINS));
+  const resolveAuth: MiddlewareHandler<AppEnv> = async (c, next) => {
+    // /v1/auth/* is Better Auth's own surface: it reads the session itself, so skip our resolver (saves 2 queries).
+    c.set("auth", c.req.path.startsWith("/v1/auth/") ? ANON : await opts.auth(c));
+    await next();
+  };
+  const policyContext: MiddlewareHandler<AppEnv> = async (c, next) => {
+    const auth = c.get("auth");
+    const matrix =
+      auth.kind === "user" && auth.tenantId !== null
+        ? await policy.matrixFor(auth.tenantId, auth.permissionsVersion, c.get("requestId"))
+        : noGrants;
+    setPolicy(c, { matrix, now: () => clock.now() });
+    await next();
+  };
+  app.use("*", resolveAuth);
   app.use("*", tenantResolver());
-  app.use("*", policyMiddleware(matrix, clock));
+  app.use("*", policyContext);
+
+  // Rate limits: Redis, FAIL CLOSED (503) and ONLY on these writes; reads never touch the limiter.
+  const limited = { redis: opts.kernelRedis, method: "POST" } as const;
+  app.use(
+    "/v1/auth/sign-in/*",
+    rateLimit(
+      [
+        { name: "signin:ip", ...LIMITS.signInPerIp, subject: ipOf },
+        {
+          name: "signin:email",
+          ...LIMITS.signInPerEmail,
+          subject: async (c) => {
+            const email = await bodyEmail(c);
+            return email === null ? null : emailDigest(email);
+          },
+        },
+      ],
+      limited,
+    ),
+  );
+  app.use(
+    "/v1/auth/sign-up/*",
+    rateLimit([{ name: "signup:ip", ...LIMITS.signUpPerIp, subject: ipOf }], limited),
+  );
+  // Every OTHER unsafe auth route (change-password, update-user, revoke-*, sign-out...): per session, per IP without one.
+  app.use(
+    "/v1/auth/*",
+    rateLimit(
+      [
+        {
+          name: "auth-write",
+          ...LIMITS.authWritePerSession,
+          subject: (c) => {
+            if (
+              c.req.path.startsWith("/v1/auth/sign-in/") ||
+              c.req.path.startsWith("/v1/auth/sign-up/")
+            ) {
+              return null;
+            } // covered above
+            const cookie = c.req.header("cookie");
+            return cookie === undefined || cookie === ""
+              ? `ip:${ipOf(c)}`
+              : `session:${sha256Hex(cookie)}`;
+          },
+        },
+      ],
+      { redis: opts.kernelRedis, unsafeOnly: true },
+    ),
+  );
+  app.use(
+    "/v1/tenancy/tenants",
+    rateLimit(
+      [
+        {
+          name: "create-business:user",
+          ...LIMITS.createBusinessPerUser,
+          subject: (c) => {
+            const auth = c.get("auth");
+            return auth.kind === "user" ? auth.userId : null;
+          },
+        },
+      ],
+      limited,
+    ),
+  );
+  if (opts.identity) {
+    const identity = opts.identity;
+    // Better Auth reads the client IP ONLY from CLIENT_IP_HEADER: strip anything the client sent, set the trusted one.
+    app.all("/v1/auth/*", (c) => {
+      const headers = new Headers(c.req.raw.headers);
+      headers.delete(CLIENT_IP_HEADER);
+      const ip = trustedIp(c);
+      if (ip !== "unknown") headers.set(CLIENT_IP_HEADER, ip);
+      return identity.handler(new Request(c.req.raw, { headers }));
+    });
+  }
 
   mountHealth(app, { pool, redis });
   const deps: ModuleDeps = {

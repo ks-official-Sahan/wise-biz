@@ -62,6 +62,103 @@
         "required": ["id", "name", "createdAt"],
         "type": "object"
       },
+      "TenancyMyTenant": {
+        "properties": {
+          "membershipId": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "name": {
+            "type": "string"
+          },
+          "tenantId": {
+            "$ref": "#/components/schemas/Uuid7"
+          }
+        },
+        "required": ["tenantId", "name", "membershipId"],
+        "type": "object"
+      },
+      "TenancyMyTenants": {
+        "properties": {
+          "tenants": {
+            "items": {
+              "$ref": "#/components/schemas/TenancyMyTenant"
+            },
+            "type": "array"
+          }
+        },
+        "required": ["tenants"],
+        "type": "object"
+      },
+      "TenancySignUpBusiness": {
+        "properties": {
+          "branch": {
+            "properties": {
+              "businessDayCutoff": {
+                "maxLength": 5,
+                "type": "string"
+              },
+              "currency": {
+                "maxLength": 3,
+                "type": "string"
+              },
+              "kind": {
+                "enum": ["store", "warehouse", "office"],
+                "type": "string"
+              },
+              "name": {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              "taxRegion": {
+                "maxLength": 100,
+                "type": "string"
+              },
+              "timezone": {
+                "maxLength": 64,
+                "type": "string"
+              }
+            },
+            "required": ["name", "kind", "timezone", "currency", "taxRegion"],
+            "type": "object"
+          },
+          "name": {
+            "maxLength": 1000,
+            "type": "string"
+          },
+          "tenantId": {
+            "$ref": "#/components/schemas/Uuid7"
+          }
+        },
+        "required": ["tenantId", "name", "branch"],
+        "type": "object"
+      },
+      "TenancySwitchTenant": {
+        "properties": {
+          "tenantId": {
+            "$ref": "#/components/schemas/Uuid7"
+          }
+        },
+        "required": ["tenantId"],
+        "type": "object"
+      },
+      "TenancyTenantCreated": {
+        "properties": {
+          "branchId": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "locationId": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "name": {
+            "type": "string"
+          },
+          "tenantId": {
+            "$ref": "#/components/schemas/Uuid7"
+          }
+        },
+        "required": ["tenantId", "name", "branchId", "locationId"],
+        "type": "object"
+      },
       "Timestamp": {
         "format": "date-time",
         "type": "string"
@@ -261,6 +358,73 @@
         },
         "summary": "Create an item with optional children",
         "tags": ["template"]
+      }
+    },
+    "/v1/tenancy/me/tenants": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenancyMyTenants"
+                }
+              }
+            },
+            "description": "Tenants"
+          }
+        },
+        "summary": "Tenants the signed-in user is an active member of",
+        "tags": ["tenancy"]
+      }
+    },
+    "/v1/tenancy/switch": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TenancySwitchTenant"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Switched"
+          }
+        },
+        "summary": "Make a tenant the active one for this session (404 unless an active member)",
+        "tags": ["tenancy"]
+      }
+    },
+    "/v1/tenancy/tenants": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TenancySignUpBusiness"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenancyTenantCreated"
+                }
+              }
+            },
+            "description": "Created"
+          }
+        },
+        "summary": "Create a business (tenant, roles, first branch, owner membership) and make it the active tenant",
+        "tags": ["tenancy"]
       }
     }
   },

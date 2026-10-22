@@ -9,9 +9,13 @@ export type AuthContext =
   | {
       kind: "user";
       userId: string;
-      tenantId: string;
+      sessionId: string;
+      /** Active tenant after a fresh membership check; null = signed in, no (valid) tenant: fail closed. */
+      tenantId: string | null;
       roles: readonly string[];
       branchScope: "all" | readonly string[];
+      /** tenancy.tenants.permissions_version at resolve time; keys the policy-matrix cache. */
+      permissionsVersion: number;
     };
 
 export interface AppEnv {

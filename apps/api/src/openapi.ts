@@ -51,7 +51,8 @@ export function buildOpenApi(modules: readonly WbModule[]): string {
     modules,
     pool: {} as pg.Pool,
     redis: { ping: () => Promise.resolve("PONG") },
-    env: { NODE_ENV: "test", API_DEV_AUTH: false, CORS_ORIGINS: [] },
+    env: { NODE_ENV: "test", CORS_ORIGINS: [] },
+    auth: () => Promise.resolve({ kind: "anonymous" }),
     logger: createLogger("silent"),
   });
   const doc = app.getOpenAPI31Document(openapiInfo);

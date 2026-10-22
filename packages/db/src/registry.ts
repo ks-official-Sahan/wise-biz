@@ -34,3 +34,26 @@ export async function loadRegistry(repoRoot: string): Promise<ModuleEntry[]> {
   }
   return out;
 }
+
+/**
+ * Schemas (module names) that are GLOBAL: no tenant_id, no RLS, reachable only by their own role (identity).
+ * `global` is optional in modules/registry.json and every entry must also be listed in `modules`.
+ */
+export async function loadGlobalSchemas(repoRoot: string): Promise<string[]> {
+  const raw: unknown = JSON.parse(
+    await readFile(join(repoRoot, "modules", "registry.json"), "utf8"),
+  );
+  const { modules, global } = raw as { modules?: unknown; global?: unknown };
+  if (global === undefined) return [];
+  if (!Array.isArray(global) || !global.every((m) => typeof m === "string")) {
+    throw new Error("modules/registry.json: expected global: string[]");
+  }
+  const known = new Set(Array.isArray(modules) ? (modules as string[]) : []);
+  for (const module of global) {
+    assertModuleName(module);
+    if (!known.has(module)) {
+      throw new Error(`modules/registry.json: global "${module}" is not in modules`);
+    }
+  }
+  return global;
+}

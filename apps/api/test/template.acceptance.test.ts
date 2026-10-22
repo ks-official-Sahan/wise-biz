@@ -9,7 +9,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createApp } from "../src/app.ts";
 import { createLogger } from "../src/logger.ts";
 
-import { baseEnv, okRedis } from "./helpers.ts";
+import { baseEnv, headerAuth, okRedis } from "./helpers.ts";
 
 import type { ApiEnv } from "../src/app.ts";
 import type { OpenAPIHono } from "@hono/zod-openapi";
@@ -18,7 +18,7 @@ import type { TestDatabase } from "@wise-biz/testing/containers";
 import type pg from "pg";
 
 const ITEMS = "/v1/template/items";
-const env: ApiEnv = { ...baseEnv, API_DEV_AUTH: true };
+const env: ApiEnv = baseEnv;
 
 let db: TestDatabase;
 let pool: pg.Pool;
@@ -44,6 +44,7 @@ beforeAll(async () => {
     pool,
     redis: okRedis,
     env,
+    auth: headerAuth,
     logger: createLogger("silent"),
   });
 });
@@ -235,6 +236,7 @@ describe("/ready against a real Postgres that is stopped", () => {
         pool: readyPool,
         redis: okRedis,
         env,
+        auth: headerAuth,
         logger: createLogger("silent"),
       });
       try {

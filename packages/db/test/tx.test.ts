@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { createPool, withTenantTx } from "../src/index.ts";
+import { createPool, withTenantTx, withUserTx } from "../src/index.ts";
 
 import { fixture, migratedDb, uuid7 } from "./helpers.ts";
 
@@ -26,10 +26,11 @@ const show =
 describe("withTenantTx", () => {
   it("sets settings inside, none leak to the reused pooled client", async () => {
     const a = uuid7();
-    const inside = await withTenantTx(pool, { tenantId: a, userId: "u1", requestId: "r1" }, (tx) =>
+    const usr = uuid7();
+    const inside = await withTenantTx(pool, { tenantId: a, userId: usr, requestId: "r1" }, (tx) =>
       tx.query(show),
     );
-    expect(inside.rows[0]).toEqual({ t: a, u: "u1", r: "r1" });
+    expect(inside.rows[0]).toEqual({ t: a, u: usr, r: "r1" });
     const b = uuid7();
     const other = await withTenantTx(pool, { tenantId: b, requestId: "r2" }, (tx) =>
       tx.query(show),
@@ -37,6 +38,14 @@ describe("withTenantTx", () => {
     expect(other.rows[0]).toEqual({ t: b, u: "", r: "r2" });
     const outside = await pool.query(show);
     expect(outside.rows[0]).toEqual({ t: "", u: "", r: "" });
+  });
+
+  it("rejects a non UUIDv7 userId before BEGIN", async () => {
+    await expect(
+      withTenantTx(pool, { tenantId: uuid7(), userId: "u1", requestId: "r" }, () =>
+        Promise.resolve(1),
+      ),
+    ).rejects.toThrow(/userId must be a UUIDv7/);
   });
 
   it("commits on success and rolls back on throw", async () => {
@@ -91,5 +100,30 @@ describe("withTenantTx", () => {
     await expect(leaked.db.execute(sql`select 1`)).rejects.toMatchObject({
       cause: { message: expect.stringMatching(/closed/) as unknown },
     });
+  });
+});
+
+describe("withUserTx", () => {
+  it("sets app.user_id with an empty tenant; nothing leaks to the pooled client", async () => {
+    const u = uuid7();
+    const inside = await withUserTx(pool, { userId: u, requestId: "r1" }, (tx) => tx.query(show));
+    expect(inside.rows[0]).toEqual({ t: "", u, r: "r1" });
+    expect((await pool.query(show)).rows[0]).toEqual({ t: "", u: "", r: "" });
+  });
+
+  it("rejects non UUIDv7 user ids before BEGIN", async () => {
+    for (const bad of ["", "nope", "00000000-0000-4000-8000-000000000000", "x'; select 1;--"]) {
+      await expect(
+        withUserTx(pool, { userId: bad, requestId: "r" }, () => Promise.resolve(1)),
+      ).rejects.toThrow(/UUIDv7/);
+    }
+  });
+
+  it("commits on success and rolls back on throw", async () => {
+    const u = uuid7();
+    await expect(
+      withUserTx(pool, { userId: u, requestId: "r" }, () => Promise.reject(new Error("boom"))),
+    ).rejects.toThrow("boom");
+    expect(await withUserTx(pool, { userId: u, requestId: "r" }, () => Promise.resolve(7))).toBe(7);
   });
 });

@@ -8,6 +8,7 @@ interface Resolved {
     passWithNoTests: boolean;
     testTimeout: number;
     hookTimeout: number;
+    maxWorkers: number;
     coverage: { provider: string; thresholds: Record<string, number>; include: string[] };
   };
 }
@@ -19,6 +20,7 @@ describe("wiseBizVitest", () => {
     expect(config.test.passWithNoTests).toBe(true);
     expect(config.test.testTimeout).toBe(5_000);
     expect(config.test.hookTimeout).toBe(10_000);
+    expect(config.test.maxWorkers).toBe(4);
     expect(config.test.coverage.provider).toBe("v8");
     expect(config.test.coverage.include).toEqual(["src/**/*.ts"]);
     expect(config.test.coverage.thresholds).toEqual({

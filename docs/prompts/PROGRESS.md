@@ -15,7 +15,7 @@ Legend: ⬜ todo · 🟡 in progress · ✅ done · ⛔ blocked
 | P0-05 Crypto, policy, audit-chain | ✅ | 2026-10-19 | d27dca0 | Own RFC 8785 canonicalize + hand-written UTF-8 (Hermes); @noble/hashes+curves 2.4 (strict RFC 8032). Vectors from pyca/cryptography + C2SP/wycheproof mirrors (rfc-editor.org/nist.gov blocked by proxy). verifyChain takes an anchor (tail truncation only detectable against one). Policy fails closed (scope, context, unknown condition keys); snapshots domain-separated, minVersion rollback guard, TTL cap. Overrides: approvers share the requesting terminal context (PIN on same device) — review suggestion declined. |
 | P0-06 API, DB, RLS | ✅ | 2026-10-20 | 005e670 | Split 06a/06b (user). **06a ✅**: @wise-biz/db (pg 8 + drizzle 0.45; withTenantTx via set_config; RLS `nullif(current_setting(…), '')::uuid` so pooled empty setting = zero rows; own SQL migrator per module, wb_migrations bookkeeping; rls-check incl. partitions/matviews/views/policy content; query counter) + testcontainers harness (PG18 template clone ~100 ms). rls-check proven with a temporary module. **06b ✅**: apps/api (Hono 4.13 + zod-openapi, middleware order per spec with CORS before body limit, problem+json incl. PAYLOAD_TOO_LARGE, /ready cached 1 s single-flight, NODE_ENV now required so dev auth can never be inferred), @wise-biz/module-kit (modules can't import apps), modules/_template (PK (tenant_id,id), RESTRICT FKs, 2 queries for 50 rows, EXPLAIN as wb_app). Verified: fresh infra → migrate → rls-check → 82 api tests; real server curl /health 200, /ready 503 with PG stopped. |
 | P0-07 Outbox, idempotency, audit | ✅ | 2026-10-21 | 260d2e4 | Split 07a/07b (user). **07a ✅**: modules/infra (outbox, processed_events, dead_letters; forced RLS + per-command wb_worker policies; new wb_worker role, no BYPASSRLS), @wise-biz/events (EventBus port, memory + pg adapters, shared contract test), apps/workers relay. Review CRITICALs fixed by a **lease-based relay** (claim in short tx, publish with no tx open, mark only delivered; quarantine after max attempts; pruning). Tenant-scoped idempotency keys; consumer tx sets app.tenant_id. **07b ✅**: infra.idempotency_keys decided in the mutation tx under an advisory xact lock (byte-identical text replay; key scoped per user; Redis = best-effort cache), modules/audit (partitioned audit_log, async chainer with chainer-assigned chain_seq — ADR 0009, daily anchors, partition job 6 months ahead), runCommand in module-kit (7 statements per create). **Deviation: load smoke target NOT met in this container** — 1 API process ~520 req/s, p50 16 ms, p97.5 41 ms at 16 conns, 0 errors, no lock waits sampled; 2 processes ~575 req/s combined (4-core box shared by API, PG, Redis, docker-proxy, load generator = machine-bound). Re-run on a laptop/perf box. |
-| P0-08 Identity + tenancy | ⬜ | | | |
+| P0-08 Identity + tenancy | 🟡 | 2026-10-22 | (08a) | Split 08a/08b (user). ADR 0010 (council-backed): own tenancy tables; `better-auth` 1.7.12 directly for identity (auth-kit engine has v4 IDs, Upstash-only limiter, Next peers — upstream in P0-11; password policy ported). **08a ✅**: modules/identity (global `identity` schema, role `wb_identity`, `__Host-wb_session`, UUIDv7 ids), modules/tenancy (8 RLS tables, own-rows SELECT policies only without an active tenant, SECURITY DEFINER version-bump trigger on grants that fails outside tenant context), create business (client UUIDv7 tenantId, one tx, cap 20), me/tenants, switch (audited), API kernel (session → membership resolver fail closed, LRU+Redis+DB policy matrix, fail-closed Redis rate limits, `TRUST_PROXY_HOPS`, origin guard), `API_DEV_AUTH` removed, rls-check global schemas + policy-shape lint. Deviation: sign-up is two steps (account, then business) — no cross-module tx. Reviews: 4 HIGH fixed (cross-tenant own-rows policy, tenants grants, getSession swallowing infra errors, XFF trust). Test infra: vitest maxWorkers 4 per package (Docker saturation); graceful shutdown no longer hangs when Redis is lost. **08b ⬜** |
 | P0-09 Design system | ⬜ | | | |
 | P0-10 Console shell | ⬜ | | | |
 | P0-11 Upstream Sahan packages | ⬜ | | | |
@@ -50,7 +50,9 @@ Tracked in `docs/prompts/P2/README.md` order; add rows here when P2 starts.
 
 ## Resume here
 
-- Next step: `/wb-step docs/prompts/P0/08-identity-tenancy.md` (gate step; ask single vs split first).
+- Next step: P0-08b on branch `feat/p0-08-identity-tenancy` (`/wb-step docs/prompts/P0/08-identity-tenancy.md`, 08b scope: invites + accept, updateMemberRoles, createRole, setRolePermissions, passkeys (virtual authenticator), emailed OTP MFA, email verification, seed script, out-of-branch 404 test).
+- After pulling P0-08a: `pnpm infra:reset` (new DB role `wb_identity`), then `pnpm db:migrate`. `.env` needs `DATABASE_IDENTITY_URL` and `TRUST_PROXY_HOPS` (see `.env.example`); `API_DEV_AUTH` is gone.
+- Run tests with `REDIS_URL` unset in the shell (the env test assumes it is absent; containers provide Redis).
 - P0-01–P0-07 merged via PR #3; all CI checks green (check, actionlint, audit, gitleaks, licenses, CodeQL, dependency review).
 - Local prerequisites: Node 24 LTS, pnpm 12 (Corepack), Docker. `pnpm i && cp .env.example .env && pnpm infra:up && pnpm check`.
 - gitleaks false positives go in `.gitleaksignore` (fingerprint, reviewed) — never real secrets.
@@ -80,7 +82,7 @@ Tracked in `docs/prompts/P2/README.md` order; add rows here when P2 starts.
 - [ ] (P0-06a) rls-check matches `app.tenant_id` in policy text; a hand-written `true OR …` would pass — review migrations for policy shape — owner: every module PR
 - [ ] (P0-06a) Pool startup `-c` options break behind pgbouncer transaction mode; move timeouts to role settings only if pgbouncer is introduced — owner: P1-15
 - [x] (P0-06b) Create endpoint goes through runCommand (idempotency + audit + outbox in one tx) — done in P0-07b
-- [ ] (P0-06b) Auth is a dev-header placeholder (API_DEV_AUTH, development/test only); real sessions, devices and tenant membership — owner: P0-08
+- [x] (P0-06b) Auth is a dev-header placeholder (API_DEV_AUTH) — replaced in P0-08a by Better Auth sessions + tenancy memberships (devices remain P1-01)
 - [ ] (P0-06b) `main.ts`/OTel bootstrap lack direct unit tests (covered by the listening-server integration test only) — owner: P0-12 gate
 - [ ] (P0-07a) Multiple relays publish out of per-key order (SKIP LOCKED); partition relays by hash(key) or rely on Kafka partitioning when the Kafka adapter lands — owner: P2 Kafka adapter
 - [ ] (P0-07b) Load smoke: re-run `pnpm load:template` (1,000 req/s, 30 s, p95 < 50 ms) on a laptop/perf box with ≥ 2 API replicas; this 4-core container topped out at ~575 req/s — owner: P0-12 gate
@@ -90,6 +92,14 @@ Tracked in `docs/prompts/P2/README.md` order; add rows here when P2 starts.
 - [ ] (P0-07b) API metrics sink (startServer hooks.onMetric) not wired; workers log metrics every 60 s pending OTel export — owner: P0-12 gate
 - [ ] (P0-07b) module-audit tests failed twice under full parallel load right after heavy Docker activity, then passed 5 cold runs; capture output if it recurs — owner: P0-12 gate
 - [ ] (P0-01) Add jsx-a11y / RN a11y lint once a plugin supports ESLint 10 — owner: P0-09
+- [ ] (P0-08a) Sign-up reveals registered emails; accounts unverified — enable `requireEmailVerification` + uniform response once email delivery lands — owner: P0-08b
+- [ ] (P0-08a) Per-email sign-in limit (5/min) lets an attacker lock one account out; add CAPTCHA/step-up or progressive delay — owner: P1-15
+- [ ] (P0-08a) `identity.accounts` OAuth tokens are plaintext columns (unused today); encrypt (tenant-agnostic KMS key) before social login/SSO — owner: P2 SSO
+- [ ] (P0-08a) Cluster default privileges grant wb_app DML on every new table, so each new global-schema table relies on its migration's REVOKE (caught by rls-check); scope defaults per schema — owner: P1-15
+- [ ] (P0-08a) Passkey RP ID is one domain; per-tenant custom domains need a passkey strategy — owner: P2 storefront domains
+- [ ] (P0-08a) Per request: session lookup + loadMembership tx (BEGIN, set_config, SELECT, COMMIT); collapse to one round trip or a 2–5 s (user, tenant) cache if p95 budget needs it — owner: P0-12 gate
+- [ ] (P0-08a) `@wise-biz/env` "defaults to process.env" test fails when the shell has REDIS_URL; make it hermetic — owner: P0-12 gate
+- [ ] (P0-08a) `pnpm db:rls-check` was verified via the test harness only (dev DB needs `pnpm infra:reset` for wb_identity) — owner: next step touching DB
 
 ## Decisions taken during build
 

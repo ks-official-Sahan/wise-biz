@@ -2,18 +2,23 @@ import { serve } from "@hono/node-server";
 import { createPool, instrumentPool } from "@wise-biz/db";
 import {
   assertProductionEnv,
+  authEnv,
   databaseEnv,
   defineEnv,
   httpEnv,
+  identityDbEnv,
   observabilityEnv,
   redisEnv,
 } from "@wise-biz/env";
+import { SESSION_COOKIE_NAME, createIdentity } from "@wise-biz/module-identity";
+import { createTenancyPorts } from "@wise-biz/module-tenancy";
 import { createClient } from "redis";
 
 import { createApp } from "./app.ts";
 import { redisIdempotencyCache } from "./idempotency-cache.ts";
+import { nodeRedisKernel, sessionResolver } from "./kernel/auth/index.ts";
 import { createLogger } from "./logger.ts";
-import { modules } from "./modules.ts";
+import { createModules } from "./modules.ts";
 
 import type { CacheOnMetric } from "./idempotency-cache.ts";
 import type { EnvSource } from "@wise-biz/env";
@@ -21,7 +26,14 @@ import type { AddressInfo } from "node:net";
 
 const CLOSE_GRACE_MS = 5000;
 
-export const API_ENV = { ...databaseEnv, ...redisEnv, ...observabilityEnv, ...httpEnv };
+export const API_ENV = {
+  ...databaseEnv,
+  ...identityDbEnv,
+  ...authEnv,
+  ...redisEnv,
+  ...observabilityEnv,
+  ...httpEnv,
+};
 
 export interface RunningServer {
   port: number;
@@ -46,6 +58,14 @@ export async function startServer(
     },
   });
   if (env.NODE_ENV !== "production") instrumentPool(pool);
+  // Dedicated pool for the identity schema: wb_identity is the only role allowed to touch it (ADR 0010).
+  const identityPool = createPool(env.DATABASE_IDENTITY_URL, {
+    max: Math.min(env.DATABASE_POOL_MAX, 10),
+    applicationName: "wb-api-identity",
+    onError: (err) => {
+      logger.warn({ err }, "idle identity postgres client error");
+    },
+  });
   // Fail fast instead of retrying forever silently: readiness reports Redis, the API still serves.
   const redis = createClient({
     url: env.REDIS_URL,
@@ -63,9 +83,23 @@ export async function startServer(
       // already ended or never connected
     }
     try {
-      await redis.close();
+      await identityPool.end();
     } catch {
-      redis.destroy();
+      // already ended or never connected
+    }
+    // close() waits for the socket; with Redis lost mid-run the client is reconnecting and close() never settles.
+    if (!redis.isReady) {
+      try {
+        redis.destroy();
+      } catch {
+        // already closed
+      }
+    } else {
+      try {
+        await redis.close();
+      } catch {
+        redis.destroy();
+      }
     }
   };
 
@@ -75,12 +109,27 @@ export async function startServer(
       logger.error({ err }, "redis connect failed");
     });
 
+    const identity = createIdentity({
+      pool: identityPool,
+      secret: env.AUTH_SECRET,
+      baseURL: env.AUTH_URL,
+      trustedOrigins: [...env.CORS_ORIGINS],
+    });
+    const tenancy = createTenancyPorts(pool);
     const app = createApp({
-      modules,
+      modules: createModules(identity),
       pool,
       redis,
       env,
       logger,
+      auth: sessionResolver({
+        sessions: identity,
+        memberships: tenancy,
+        cookieName: SESSION_COOKIE_NAME,
+      }),
+      policyRows: (tenantId, requestId) => tenancy.loadPolicyRows(tenantId, requestId),
+      kernelRedis: nodeRedisKernel(redis),
+      identity,
       idempotencyCache: redisIdempotencyCache(redis, logger, { onMetric: hooks.onMetric }),
     });
     const server = serve({ fetch: app.fetch, port: env.PORT }, (info: AddressInfo) => {

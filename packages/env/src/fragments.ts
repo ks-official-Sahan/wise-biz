@@ -72,8 +72,7 @@ export const httpEnv = {
         .map((o) => o.trim())
         .filter((o) => o.length > 0),
     ),
-  API_DEV_AUTH: z.stringbool().default(false),
-  TRUST_PROXY: z.stringbool().default(false),
+  TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(10).default(0),
 };
 
 export const workerEnv = {
@@ -88,4 +87,8 @@ export const workerEnv = {
 export const chainerEnv = {
   DATABASE_CHAINER_URL: pgUrl,
   AUDIT_CHAIN_INTERVAL_MS: z.coerce.number().int().min(100).max(300_000).default(2000),
+};
+
+export const identityDbEnv = {
+  DATABASE_IDENTITY_URL: pgUrl,
 };
