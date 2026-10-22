@@ -49,6 +49,17 @@ These carry straight into `AGENTS.md` non-negotiables.
 | 13 | **CMS not packaged** (noted in the repo's own packages README) | app | Not needed for POS; storefront content uses simple tenant pages |
 | 14 | **Node crypto in server packages** | auth-kit, analytics-kit | Import only browser-safe subpaths in Expo; keep server subpaths out of the POS bundle (lint rule) |
 
+### Found while building P0-08 (fix upstream in P0-11)
+
+| # | Gap | Where | Upgrade |
+|---|---|---|---|
+| 15 | Engine generates its own (v4) IDs; no ID generator injection | auth-kit | Accept `generateId` (UUIDv7) in the engine and adapters |
+| 16 | Rate limiter is Upstash-only | auth-kit | Port interface; node-redis / ioredis adapter, fail-closed option |
+| 17 | Next.js peers on server entry points | auth-kit | Split framework-free core (`/server`) from Next helpers |
+| 18 | No email verification gate or uniform sign-up response | auth-kit | Expose `requireEmailVerification` + uniform response (wise-biz identity does both) |
+| 19 | WebAuthn verifies with `requireUserVerification: false` (`webauthn/index.ts`) | auth-kit | Require UV on sign-in assertions (as wise-biz identity does) |
+| 20 | SMTP provider is Brevo-only (AUTH mandatory); no generic relay SMTP for local Mailpit or self-hosted relays | email-kit | Generic SMTP provider (optional AUTH, TLS required in production) so `@wise-biz/mailer` can drop its nodemailer path |
+
 ## Plan
 
 1. Fork-free: contribute upgrades to the Sahan repo packages where general (tenancy context in auth-kit RBAC, ID generator injection, tenant prefix in media-kit, budgets in ai-core). Bump minor versions; keep backward compatible.

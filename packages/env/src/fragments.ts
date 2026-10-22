@@ -46,12 +46,50 @@ export const storageEnv = {
   STORAGE_FORCE_PATH_STYLE: z.stringbool().default(false),
 };
 
+const resendApiKey = z.string().min(1).optional();
+
 export const emailEnv = {
   EMAIL_PROVIDER: z.enum(["capture", "smtp", "resend", "brevo"]).default("capture"),
   EMAIL_FROM: z.email(),
   SMTP_URL: z.url().optional(),
-  RESEND_API_KEY: z.string().min(1).optional(),
+  RESEND_API_KEY: resendApiKey,
   BREVO_API_KEY: z.string().min(1).optional(),
+};
+
+/** Transactional mail (@wise-biz/mailer). SMTP wins when MAIL_SMTP_HOST is set, else Resend. */
+export const mailEnv = {
+  MAIL_FROM: z.email(),
+  MAIL_SMTP_HOST: z.string().min(1).optional(),
+  MAIL_SMTP_PORT: z.coerce.number().int().min(1).max(65535).optional(),
+  RESEND_API_KEY: resendApiKey,
+};
+
+/** HMAC key for invite tokens (tenancy). Never log it. */
+export const inviteEnv = {
+  INVITE_SECRET: z.string().min(32),
+};
+
+/** Public console base URL; email links (verify, invite) point here. */
+export const consoleEnv = {
+  CONSOLE_URL: z.url(),
+};
+
+/** WebAuthn relying-party id: a bare hostname, no scheme or port. */
+export const webauthnEnv = {
+  AUTH_RP_ID: z
+    .string()
+    .min(1)
+    .max(253)
+    .regex(
+      /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$/,
+      { error: "invalid hostname" },
+    )
+    .default("localhost"),
+};
+
+/** Dev seed password (scripts/seed-demo.ts). Refused in production. */
+export const demoSeedEnv = {
+  DEMO_PASSWORD: z.string().min(12).optional(),
 };
 
 export const observabilityEnv = {

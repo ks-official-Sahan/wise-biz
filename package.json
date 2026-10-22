@@ -29,6 +29,7 @@
     "env:check": "node scripts/check-env-example.mts",
     "licenses:check": "node scripts/check-licenses.mts",
     "db:migrate": "pnpm -F @wise-biz/db migrate",
+    "db:seed": "node --experimental-strip-types scripts/seed-demo.mts",
     "db:migration": "pnpm -F @wise-biz/db migration",
     "db:rls-check": "pnpm -F @wise-biz/db rls-check",
     "load:template": "node scripts/load/template-create.mjs"

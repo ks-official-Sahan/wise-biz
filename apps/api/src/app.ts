@@ -206,6 +206,23 @@ export function createApp(opts: CreateAppOptions): OpenAPIHono<AppEnv> {
       limited,
     ),
   );
+  // Invite acceptance: per signed-in user (guessing tokens needs a session first), fail closed like the others.
+  app.use(
+    "/v1/tenancy/invites/accept",
+    rateLimit(
+      [
+        {
+          name: "accept-invite:user",
+          ...LIMITS.acceptInvitePerUser,
+          subject: (c) => {
+            const auth = c.get("auth");
+            return auth.kind === "user" ? auth.userId : null;
+          },
+        },
+      ],
+      limited,
+    ),
+  );
   if (opts.identity) {
     const identity = opts.identity;
     // Better Auth reads the client IP ONLY from CLIENT_IP_HEADER: strip anything the client sent, set the trusted one.
@@ -223,6 +240,7 @@ export function createApp(opts: CreateAppOptions): OpenAPIHono<AppEnv> {
     pool,
     clock,
     ids: { uuidv7 },
+    catalog,
     ...(opts.idempotencyCache && { idempotencyCache: opts.idempotencyCache }),
     ...(opts.idempotencyTtlMs !== undefined && { idempotencyTtlMs: opts.idempotencyTtlMs }),
   };

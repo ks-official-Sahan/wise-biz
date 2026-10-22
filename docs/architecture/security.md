@@ -32,8 +32,26 @@ PIN rules: per-tenant unique, hashed with Argon2id + pepper, 5 tries → lockout
   `TRUST_PROXY_HOPS=N`; IPv6 bucketed by /64. Better Auth receives the same trusted IP.
 - CSRF: cookie-bearing unsafe requests need an allowlisted `Origin` or `Sec-Fetch-Site: same-origin` (403
   `ORIGIN_REJECTED`); `*` is never a trusted origin and is rejected in production.
-- Known gaps (P0-08b): sign-up reveals whether an email is registered and accounts are not email-verified until
-  email delivery lands (`requireEmailVerification`); per-email sign-in limit allows a cheap lockout of one account.
+- Known gap: the per-email sign-in limit allows a cheap lockout of one account (P1-15).
+
+### Implementation (P0-08b)
+
+- Email verification: `requireEmailVerification`, no auto sign-in, and a uniform sign-up response (same body for a new
+  and an existing email), so sign-up no longer reveals registered addresses. Links point at `CONSOLE_URL`.
+- Second factor: emailed 6-digit OTP (Better Auth `twoFactor`), stored hashed, limited attempts per challenge; enabling
+  is confirmed by an emailed code. Backup codes are encrypted by the plugin.
+- Passkeys (WebAuthn, `@better-auth/passkey`): RP ID `AUTH_RP_ID`, origins = the CORS allowlist. Registration needs a
+  fresh session. A passkey is a full sign-in on its own, so user verification (PIN or biometrics) is required: an
+  assertion without the UV flag is rejected (401 `USER_VERIFICATION_REQUIRED`) before the plugin verifies it.
+- Invites: token = base64url(HMAC-SHA256(HMAC-SHA256(`INVITE_SECRET`, "wb:invite:v1"), `tenantId:inviteId`)), never
+  stored, constant-time compared; 72 h expiry. Accept needs a signed-in, verified account whose email matches.
+  Accepted and revoked are terminal (DB trigger); unknown, revoked, expired or wrong-email tokens all answer 404.
+- Privilege ceiling: only owners create roles, edit role grants, change the owner role, or touch an owner member.
+  A non-owner with `tenancy:manage` may assign (member update, invite) only roles they hold. All refusals are 404.
+- Last owner: a demotion that would leave no active owner is 409; membership changes take a per-tenant advisory lock.
+- Mail (`@wise-biz/mailer`): SMTP (local relay) or Resend. Production SMTP requires TLS (implicit on 465, STARTTLS
+  otherwise). Bodies, subjects and addresses are never logged; Better Auth's logger is pinned to `warn` (its info lines
+  contain emails). Invite mail is sent by the outbox consumer, so a mail outage never fails the request.
 
 ## Authorization
 

@@ -1,4 +1,11 @@
-export { authorize, policyMiddleware, requireTenant, requireUser, setPolicy } from "./authz.ts";
+export {
+  authorize,
+  permits,
+  policyMiddleware,
+  requireTenant,
+  requireUser,
+  setPolicy,
+} from "./authz.ts";
 export type { AuthorizeResource } from "./authz.ts";
 export { defineModule } from "./define-module.ts";
 export { DEFAULT_IDEMPOTENCY_TTL_MS } from "./types.ts";

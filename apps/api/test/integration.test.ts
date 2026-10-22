@@ -86,6 +86,9 @@ describe("startServer", () => {
       DATABASE_IDENTITY_URL: db.url("identity"),
       AUTH_SECRET: AUTH_SECRET,
       AUTH_URL: "http://localhost:3001",
+      MAIL_FROM: "no-reply@wise-biz.local",
+      INVITE_SECRET: "integration-invite-secret-".padEnd(40, "x"),
+      CONSOLE_URL: "http://localhost:3001",
       REDIS_URL: redis.url,
       PORT: String(port),
     });
@@ -112,6 +115,9 @@ describe("startServer", () => {
       DATABASE_IDENTITY_URL: db.url("identity"),
       AUTH_SECRET: AUTH_SECRET,
       AUTH_URL: "http://localhost:3001",
+      MAIL_FROM: "no-reply@wise-biz.local",
+      INVITE_SECRET: "integration-invite-secret-".padEnd(40, "x"),
+      CONSOLE_URL: "http://localhost:3001",
       REDIS_URL: "redis://127.0.0.1:1",
       PORT: String(port),
     });
@@ -139,6 +145,9 @@ describe("startServer", () => {
       DATABASE_IDENTITY_URL: db.url("identity"),
       AUTH_SECRET: AUTH_SECRET,
       AUTH_URL: "http://localhost:3001",
+      MAIL_FROM: "no-reply@wise-biz.local",
+      INVITE_SECRET: "integration-invite-secret-".padEnd(40, "x"),
+      CONSOLE_URL: "http://localhost:3001",
       REDIS_URL: redis.url,
       PORT: String(port),
     };

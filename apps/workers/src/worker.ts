@@ -7,11 +7,15 @@ import {
 import {
   assertProductionEnv,
   chainerEnv,
+  consoleEnv,
   defineEnv,
+  inviteEnv,
+  mailEnv,
   observabilityEnv,
   workerEnv,
 } from "@wise-biz/env";
 import { createPgBus } from "@wise-biz/events";
+import { createMailer } from "@wise-biz/mailer";
 import {
   createAnchorJob,
   createAuditChainer,
@@ -19,7 +23,7 @@ import {
   createPeriodic,
 } from "@wise-biz/module-audit";
 
-import { consumers as defaultConsumers } from "./consumers.ts";
+import { createConsumers } from "./consumers.ts";
 import { createLogger } from "./logger.ts";
 import { OLDEST_UNCHAINED_SQL, createMetrics } from "./metrics.ts";
 import { createRelay } from "./relay.ts";
@@ -31,6 +35,8 @@ import type { AuditOnMetric } from "@wise-biz/module-audit";
 import type { Logger } from "pino";
 
 export const WORKER_ENV = { ...observabilityEnv, ...workerEnv, ...chainerEnv };
+/** Only the default consumer set needs these (invite email); an explicit consumer list does not require them. */
+export const CONSUMER_ENV = { ...mailEnv, ...inviteEnv, ...consoleEnv };
 const POOL_MAX = 10;
 const CHAINER_POOL_MAX = 4;
 const HOUR_MS = 3_600_000;
@@ -45,13 +51,23 @@ export interface RunningWorker {
 /** Validate env, wire pool -> pg bus -> relay, start the loop. `source` is a parameter for tests. */
 export function startWorker(
   source: EnvSource = process.env,
-  consumers: readonly ConsumerDefinition[] = defaultConsumers,
+  consumers?: readonly ConsumerDefinition[],
   onMetricOverride?: OnMetric,
   onAuditMetricOverride?: AuditOnMetric,
 ): RunningWorker {
   assertProductionEnv(source);
   const env = defineEnv(WORKER_ENV, source);
   const logger = createLogger(env.LOG_LEVEL);
+  const consumerSet =
+    consumers ??
+    (() => {
+      const c = defineEnv(CONSUMER_ENV, source);
+      return createConsumers({
+        mailer: createMailer(c),
+        consoleUrl: c.CONSOLE_URL,
+        inviteSecret: c.INVITE_SECRET,
+      });
+    })();
   const poolError = (name: string) => (err: Error) => {
     logger.warn({ err, pool: name }, "idle postgres client error");
   };
@@ -85,7 +101,7 @@ export function startWorker(
     onMetric,
     handlerTimeoutMs: env.WORKER_HANDLER_TIMEOUT_MS,
   });
-  for (const c of consumers) bus.subscribe(c);
+  for (const c of consumerSet) bus.subscribe(c);
   const relay = createRelay({
     pool,
     bus,
@@ -121,7 +137,7 @@ export function startWorker(
   const loops = [chainer, anchorJob, partitionJob, pruneJob];
   for (const l of loops) l.start();
   metrics.start();
-  logger.info({ consumers: consumers.map((c) => c.name) }, "worker started");
+  logger.info({ consumers: consumerSet.map((c) => c.name) }, "worker started");
   return {
     logger,
     stop: async () => {

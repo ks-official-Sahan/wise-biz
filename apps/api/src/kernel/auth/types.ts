@@ -7,9 +7,14 @@ export type AuthResolver = (c: Context<AppEnv>) => Promise<AuthContext>;
 
 /** Slice of the identity port the kernel reads. */
 export interface SessionReader {
-  getSession(
-    headers: Headers,
-  ): Promise<{ sessionId: string; userId: string; activeTenantId: string | null } | null>;
+  getSession(headers: Headers): Promise<{
+    sessionId: string;
+    userId: string;
+    /** Lower-cased account email. */
+    email: string;
+    emailVerified: boolean;
+    activeTenantId: string | null;
+  } | null>;
 }
 
 /** Slice of the tenancy ports the kernel reads. */

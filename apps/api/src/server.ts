@@ -3,13 +3,18 @@ import { createPool, instrumentPool } from "@wise-biz/db";
 import {
   assertProductionEnv,
   authEnv,
+  consoleEnv,
   databaseEnv,
   defineEnv,
   httpEnv,
   identityDbEnv,
+  inviteEnv,
+  mailEnv,
   observabilityEnv,
   redisEnv,
+  webauthnEnv,
 } from "@wise-biz/env";
+import { createMailer } from "@wise-biz/mailer";
 import { SESSION_COOKIE_NAME, createIdentity } from "@wise-biz/module-identity";
 import { createTenancyPorts } from "@wise-biz/module-tenancy";
 import { createClient } from "redis";
@@ -33,6 +38,10 @@ export const API_ENV = {
   ...redisEnv,
   ...observabilityEnv,
   ...httpEnv,
+  ...mailEnv,
+  ...inviteEnv,
+  ...consoleEnv,
+  ...webauthnEnv,
 };
 
 export interface RunningServer {
@@ -49,6 +58,10 @@ export async function startServer(
   assertProductionEnv(source);
   const env = defineEnv(API_ENV, source);
   const logger = createLogger(env.LOG_LEVEL);
+  // Transactional mail (verification, second factor, invites). Sends never block a request: see the callers.
+  const mailer = createMailer(env);
+  // CORS allowlist without wildcards: the same origins are WebAuthn origins and Better Auth trusted origins.
+  const origins = env.CORS_ORIGINS.filter((o) => o !== "*");
 
   const pool = createPool(env.DATABASE_URL, {
     max: env.DATABASE_POOL_MAX,
@@ -114,10 +127,14 @@ export async function startServer(
       secret: env.AUTH_SECRET,
       baseURL: env.AUTH_URL,
       trustedOrigins: [...env.CORS_ORIGINS],
+      mailer,
+      consoleUrl: env.CONSOLE_URL,
+      rpId: env.AUTH_RP_ID,
+      rpOrigins: origins,
     });
     const tenancy = createTenancyPorts(pool);
     const app = createApp({
-      modules: createModules(identity),
+      modules: createModules(identity, { inviteSecret: env.INVITE_SECRET }),
       pool,
       redis,
       env,

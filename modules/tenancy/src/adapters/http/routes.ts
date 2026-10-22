@@ -3,9 +3,11 @@ import { withUserTx } from "@wise-biz/db";
 import { DomainError } from "@wise-biz/errors";
 import { toUuid7 } from "@wise-biz/ids";
 import { asRouteResponse, requireUser, runCommand } from "@wise-biz/module-kit";
+import { createCatalog } from "@wise-biz/policy";
 
 import { signUpBusinessCommand } from "../../application/business.ts";
 import { switchTenant } from "../../application/switch.ts";
+import { TENANCY_PERMISSIONS } from "../../permissions.ts";
 import { MAX_MEMBERSHIPS_PER_USER } from "../../ports/tenancy-repository.ts";
 import {
   MyTenantsSchema,
@@ -14,6 +16,8 @@ import {
   TenantCreatedSchema,
 } from "../../schemas.ts";
 import { drizzleTenancyRepository } from "../db/tenancy-repository.ts";
+
+import { mountAdminRoutes } from "./admin-routes.ts";
 
 import type { ActiveTenantSetter, TenancyRepository } from "../../ports/tenancy-repository.ts";
 import type { OpenAPIHono } from "@hono/zod-openapi";
@@ -67,11 +71,33 @@ const switchRoute = createRoute({
   responses: { 204: { description: "Switched" } },
 });
 
+export interface TenancyRouteOptions {
+  /** INVITE_SECRET. Undefined = not configured: no invite token can verify (fail closed). */
+  readonly inviteSecret?: string | undefined;
+}
+
 export function mountRoutes(
   app: OpenAPIHono<AppEnv>,
   deps: ModuleDeps,
   sessions: ActiveTenantSetter,
   repo: TenancyRepository = drizzleTenancyRepository,
+  options: TenancyRouteOptions = {},
+): void {
+  mountTenantRoutes(app, deps, sessions, repo);
+  mountAdminRoutes(app, {
+    module: deps,
+    repo,
+    sessions,
+    options,
+    catalog: deps.catalog ?? createCatalog(TENANCY_PERMISSIONS),
+  });
+}
+
+function mountTenantRoutes(
+  app: OpenAPIHono<AppEnv>,
+  deps: ModuleDeps,
+  sessions: ActiveTenantSetter,
+  repo: TenancyRepository,
 ): void {
   app.openapi(signUpRoute, async (c) => {
     const { userId, sessionId } = requireUser(c);

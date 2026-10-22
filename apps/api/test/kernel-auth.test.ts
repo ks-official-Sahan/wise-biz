@@ -72,9 +72,11 @@ describe("sessionResolver (fail closed)", () => {
       },
       get: () => "req-1",
     }) as never;
-  const session = (activeTenantId: string | null) => ({
+  const session = (activeTenantId: string | null, emailVerified = true) => ({
     sessionId: SESSION,
     userId: USER,
+    email: "ana@example.com",
+    emailVerified,
     activeTenantId,
   });
   const mk = (
@@ -145,6 +147,8 @@ describe("sessionResolver (fail closed)", () => {
       roles: ["manager"],
       branchScope: "all",
       permissionsVersion: 7,
+      email: "ana@example.com",
+      emailVerified: true,
     });
   });
 
@@ -550,5 +554,46 @@ describe("nodeRedisKernel", () => {
     expect(await k.get("a")).toBe("v");
     await k.set("a", "b", 60);
     expect(set).toHaveBeenCalledWith("a", "b", { expiration: { type: "EX", value: 60 } });
+  });
+});
+
+describe("AuthContext carries the account email (invite acceptance reads it)", () => {
+  const ctxWithCookie = (): Context<AppEnv> =>
+    ({
+      req: {
+        header: (n: string) => (n === "cookie" ? `${COOKIE}=x` : undefined),
+        raw: { headers: new Headers({ cookie: `${COOKIE}=x` }) },
+      },
+      get: () => "req-1",
+    }) as never;
+  const resolverFor = (emailVerified: boolean, activeTenantId: string | null) =>
+    sessionResolver({
+      sessions: {
+        getSession: () =>
+          Promise.resolve({
+            sessionId: SESSION,
+            userId: USER,
+            email: "ana@example.com",
+            emailVerified,
+            activeTenantId,
+          }),
+      },
+      memberships: { loadMembership: () => Promise.resolve(null) },
+      cookieName: COOKIE,
+    });
+
+  it("a user context with a tenant copies email and emailVerified from the session", async () => {
+    const auth = await resolverFor(true, TENANT)(ctxWithCookie());
+    expect(auth).toMatchObject({ kind: "user", email: "ana@example.com", emailVerified: true });
+  });
+
+  it("a signed-in user without a tenant (membership missing) still carries the account fields", async () => {
+    const auth = await resolverFor(false, TENANT)(ctxWithCookie());
+    expect(auth).toMatchObject({
+      kind: "user",
+      tenantId: null,
+      email: "ana@example.com",
+      emailVerified: false,
+    });
   });
 });

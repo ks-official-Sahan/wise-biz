@@ -145,6 +145,8 @@ export const LIMITS = {
   signInPerEmail: { limit: 5, windowMs: MINUTE },
   signUpPerIp: { limit: 5, windowMs: MINUTE },
   createBusinessPerUser: { limit: 5, windowMs: MINUTE },
+  /** Invite acceptance per signed-in user (token guessing; fails closed like the others). */
+  acceptInvitePerUser: { limit: 10, windowMs: MINUTE },
   /** Every other unsafe /v1/auth/* route (change-password, update-user, revoke-*, sign-out...). */
   authWritePerSession: { limit: 10, windowMs: MINUTE },
 } as const;

@@ -27,6 +27,7 @@
     "@wise-biz/env": "workspace:*",
     "@wise-biz/errors": "workspace:*",
     "@wise-biz/ids": "workspace:*",
+    "@wise-biz/mailer": "workspace:*",
     "@wise-biz/module-identity": "workspace:*",
     "@wise-biz/module-kit": "workspace:*",
     "@wise-biz/module-template": "workspace:*",

@@ -109,6 +109,9 @@ export function assertProductionEnv(source: EnvSource = process.env): void {
       problems.set(key, "dev database password is not allowed in production");
     }
   }
+  if (env.DEMO_PASSWORD !== undefined) {
+    problems.set("DEMO_PASSWORD", "demo seed password is not allowed in production");
+  }
   if ((EMAIL_PROVIDER ?? "capture") === "capture") {
     problems.set("EMAIL_PROVIDER", "capture is not allowed in production");
   }

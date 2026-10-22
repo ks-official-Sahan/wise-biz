@@ -59,6 +59,29 @@ export interface AuthorizeResource {
 }
 
 /**
+ * Non-throwing form of `authorize` for filtering: true when the caller would be allowed. Only the refusals `authorize`
+ * maps to 404 or 412 become false; infrastructure errors still propagate.
+ */
+export function permits(
+  c: Context<AppEnv>,
+  permission: Permission,
+  resource: AuthorizeResource = {},
+): boolean {
+  try {
+    authorize(c, permission, resource);
+    return true;
+  } catch (err) {
+    if (
+      err instanceof DomainError &&
+      (err.code === "NOT_FOUND" || err.code === "PRECONDITION_FAILED")
+    ) {
+      return false;
+    }
+    throw err;
+  }
+}
+
+/**
  * Throws unless the caller holds `permission` for this resource.
  * Not granted / tenant / branch / context denials are NOT_FOUND (a surface never confirms it exists).
  * Condition denials are PRECONDITION_FAILED, with details.override listing approver roles when any.

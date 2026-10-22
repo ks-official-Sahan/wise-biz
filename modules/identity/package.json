@@ -15,7 +15,9 @@
     "test": "vitest run --coverage"
   },
   "dependencies": {
+    "@better-auth/passkey": "1.7.12",
     "@wise-biz/ids": "workspace:*",
+    "@wise-biz/mailer": "workspace:*",
     "better-auth": "1.7.12",
     "drizzle-orm": "0.45.4",
     "pg": "8.23.1"

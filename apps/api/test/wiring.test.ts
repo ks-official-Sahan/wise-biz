@@ -1,7 +1,7 @@
 import { createServer } from "node:net";
 import { join } from "node:path";
 
-import { migrate } from "@wise-biz/db";
+import { createPool, migrate } from "@wise-biz/db";
 import { uuidv7 } from "@wise-biz/ids";
 import { startRedis, testDatabase } from "@wise-biz/testing/containers";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -33,6 +33,7 @@ const freePort = (): Promise<number> =>
 let redis: RedisHarness;
 let db: TestDatabase;
 let server: RunningServer;
+let identityPool: ReturnType<typeof createPool>;
 let base: string;
 
 beforeAll(async () => {
@@ -44,6 +45,7 @@ beforeAll(async () => {
       dir: join(modulesDir, module, "migrations"),
     })),
   );
+  identityPool = createPool(db.url("identity"), { max: 2 });
   server = await startServer({
     NODE_ENV: "test",
     LOG_LEVEL: "fatal",
@@ -51,6 +53,9 @@ beforeAll(async () => {
     DATABASE_IDENTITY_URL: db.url("identity"),
     AUTH_SECRET: "wiring-test-secret-".padEnd(40, "x"),
     AUTH_URL: "http://localhost:3001",
+    MAIL_FROM: "no-reply@wise-biz.local",
+    INVITE_SECRET: "wiring-invite-secret-".padEnd(40, "x"),
+    CONSOLE_URL: "http://localhost:3001",
     CORS_ORIGINS: ORIGIN,
     REDIS_URL: redis.url,
     PORT: String(await freePort()),
@@ -59,6 +64,7 @@ beforeAll(async () => {
 });
 afterAll(async () => {
   await server.close();
+  await identityPool.end();
   await Promise.all([redis.stop(), db.drop()]);
 });
 
@@ -72,7 +78,19 @@ describe("production wiring", () => {
       body: JSON.stringify({ name: "Wire", email, password: "correct-horse-battery-staple-91" }),
     });
     expect(up.status).toBe(200);
-    const setCookie = up.headers.get("set-cookie") ?? "";
+    // Sign-up never signs in: the account must verify its email first. Mark it verified through the identity pool
+    // (the mailer has no provider in this test), then sign in for the session cookie.
+    expect(up.headers.get("set-cookie")).toBeNull();
+    await identityPool.query("update identity.users set email_verified = true where email = $1", [
+      email,
+    ]);
+    const signIn = await fetch(`${base}/v1/auth/sign-in/email`, {
+      method: "POST",
+      headers: json,
+      body: JSON.stringify({ email, password: "correct-horse-battery-staple-91" }),
+    });
+    expect(signIn.status).toBe(200);
+    const setCookie = signIn.headers.get("set-cookie") ?? "";
     expect(setCookie).toMatch(/^__Host-wb_session=/);
     expect(setCookie).toContain("HttpOnly");
     expect(setCookie).toContain("Secure");

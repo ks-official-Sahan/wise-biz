@@ -22,7 +22,9 @@
     "@wise-biz/env": "workspace:*",
     "@wise-biz/events": "workspace:*",
     "@wise-biz/ids": "workspace:*",
+    "@wise-biz/mailer": "workspace:*",
     "@wise-biz/module-audit": "workspace:*",
+    "@wise-biz/module-tenancy": "workspace:*",
     "pg": "8.23.1",
     "pino": "10.4.0"
   },

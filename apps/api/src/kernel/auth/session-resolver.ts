@@ -25,7 +25,13 @@ export function sessionResolver(deps: SessionResolverDeps): AuthResolver {
     const session = await deps.sessions.getSession(c.req.raw.headers);
     if (session === null) return ANON;
 
-    const base = { kind: "user", userId: session.userId, sessionId: session.sessionId } as const;
+    const base = {
+      kind: "user",
+      userId: session.userId,
+      sessionId: session.sessionId,
+      email: session.email,
+      emailVerified: session.emailVerified,
+    } as const;
     const noTenant: AuthContext = {
       ...base,
       tenantId: null,

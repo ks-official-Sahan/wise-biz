@@ -1,6 +1,6 @@
 import type { OpenAPIHono } from "@hono/zod-openapi";
 import type { TenantCtx } from "@wise-biz/db";
-import type { Permission } from "@wise-biz/policy";
+import type { Permission, PermissionCatalog } from "@wise-biz/policy";
 import type pg from "pg";
 import type { Logger } from "pino";
 
@@ -16,6 +16,10 @@ export type AuthContext =
       branchScope: "all" | readonly string[];
       /** tenancy.tenants.permissions_version at resolve time; keys the policy-matrix cache. */
       permissionsVersion: number;
+      /** Lower-cased account email from the session. Absent (test contexts) = unknown = treated as unverified. */
+      email?: string;
+      /** Email verified on the account. Absent = false: invite acceptance fails closed. */
+      emailVerified?: boolean;
     };
 
 export interface AppEnv {
@@ -46,6 +50,11 @@ export interface ModuleDeps {
   idempotencyCache?: IdempotencyCache;
   /** Defaults to DEFAULT_IDEMPOTENCY_TTL_MS. */
   idempotencyTtlMs?: number;
+  /**
+   * Every permission of the mounted modules (the kernel builds it). Modules that validate permission names (grants)
+   * fall back to their own list when absent, so a missing catalog narrows what can be granted, never widens it.
+   */
+  catalog?: PermissionCatalog;
 }
 
 export interface WbModule {
