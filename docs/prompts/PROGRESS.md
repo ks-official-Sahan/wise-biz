@@ -51,7 +51,7 @@ Tracked in `docs/prompts/P2/README.md` order; add rows here when P2 starts.
 ## Resume here
 
 - Next step: P0-09 (`docs/prompts/README.md` order). Branch `feat/p0-08-identity-tenancy` holds P0-08a+b, not yet pushed/PR'd.
-- After pulling P0-08: `pnpm infra:reset` (new DB role `wb_identity`), then `pnpm db:migrate`. `.env` needs `DATABASE_IDENTITY_URL`, `TRUST_PROXY_HOPS`, `INVITE_SECRET`, `CONSOLE_URL`, `AUTH_RP_ID`, `MAIL_*` (see `.env.example`); `API_DEV_AUTH` is gone. Demo data: `DEMO_PASSWORD=... pnpm db:seed`.
+- After pulling P0-08: `pnpm infra:reset` (new DB role `wb_identity`), then `pnpm db:migrate`. `.env` needs `DATABASE_IDENTITY_URL`, `TRUST_PROXY_HOPS`, `INVITE_SECRET`, `CONSOLE_URL`, `AUTH_RP_ID`, `MAIL_*` (see `.env.example`); `API_DEV_AUTH` is gone. Demo data: `DEMO_PASSWORD=... pnpm db:seed`. Root/package scripts load the repo `.env` via `node --env-file-if-exists` (shell env wins); `infra:reset` is a Node script (the old `sh -c` one-liner silently did nothing under cmd.exe).
 - Run tests with `REDIS_URL` unset in the shell (the env test assumes it is absent; containers provide Redis).
 - P0-01–P0-07 merged via PR #3; all CI checks green (check, actionlint, audit, gitleaks, licenses, CodeQL, dependency review).
 - Local prerequisites: Node 24 LTS, pnpm 12 (Corepack), Docker. `pnpm i && cp .env.example .env && pnpm infra:up && pnpm check`.
@@ -99,7 +99,7 @@ Tracked in `docs/prompts/P2/README.md` order; add rows here when P2 starts.
 - [ ] (P0-08a) Passkey RP ID is one domain; per-tenant custom domains need a passkey strategy — owner: P2 storefront domains
 - [ ] (P0-08a) Per request: session lookup + loadMembership tx (BEGIN, set_config, SELECT, COMMIT); collapse to one round trip or a 2–5 s (user, tenant) cache if p95 budget needs it — owner: P0-12 gate
 - [ ] (P0-08a) `@wise-biz/env` "defaults to process.env" test fails when the shell has REDIS_URL; make it hermetic — owner: P0-12 gate
-- [ ] (P0-08a) `pnpm db:rls-check` was verified via the test harness only (dev DB needs `pnpm infra:reset` for wb_identity) — owner: next step touching DB
+- [x] (P0-08a) `pnpm db:rls-check` verified against the dev DB after `pnpm infra:reset` (2026-10-22); `db:seed` verified too
 - [ ] (P0-08b) OTP attempts reset per challenge; add a per-user failed-OTP counter or rate-limit `two-factor/*` by user — owner: P1-15
 - [ ] (P0-08b) Sign-up limited per IP only (verification-mail flooding of one mailbox); add a per-email-digest limit; cap invites per tenant/user and limit `tenantName` length/charset in invite subjects — owner: P1-15
 - [ ] (P0-08b) Passkey add/delete relies on Better Auth `freshAge` (1 day); consider password re-auth for factor changes — owner: P1-15

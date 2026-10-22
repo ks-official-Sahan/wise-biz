@@ -14,9 +14,9 @@
     "lint": "eslint . --max-warnings 0",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --coverage",
-    "migrate": "node scripts/migrate.mts",
+    "migrate": "node --env-file-if-exists=../../.env scripts/migrate.mts",
     "migration": "node scripts/new-migration.mts",
-    "rls-check": "node scripts/rls-check.mts"
+    "rls-check": "node --env-file-if-exists=../../.env scripts/rls-check.mts"
   },
   "dependencies": {
     "@wise-biz/audit-chain": "workspace:*",
