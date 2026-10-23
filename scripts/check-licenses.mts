@@ -3,6 +3,8 @@ import { execFileSync } from "node:child_process";
 // SPDX ids accepted for dependencies. Anything else is an offender.
 const ALLOWED = new Set([
   "MIT",
+  // MIT without the attribution clause (nodemailer, postal-mime): strictly more permissive than MIT.
+  "MIT-0",
   "Apache-2.0",
   "BSD-2-Clause",
   "BSD-3-Clause",
@@ -82,6 +84,8 @@ function allowedExpression(expr: string): boolean {
 }
 
 const raw = execFileSync("pnpm", ["licenses", "list", "--json", "--prod", "--recursive"], {
+  // On Windows pnpm is a .cmd shim, which needs a shell; arguments are constants, so no injection surface.
+  shell: process.platform === "win32",
   encoding: "utf8",
   maxBuffer: 64 * 1024 * 1024,
   stdio: ["ignore", "pipe", "inherit"],

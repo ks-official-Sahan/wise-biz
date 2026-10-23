@@ -31,3 +31,9 @@ auditConfig:
     # @next/eslint-plugin-next > fast-glob: lint-time tooling, never shipped at runtime.
     # Re-check on every Renovate eslint group PR; remove once a patched braces exists.
     - GHSA-vfj7-8cjw-p6xm
+
+# @material/material-color-utilities 0.4.0 imports its own modules without file extensions, which native Node ESM
+# cannot resolve (our packages run as TS source on Node, ADR 0008). The patch only appends .js to relative imports;
+# regenerate it on upgrade (pnpm patch).
+patchedDependencies:
+  "@material/material-color-utilities@0.4.0": patches/@material__material-color-utilities@0.4.0.patch
