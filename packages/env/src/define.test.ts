@@ -10,6 +10,7 @@ import {
   defineEnv,
   emailEnv,
   httpEnv,
+  identityDbEnv,
   kafkaEnv,
   observabilityEnv,
   redisEnv,
@@ -137,6 +138,7 @@ describe("assertProductionEnv", () => {
       DATABASE_MIGRATOR_URL: "postgres://wb_migrator:wb_migrator@db:5432/x",
       DATABASE_WORKER_URL: "postgres://wb_worker:wb_worker@db:5432/x",
       DATABASE_CHAINER_URL: "postgres://wb_chainer:wb_chainer@db:5432/x",
+      DATABASE_IDENTITY_URL: "postgres://wb_identity:wb_identity@db:5432/x",
     };
     try {
       assertProductionEnv({ ...ok, ...urls });
@@ -217,29 +219,34 @@ describe("httpEnv", () => {
     const d = defineEnv(httpEnv, {});
     expect(d.PORT).toBe(3001);
     expect(d.CORS_ORIGINS).toEqual([]);
-    expect(d.API_DEV_AUTH).toBe(false);
-    expect(d.TRUST_PROXY).toBe(false);
+    expect(d.TRUST_PROXY_HOPS).toBe(0);
     const e = defineEnv(httpEnv, {
       PORT: "8080",
       CORS_ORIGINS: "http://a.test, http://b.test",
-      API_DEV_AUTH: "true",
     });
     expect(e.PORT).toBe(8080);
     expect(e.CORS_ORIGINS).toEqual(["http://a.test", "http://b.test"]);
-    expect(e.API_DEV_AUTH).toBe(true);
+  });
+});
+
+describe("httpEnv hardening", () => {
+  it("bounds TRUST_PROXY_HOPS", () => {
+    expect(defineEnv(httpEnv, { TRUST_PROXY_HOPS: "2" }).TRUST_PROXY_HOPS).toBe(2);
+    for (const bad of ["-1", "11", "1.5", "x"]) {
+      expect(() => defineEnv(httpEnv, { TRUST_PROXY_HOPS: bad })).toThrow(/TRUST_PROXY_HOPS/);
+    }
   });
 
-  it("production rejects API_DEV_AUTH=true", () => {
-    const prod = {
-      NODE_ENV: "production",
-      AUTH_SECRET: "x".repeat(40),
-      EMAIL_PROVIDER: "smtp",
-    };
+  it("production rejects a wildcard CORS origin, development tolerates it", () => {
+    const prod = { NODE_ENV: "production", AUTH_SECRET: "x".repeat(40), EMAIL_PROVIDER: "smtp" };
     expect(() => {
-      assertProductionEnv({ ...prod, API_DEV_AUTH: "true" });
-    }).toThrow(/API_DEV_AUTH/);
+      assertProductionEnv({ ...prod, CORS_ORIGINS: "https://a.test, *" });
+    }).toThrow(/CORS_ORIGINS/);
     expect(() => {
-      assertProductionEnv({ ...prod, API_DEV_AUTH: "false" });
+      assertProductionEnv({ ...prod, CORS_ORIGINS: "https://a.test" });
+    }).not.toThrow();
+    expect(() => {
+      assertProductionEnv({ NODE_ENV: "development", CORS_ORIGINS: "*" });
     }).not.toThrow();
   });
 });
@@ -269,6 +276,19 @@ describe("chainerEnv", () => {
     expect(() =>
       defineEnv(chainerEnv, { DATABASE_CHAINER_URL: url, AUDIT_CHAIN_INTERVAL_MS: "5" }),
     ).toThrow(/AUDIT_CHAIN_INTERVAL_MS/);
+  });
+});
+
+describe("identityDbEnv", () => {
+  it("requires a postgres URL for the identity role", () => {
+    expect(() => defineEnv(identityDbEnv, {})).toThrow(/DATABASE_IDENTITY_URL/);
+    expect(() => defineEnv(identityDbEnv, { DATABASE_IDENTITY_URL: "mysql://x/y" })).toThrow(
+      /DATABASE_IDENTITY_URL: invalid postgres url/,
+    );
+    const url = "postgres://wb_identity:wb_identity@localhost:5432/wise_biz";
+    expect(defineEnv(identityDbEnv, { DATABASE_IDENTITY_URL: url }).DATABASE_IDENTITY_URL).toBe(
+      url,
+    );
   });
 });
 

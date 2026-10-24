@@ -70,6 +70,7 @@ const DEV_DB_PASSWORDS: Readonly<Record<string, string>> = {
   DATABASE_MIGRATOR_URL: "wb_migrator",
   DATABASE_WORKER_URL: "wb_worker",
   DATABASE_CHAINER_URL: "wb_chainer",
+  DATABASE_IDENTITY_URL: "wb_identity",
 };
 
 function hasDevDbPassword(key: string, value: string): boolean {
@@ -85,7 +86,7 @@ function hasDevDbPassword(key: string, value: string): boolean {
 /** Production-only guardrails. Pure: the secret source is a parameter. */
 export function assertProductionEnv(source: EnvSource = process.env): void {
   const env = clean(source);
-  const { NODE_ENV, AUTH_SECRET, EMAIL_PROVIDER, API_DEV_AUTH } = env;
+  const { NODE_ENV, AUTH_SECRET, EMAIL_PROVIDER } = env;
   if (NODE_ENV === "development" || NODE_ENV === "test") return;
 
   const problems = new Map<string, string>();
@@ -108,11 +109,22 @@ export function assertProductionEnv(source: EnvSource = process.env): void {
       problems.set(key, "dev database password is not allowed in production");
     }
   }
+  if (env.DEMO_PASSWORD !== undefined) {
+    problems.set("DEMO_PASSWORD", "demo seed password is not allowed in production");
+  }
   if ((EMAIL_PROVIDER ?? "capture") === "capture") {
     problems.set("EMAIL_PROVIDER", "capture is not allowed in production");
   }
-  if (API_DEV_AUTH !== undefined && /^(true|1|yes|on|y|enabled)$/i.test(API_DEV_AUTH)) {
-    problems.set("API_DEV_AUTH", "dev auth is not allowed in production");
+  if (
+    (env.CORS_ORIGINS ?? "")
+      .split(",")
+      .map((o) => o.trim())
+      .includes("*")
+  ) {
+    problems.set(
+      "CORS_ORIGINS",
+      "wildcard origin is not allowed in production (credentials are on)",
+    );
   }
   if (problems.size > 0) throw new EnvError(problems);
 }

@@ -62,6 +62,492 @@
         "required": ["id", "name", "createdAt"],
         "type": "object"
       },
+      "TenancyBranch": {
+        "properties": {
+          "branchId": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "businessDayCutoff": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": ["store", "warehouse", "office"],
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "taxRegion": {
+            "type": "string"
+          },
+          "timezone": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "branchId",
+          "name",
+          "kind",
+          "timezone",
+          "currency",
+          "taxRegion",
+          "businessDayCutoff"
+        ],
+        "type": "object"
+      },
+      "TenancyBranchList": {
+        "properties": {
+          "branches": {
+            "items": {
+              "$ref": "#/components/schemas/TenancyBranch"
+            },
+            "type": "array"
+          }
+        },
+        "required": ["branches"],
+        "type": "object"
+      },
+      "TenancyEmptyBody": {
+        "properties": {},
+        "type": "object"
+      },
+      "TenancyGrant": {
+        "properties": {
+          "conditions": {
+            "additionalProperties": {},
+            "type": ["object", "null"]
+          },
+          "permission": {
+            "type": "string"
+          }
+        },
+        "required": ["permission"],
+        "type": "object"
+      },
+      "TenancyInvite": {
+        "properties": {
+          "branchIds": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "type": ["array", "null"]
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "expired": {
+            "type": "boolean"
+          },
+          "expiresAt": {
+            "type": "string"
+          },
+          "inviteId": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "roleIds": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "inviteId",
+          "email",
+          "roleIds",
+          "branchIds",
+          "expiresAt",
+          "createdAt",
+          "expired"
+        ],
+        "type": "object"
+      },
+      "TenancyInviteAccept": {
+        "properties": {
+          "inviteId": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "tenantId": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "token": {
+            "maxLength": 128,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": ["tenantId", "inviteId", "token"],
+        "type": "object"
+      },
+      "TenancyInviteAccepted": {
+        "properties": {
+          "membershipId": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "tenantId": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": ["tenantId", "membershipId"],
+        "type": "object"
+      },
+      "TenancyInviteCreate": {
+        "properties": {
+          "branchIds": {
+            "items": {
+              "$ref": "#/components/schemas/Uuid7"
+            },
+            "maxItems": 50,
+            "minItems": 1,
+            "type": ["array", "null"]
+          },
+          "email": {
+            "maxLength": 320,
+            "type": "string"
+          },
+          "id": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "roleIds": {
+            "items": {
+              "$ref": "#/components/schemas/Uuid7"
+            },
+            "maxItems": 20,
+            "minItems": 1,
+            "type": "array"
+          }
+        },
+        "required": ["id", "email", "roleIds"],
+        "type": "object"
+      },
+      "TenancyInviteCreated": {
+        "properties": {
+          "branchIds": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "type": ["array", "null"]
+          },
+          "email": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string"
+          },
+          "inviteId": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "roleIds": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": ["inviteId", "email", "roleIds", "branchIds", "expiresAt"],
+        "type": "object"
+      },
+      "TenancyInviteList": {
+        "properties": {
+          "invites": {
+            "items": {
+              "$ref": "#/components/schemas/TenancyInvite"
+            },
+            "type": "array"
+          },
+          "nextCursor": {
+            "minLength": 1,
+            "type": ["string", "null"]
+          }
+        },
+        "required": ["invites", "nextCursor"],
+        "type": "object"
+      },
+      "TenancyInviteRevoked": {
+        "properties": {
+          "inviteId": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "revokedAt": {
+            "type": "string"
+          }
+        },
+        "required": ["inviteId", "revokedAt"],
+        "type": "object"
+      },
+      "TenancyMember": {
+        "properties": {
+          "branchIds": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "type": ["array", "null"]
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "membershipId": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "roles": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "status": {
+            "enum": ["active", "suspended"],
+            "type": "string"
+          },
+          "userId": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": ["membershipId", "userId", "status", "roles", "branchIds", "createdAt"],
+        "type": "object"
+      },
+      "TenancyMemberList": {
+        "properties": {
+          "members": {
+            "items": {
+              "$ref": "#/components/schemas/TenancyMember"
+            },
+            "type": "array"
+          },
+          "nextCursor": {
+            "minLength": 1,
+            "type": ["string", "null"]
+          }
+        },
+        "required": ["members", "nextCursor"],
+        "type": "object"
+      },
+      "TenancyMemberRolesUpdate": {
+        "properties": {
+          "branchIds": {
+            "items": {
+              "$ref": "#/components/schemas/Uuid7"
+            },
+            "maxItems": 50,
+            "minItems": 1,
+            "type": ["array", "null"]
+          },
+          "roleIds": {
+            "items": {
+              "$ref": "#/components/schemas/Uuid7"
+            },
+            "maxItems": 20,
+            "minItems": 1,
+            "type": "array"
+          }
+        },
+        "required": ["roleIds"],
+        "type": "object"
+      },
+      "TenancyMemberRolesUpdated": {
+        "properties": {
+          "branchIds": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "type": ["array", "null"]
+          },
+          "membershipId": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "roleIds": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": ["membershipId", "roleIds", "branchIds"],
+        "type": "object"
+      },
+      "TenancyMyTenant": {
+        "properties": {
+          "membershipId": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "name": {
+            "type": "string"
+          },
+          "tenantId": {
+            "$ref": "#/components/schemas/Uuid7"
+          }
+        },
+        "required": ["tenantId", "name", "membershipId"],
+        "type": "object"
+      },
+      "TenancyMyTenants": {
+        "properties": {
+          "tenants": {
+            "items": {
+              "$ref": "#/components/schemas/TenancyMyTenant"
+            },
+            "type": "array"
+          }
+        },
+        "required": ["tenants"],
+        "type": "object"
+      },
+      "TenancyRole": {
+        "properties": {
+          "grants": {
+            "items": {
+              "$ref": "#/components/schemas/TenancyGrant"
+            },
+            "type": "array"
+          },
+          "implicitAll": {
+            "type": "boolean"
+          },
+          "isSystem": {
+            "type": "boolean"
+          },
+          "name": {
+            "type": "string"
+          },
+          "roleId": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": ["roleId", "name", "isSystem", "implicitAll", "grants"],
+        "type": "object"
+      },
+      "TenancyRoleCreate": {
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "name": {
+            "maxLength": 63,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": ["id", "name"],
+        "type": "object"
+      },
+      "TenancyRoleList": {
+        "properties": {
+          "roles": {
+            "items": {
+              "$ref": "#/components/schemas/TenancyRole"
+            },
+            "type": "array"
+          }
+        },
+        "required": ["roles"],
+        "type": "object"
+      },
+      "TenancyRolePermissions": {
+        "properties": {
+          "grants": {
+            "items": {
+              "$ref": "#/components/schemas/TenancyGrant"
+            },
+            "maxItems": 200,
+            "type": "array"
+          }
+        },
+        "required": ["grants"],
+        "type": "object"
+      },
+      "TenancySignUpBusiness": {
+        "properties": {
+          "branch": {
+            "properties": {
+              "businessDayCutoff": {
+                "maxLength": 5,
+                "type": "string"
+              },
+              "currency": {
+                "maxLength": 3,
+                "type": "string"
+              },
+              "kind": {
+                "enum": ["store", "warehouse", "office"],
+                "type": "string"
+              },
+              "name": {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              "taxRegion": {
+                "maxLength": 100,
+                "type": "string"
+              },
+              "timezone": {
+                "maxLength": 64,
+                "type": "string"
+              }
+            },
+            "required": ["name", "kind", "timezone", "currency", "taxRegion"],
+            "type": "object"
+          },
+          "name": {
+            "maxLength": 1000,
+            "type": "string"
+          },
+          "tenantId": {
+            "$ref": "#/components/schemas/Uuid7"
+          }
+        },
+        "required": ["tenantId", "name", "branch"],
+        "type": "object"
+      },
+      "TenancySwitchTenant": {
+        "properties": {
+          "tenantId": {
+            "$ref": "#/components/schemas/Uuid7"
+          }
+        },
+        "required": ["tenantId"],
+        "type": "object"
+      },
+      "TenancyTenantCreated": {
+        "properties": {
+          "branchId": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "locationId": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "name": {
+            "type": "string"
+          },
+          "tenantId": {
+            "$ref": "#/components/schemas/Uuid7"
+          }
+        },
+        "required": ["tenantId", "name", "branchId", "locationId"],
+        "type": "object"
+      },
       "Timestamp": {
         "format": "date-time",
         "type": "string"
@@ -261,6 +747,407 @@
         },
         "summary": "Create an item with optional children",
         "tags": ["template"]
+      }
+    },
+    "/v1/tenancy/branches": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenancyBranchList"
+                }
+              }
+            },
+            "description": "Branches"
+          }
+        },
+        "summary": "Branches this caller may see (a branch-scoped member sees only their branches)",
+        "tags": ["tenancy"]
+      }
+    },
+    "/v1/tenancy/branches/{id}": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Uuid7"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenancyBranch"
+                }
+              }
+            },
+            "description": "Branch"
+          }
+        },
+        "summary": "One branch (404 outside the caller's branch scope)",
+        "tags": ["tenancy"]
+      }
+    },
+    "/v1/tenancy/invites": {
+      "get": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/Uuid7"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenancyInviteList"
+                }
+              }
+            },
+            "description": "Invites"
+          }
+        },
+        "summary": "Pending invites (newest first, keyset paginated)",
+        "tags": ["tenancy"]
+      },
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TenancyInviteCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenancyInviteCreated"
+                }
+              }
+            },
+            "description": "Created"
+          }
+        },
+        "summary": "Invite a person by email to this business (72 h, emailed link)",
+        "tags": ["tenancy"]
+      }
+    },
+    "/v1/tenancy/invites/accept": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TenancyInviteAccept"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenancyInviteAccepted"
+                }
+              }
+            },
+            "description": "Joined"
+          }
+        },
+        "summary": "Accept an invite as the signed-in, verified user whose email it was sent to",
+        "tags": ["tenancy"]
+      }
+    },
+    "/v1/tenancy/invites/{id}/revoke": {
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Uuid7"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TenancyEmptyBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenancyInviteRevoked"
+                }
+              }
+            },
+            "description": "Revoked"
+          }
+        },
+        "summary": "Revoke a pending invite (its link stops working)",
+        "tags": ["tenancy"]
+      }
+    },
+    "/v1/tenancy/me/tenants": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenancyMyTenants"
+                }
+              }
+            },
+            "description": "Tenants"
+          }
+        },
+        "summary": "Tenants the signed-in user is an active member of",
+        "tags": ["tenancy"]
+      }
+    },
+    "/v1/tenancy/members": {
+      "get": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/Uuid7"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenancyMemberList"
+                }
+              }
+            },
+            "description": "Members"
+          }
+        },
+        "summary": "Members with their role names and branch scope (one query, keyset paginated)",
+        "tags": ["tenancy"]
+      }
+    },
+    "/v1/tenancy/members/{id}/roles": {
+      "put": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Uuid7"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TenancyMemberRolesUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenancyMemberRolesUpdated"
+                }
+              }
+            },
+            "description": "Updated"
+          }
+        },
+        "summary": "Replace a member's roles and, optionally, branch scope",
+        "tags": ["tenancy"]
+      }
+    },
+    "/v1/tenancy/roles": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenancyRoleList"
+                }
+              }
+            },
+            "description": "Roles"
+          }
+        },
+        "summary": "Roles of this business with their grants (one query)",
+        "tags": ["tenancy"]
+      },
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TenancyRoleCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenancyRole"
+                }
+              }
+            },
+            "description": "Created"
+          }
+        },
+        "summary": "Create a custom role (no grants yet)",
+        "tags": ["tenancy"]
+      }
+    },
+    "/v1/tenancy/roles/{id}/permissions": {
+      "put": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Uuid7"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TenancyRolePermissions"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenancyRole"
+                }
+              }
+            },
+            "description": "Updated"
+          }
+        },
+        "summary": "Replace a role's grants (takes effect on the next request)",
+        "tags": ["tenancy"]
+      }
+    },
+    "/v1/tenancy/switch": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TenancySwitchTenant"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Switched"
+          }
+        },
+        "summary": "Make a tenant the active one for this session (404 unless an active member)",
+        "tags": ["tenancy"]
+      }
+    },
+    "/v1/tenancy/tenants": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TenancySignUpBusiness"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenancyTenantCreated"
+                }
+              }
+            },
+            "description": "Created"
+          }
+        },
+        "summary": "Create a business (tenant, roles, first branch, owner membership) and make it the active tenant",
+        "tags": ["tenancy"]
       }
     }
   },

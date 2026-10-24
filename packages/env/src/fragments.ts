@@ -46,12 +46,50 @@ export const storageEnv = {
   STORAGE_FORCE_PATH_STYLE: z.stringbool().default(false),
 };
 
+const resendApiKey = z.string().min(1).optional();
+
 export const emailEnv = {
   EMAIL_PROVIDER: z.enum(["capture", "smtp", "resend", "brevo"]).default("capture"),
   EMAIL_FROM: z.email(),
   SMTP_URL: z.url().optional(),
-  RESEND_API_KEY: z.string().min(1).optional(),
+  RESEND_API_KEY: resendApiKey,
   BREVO_API_KEY: z.string().min(1).optional(),
+};
+
+/** Transactional mail (@wise-biz/mailer). SMTP wins when MAIL_SMTP_HOST is set, else Resend. */
+export const mailEnv = {
+  MAIL_FROM: z.email(),
+  MAIL_SMTP_HOST: z.string().min(1).optional(),
+  MAIL_SMTP_PORT: z.coerce.number().int().min(1).max(65535).optional(),
+  RESEND_API_KEY: resendApiKey,
+};
+
+/** HMAC key for invite tokens (tenancy). Never log it. */
+export const inviteEnv = {
+  INVITE_SECRET: z.string().min(32),
+};
+
+/** Public console base URL; email links (verify, invite) point here. */
+export const consoleEnv = {
+  CONSOLE_URL: z.url(),
+};
+
+/** WebAuthn relying-party id: a bare hostname, no scheme or port. */
+export const webauthnEnv = {
+  AUTH_RP_ID: z
+    .string()
+    .min(1)
+    .max(253)
+    .regex(
+      /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$/,
+      { error: "invalid hostname" },
+    )
+    .default("localhost"),
+};
+
+/** Dev seed password (scripts/seed-demo.ts). Refused in production. */
+export const demoSeedEnv = {
+  DEMO_PASSWORD: z.string().min(12).optional(),
 };
 
 export const observabilityEnv = {
@@ -72,8 +110,7 @@ export const httpEnv = {
         .map((o) => o.trim())
         .filter((o) => o.length > 0),
     ),
-  API_DEV_AUTH: z.stringbool().default(false),
-  TRUST_PROXY: z.stringbool().default(false),
+  TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(10).default(0),
 };
 
 export const workerEnv = {
@@ -88,4 +125,8 @@ export const workerEnv = {
 export const chainerEnv = {
   DATABASE_CHAINER_URL: pgUrl,
   AUDIT_CHAIN_INTERVAL_MS: z.coerce.number().int().min(100).max(300_000).default(2000),
+};
+
+export const identityDbEnv = {
+  DATABASE_IDENTITY_URL: pgUrl,
 };

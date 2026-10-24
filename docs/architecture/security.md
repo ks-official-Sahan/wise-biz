@@ -14,6 +14,45 @@ Baseline: OWASP ASVS L2, L3 for identity/payments/devices/MCP. Threat model revi
 
 PIN rules: per-tenant unique, hashed with Argon2id + pepper, 5 tries → lockout with supervisor reset, PIN snapshot on device is a salted hash list signed by server and expiring.
 
+### Implementation (P0-08a, ADR 0010)
+
+- Engine: `better-auth` behind `IdentityPort` (`modules/identity`), mounted at `/v1/auth/*`. Tenancy is our own module.
+- Identity tables (`identity.*`) are global, granted only to DB role `wb_identity`; `wb_app`, `wb_worker`, `wb_chainer`
+  have no privileges (enforced by `rls-check`). Every identity row id is UUIDv7.
+- Session cookie `__Host-wb_session`: `Secure`, `HttpOnly`, `SameSite=Strict`, `Path=/`, no `Domain`; 12 h, rolling
+  every 1 h; no cookie cache, so revocation is immediate.
+- Tenant context: only `identity.sessions.active_tenant_id`, written by switch-tenant / create-business after an active
+  membership is verified, and re-checked against `tenancy.memberships` on every request. Missing → no tenant → 404.
+- Permissions: policy rows per tenant, matrix cached in-process (LRU) and in Redis under `t:{tenant}:perm:v{n}`;
+  `permissions_version` is bumped by a trigger on any grant change (a grant change outside the tenant context fails).
+  Redis must be private and authenticated: whoever can write it can grant permissions.
+- Rate limits (Redis fixed window, fail closed with 503 `RATE_LIMIT_UNAVAILABLE`): sign-in 10/min per IP and 5/min per
+  email, sign-up 5/min per IP, other unsafe `/v1/auth/*` 10/min per session, create-business 5/min per user; at most 20
+  owned tenants per user. Client IP = socket peer, or the Nth `X-Forwarded-For` entry from the right with
+  `TRUST_PROXY_HOPS=N`; IPv6 bucketed by /64. Better Auth receives the same trusted IP.
+- CSRF: cookie-bearing unsafe requests need an allowlisted `Origin` or `Sec-Fetch-Site: same-origin` (403
+  `ORIGIN_REJECTED`); `*` is never a trusted origin and is rejected in production.
+- Known gap: the per-email sign-in limit allows a cheap lockout of one account (P1-15).
+
+### Implementation (P0-08b)
+
+- Email verification: `requireEmailVerification`, no auto sign-in, and a uniform sign-up response (same body for a new
+  and an existing email), so sign-up no longer reveals registered addresses. Links point at `CONSOLE_URL`.
+- Second factor: emailed 6-digit OTP (Better Auth `twoFactor`), stored hashed, limited attempts per challenge; enabling
+  is confirmed by an emailed code. Backup codes are encrypted by the plugin.
+- Passkeys (WebAuthn, `@better-auth/passkey`): RP ID `AUTH_RP_ID`, origins = the CORS allowlist. Registration needs a
+  fresh session. A passkey is a full sign-in on its own, so user verification (PIN or biometrics) is required: an
+  assertion without the UV flag is rejected (401 `USER_VERIFICATION_REQUIRED`) before the plugin verifies it.
+- Invites: token = base64url(HMAC-SHA256(HMAC-SHA256(`INVITE_SECRET`, "wb:invite:v1"), `tenantId:inviteId`)), never
+  stored, constant-time compared; 72 h expiry. Accept needs a signed-in, verified account whose email matches.
+  Accepted and revoked are terminal (DB trigger); unknown, revoked, expired or wrong-email tokens all answer 404.
+- Privilege ceiling: only owners create roles, edit role grants, change the owner role, or touch an owner member.
+  A non-owner with `tenancy:manage` may assign (member update, invite) only roles they hold. All refusals are 404.
+- Last owner: a demotion that would leave no active owner is 409; membership changes take a per-tenant advisory lock.
+- Mail (`@wise-biz/mailer`): SMTP (local relay) or Resend. Production SMTP requires TLS (implicit on 465, STARTTLS
+  otherwise). Bodies, subjects and addresses are never logged; Better Auth's logger is pinned to `warn` (its info lines
+  contain emails). Invite mail is sent by the outbox consumer, so a mail outage never fails the request.
+
 ## Authorization
 
 `@wise-biz/policy`: RBAC + ABAC.

@@ -9,7 +9,7 @@ import { createApp } from "../src/app.ts";
 import { createLogger } from "../src/logger.ts";
 import { startServer } from "../src/server.ts";
 
-import { baseEnv, probeModule } from "./helpers.ts";
+import { baseEnv, headerAuth, probeModule } from "./helpers.ts";
 
 import type { RedisHarness, TestDatabase } from "@wise-biz/testing/containers";
 
@@ -21,6 +21,8 @@ beforeAll(async () => {
 afterAll(async () => {
   await Promise.all([redis.stop(), db.drop()]);
 });
+
+const AUTH_SECRET = "test-secret-".padEnd(40, "x");
 
 const freePort = (): Promise<number> =>
   new Promise((resolve, reject) => {
@@ -45,6 +47,7 @@ describe("ready against real services", () => {
         pool: p,
         redis: client,
         env: baseEnv,
+        auth: headerAuth,
         logger: createLogger("silent"),
       });
     try {
@@ -80,6 +83,12 @@ describe("startServer", () => {
       NODE_ENV: "test",
       LOG_LEVEL: "fatal",
       DATABASE_URL: db.url("app"),
+      DATABASE_IDENTITY_URL: db.url("identity"),
+      AUTH_SECRET: AUTH_SECRET,
+      AUTH_URL: "http://localhost:3001",
+      MAIL_FROM: "no-reply@wise-biz.local",
+      INVITE_SECRET: "integration-invite-secret-".padEnd(40, "x"),
+      CONSOLE_URL: "http://localhost:3001",
       REDIS_URL: redis.url,
       PORT: String(port),
     });
@@ -109,6 +118,12 @@ describe("startServer", () => {
       NODE_ENV: "test",
       LOG_LEVEL: "fatal",
       DATABASE_URL: db.url("app"),
+      DATABASE_IDENTITY_URL: db.url("identity"),
+      AUTH_SECRET: AUTH_SECRET,
+      AUTH_URL: "http://localhost:3001",
+      MAIL_FROM: "no-reply@wise-biz.local",
+      INVITE_SECRET: "integration-invite-secret-".padEnd(40, "x"),
+      CONSOLE_URL: "http://localhost:3001",
       REDIS_URL: "redis://127.0.0.1:1",
       PORT: String(port),
     });
@@ -133,6 +148,12 @@ describe("startServer", () => {
       NODE_ENV: "test",
       LOG_LEVEL: "fatal",
       DATABASE_URL: db.url("app"),
+      DATABASE_IDENTITY_URL: db.url("identity"),
+      AUTH_SECRET: AUTH_SECRET,
+      AUTH_URL: "http://localhost:3001",
+      MAIL_FROM: "no-reply@wise-biz.local",
+      INVITE_SECRET: "integration-invite-secret-".padEnd(40, "x"),
+      CONSOLE_URL: "http://localhost:3001",
       REDIS_URL: redis.url,
       PORT: String(port),
     };
@@ -144,16 +165,17 @@ describe("startServer", () => {
     }
   });
 
-  it("refuses API_DEV_AUTH in production", async () => {
+  it("still enforces the production env guard", async () => {
     await expect(
       startServer({
         NODE_ENV: "production",
-        API_DEV_AUTH: "true",
-        AUTH_SECRET: "x".repeat(40),
-        EMAIL_PROVIDER: "smtp",
+        AUTH_SECRET,
+        EMAIL_PROVIDER: "capture",
         DATABASE_URL: db.url("app"),
+        DATABASE_IDENTITY_URL: db.url("identity"),
+        AUTH_URL: "https://api.example.com",
         REDIS_URL: redis.url,
       }),
-    ).rejects.toThrow(/API_DEV_AUTH/);
+    ).rejects.toThrow(/EMAIL_PROVIDER/);
   });
 });

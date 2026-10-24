@@ -12,8 +12,11 @@ describe("ERROR_CODES", () => {
     for (const c of Object.values(ERROR_CODES)) expect(c.status).toBeGreaterThanOrEqual(400);
   });
 
-  it("has no 403", () => {
-    expect(Object.values(ERROR_CODES).some((c) => (c.status as number) === 403)).toBe(false);
+  it("has no 403 except the CSRF origin guard", () => {
+    const codes = Object.entries(ERROR_CODES)
+      .filter(([, c]) => (c.status as number) === 403)
+      .map(([k]) => k);
+    expect(codes).toEqual(["ORIGIN_REJECTED"]);
   });
 
   it.each<[ErrorCode, number]>([
@@ -26,6 +29,8 @@ describe("ERROR_CODES", () => {
     ["STOCK_INSUFFICIENT", 409],
     ["ENTITLEMENT_REQUIRED", 402],
     ["RATE_LIMITED", 429],
+    ["RATE_LIMIT_UNAVAILABLE", 503],
+    ["ORIGIN_REJECTED", 403],
     ["CURRENCY_MISMATCH", 422],
     ["PRECONDITION_FAILED", 412],
     ["INTERNAL", 500],

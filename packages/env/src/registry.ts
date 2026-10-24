@@ -1,13 +1,19 @@
 import {
   authEnv,
   chainerEnv,
+  consoleEnv,
   databaseEnv,
+  demoSeedEnv,
   emailEnv,
   httpEnv,
+  identityDbEnv,
+  inviteEnv,
   kafkaEnv,
+  mailEnv,
   observabilityEnv,
   redisEnv,
   storageEnv,
+  webauthnEnv,
   workerEnv,
 } from "./fragments.ts";
 
@@ -26,6 +32,12 @@ export const ALL_ENV_FRAGMENTS = {
   http: httpEnv,
   worker: workerEnv,
   chainer: chainerEnv,
+  identityDb: identityDbEnv,
+  mail: mailEnv,
+  invite: inviteEnv,
+  console: consoleEnv,
+  webauthn: webauthnEnv,
+  demoSeed: demoSeedEnv,
 } as const satisfies Record<string, EnvShape>;
 
 export interface EnvKeyInfo {

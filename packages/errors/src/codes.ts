@@ -28,6 +28,14 @@ export const ERROR_CODES = Object.freeze({
   },
   PAYLOAD_TOO_LARGE: { status: 413, title: "Payload too large", slug: "payload-too-large" },
   RATE_LIMITED: { status: 429, title: "Too many requests", slug: "rate-limited" },
+  RATE_LIMIT_UNAVAILABLE: {
+    status: 503,
+    title: "Rate limiter unavailable",
+    slug: "rate-limit-unavailable",
+  },
+  // The only 403: a browser cookie request from an origin we do not trust (CSRF guard). It reveals nothing about
+  // any resource, so it does not break "unauthorized = 404" for admin/platform surfaces.
+  ORIGIN_REJECTED: { status: 403, title: "Origin rejected", slug: "origin-rejected" },
   CURRENCY_MISMATCH: { status: 422, title: "Currency mismatch", slug: "money/currency-mismatch" },
   PRECONDITION_FAILED: { status: 412, title: "Precondition failed", slug: "precondition-failed" },
   INTERNAL: { status: 500, title: "Internal error", slug: "internal" },

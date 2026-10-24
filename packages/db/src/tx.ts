@@ -4,6 +4,7 @@ import type { Db } from "./pool.ts";
 import type pg from "pg";
 
 export type TenantCtx = Readonly<{ tenantId: string; userId?: string; requestId: string }>;
+export type UserCtx = Readonly<{ userId: string; requestId: string }>;
 export type PlatformCtx = Readonly<{ reason: string; requestId: string; actorId: string }>;
 
 export interface TxHandle {
@@ -101,5 +102,21 @@ export async function withTenantTx<T>(
   fn: (tx: TxHandle) => Promise<T>,
 ): Promise<T> {
   if (!isUuidV7(ctx.tenantId)) throw new Error("withTenantTx: tenantId must be a UUIDv7");
+  if (ctx.userId !== undefined && !isUuidV7(ctx.userId))
+    throw new Error("withTenantTx: userId must be a UUIDv7");
   return run(pool, SETTINGS_SQL, [ctx.tenantId, ctx.userId ?? "", ctx.requestId], fn);
+}
+
+/**
+ * BEGIN -> set app.user_id with an EMPTY tenant (local) -> fn -> COMMIT; ROLLBACK on throw.
+ * For the signed-in-but-no-active-tenant window (list my tenants, switch tenant): tenant tables return zero rows
+ * except the user-keyed SELECT policies (tenancy.memberships / tenancy.tenants). Never use it for tenant data.
+ */
+export async function withUserTx<T>(
+  pool: pg.Pool,
+  ctx: UserCtx,
+  fn: (tx: TxHandle) => Promise<T>,
+): Promise<T> {
+  if (!isUuidV7(ctx.userId)) throw new Error("withUserTx: userId must be a UUIDv7");
+  return run(pool, SETTINGS_SQL, ["", ctx.userId, ctx.requestId], fn);
 }

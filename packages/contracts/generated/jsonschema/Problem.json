@@ -14,6 +14,8 @@
             "ENTITLEMENT_REQUIRED",
             "PAYLOAD_TOO_LARGE",
             "RATE_LIMITED",
+            "RATE_LIMIT_UNAVAILABLE",
+            "ORIGIN_REJECTED",
             "CURRENCY_MISMATCH",
             "PRECONDITION_FAILED",
             "INTERNAL"

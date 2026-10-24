@@ -3,13 +3,14 @@ import { createHash } from "node:crypto";
 import {
   appendAudit,
   appendOutbox,
+  isUuidV7,
   lockIdempotencyKey,
   saveIdempotencyResponse,
   withTenantTx,
 } from "@wise-biz/db";
 import { DomainError } from "@wise-biz/errors";
 
-import { authorize, requireTenant } from "./authz.ts";
+import { authorize, requireTenant, requireUser } from "./authz.ts";
 import { DEFAULT_IDEMPOTENCY_TTL_MS } from "./types.ts";
 
 import type { AuthorizeResource } from "./authz.ts";
@@ -48,7 +49,15 @@ export interface CommandResult {
 }
 
 export interface CommandOptions<I> {
-  permission: Permission;
+  /** Required unless `bootstrapTenantId` is set. */
+  permission?: Permission;
+  /**
+   * Bootstrap commands (the first tenant of a signed-in user): no active tenant and no permission exist yet.
+   * Instead the caller must be authenticated, and the tenant of the transaction is taken from the VALIDATED input
+   * (client-generated UUIDv7). The handler must fail on a tenant id that already exists (primary-key conflict)
+   * as its first write, so a caller can never act inside someone else's tenant.
+   */
+  bootstrapTenantId?: (input: I) => string;
   input: ZodType<I>;
   /** Default "required". "optional": honoured when the header is present. "off": never. */
   idempotency?: "required" | "optional" | "off";
@@ -155,8 +164,18 @@ export async function runCommand<I>(
   opts: CommandOptions<I>,
 ): Promise<Response> {
   // 1. authorize (needs no body; resource-scoped checks run after validation below)
-  authorize(c, opts.permission);
-  const tenant = requireTenant(c);
+  const bootstrap = opts.bootstrapTenantId;
+  let tenant: TenantCtx;
+  if (bootstrap === undefined) {
+    if (opts.permission === undefined) {
+      throw new DomainError("INTERNAL", "command needs a permission or bootstrapTenantId");
+    }
+    authorize(c, opts.permission);
+    tenant = requireTenant(c);
+  } else {
+    const { userId: actor } = requireUser(c);
+    tenant = { tenantId: "", userId: actor, requestId: c.get("requestId") }; // tenantId set after validation
+  }
 
   // 2. validate
   let raw: unknown;
@@ -172,7 +191,14 @@ export async function runCommand<I>(
     });
   }
   const input = parsed.data;
-  if (opts.resource) authorize(c, opts.permission, opts.resource(input));
+  if (bootstrap !== undefined) {
+    const tenantId = bootstrap(input);
+    if (!isUuidV7(tenantId))
+      throw new DomainError("VALIDATION_FAILED", "tenantId must be a UUIDv7");
+    tenant = { ...tenant, tenantId };
+  } else if (opts.resource && opts.permission !== undefined) {
+    authorize(c, opts.permission, opts.resource(input));
+  }
 
   // 3. idempotency key
   const mode = opts.idempotency ?? "required";
@@ -284,4 +310,13 @@ export async function runCommand<I>(
     }
   }
   return send(c, outcome.response);
+}
+
+/**
+ * The ONE sanctioned type bridge for `app.openapi` handlers that return a `runCommand` Response. runCommand's body was
+ * already produced from the route's own response schema, but Hono cannot see that through a raw Response; this
+ * keeps the cast in one reviewed place instead of `as never` at every call site.
+ */
+export function asRouteResponse(res: Response): never {
+  return res as never;
 }

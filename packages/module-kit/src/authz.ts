@@ -32,10 +32,21 @@ export function policyMiddleware(
   };
 }
 
-/** Tenant context of the caller. Anonymous callers get UNAUTHENTICATED (401). */
+/** Signed-in caller without needing an active tenant. Anonymous callers get UNAUTHENTICATED (401). */
+export function requireUser(c: Context<AppEnv>): { userId: string; sessionId: string } {
+  const auth = c.get("auth");
+  if (auth.kind !== "user") throw new DomainError("UNAUTHENTICATED", "Authentication required");
+  return { userId: auth.userId, sessionId: auth.sessionId };
+}
+
+/**
+ * Tenant context of the caller. Anonymous callers get UNAUTHENTICATED (401);
+ * a signed-in caller with no valid active tenant gets NOT_FOUND (404).
+ */
 export function requireTenant(c: Context<AppEnv>): TenantCtx {
   const auth = c.get("auth");
   if (auth.kind !== "user") throw new DomainError("UNAUTHENTICATED", "Authentication required");
+  if (auth.tenantId === null) throw new DomainError("NOT_FOUND", "Not found");
   const existing = c.get("tenant");
   if (existing !== undefined) return existing;
   return { tenantId: auth.tenantId, userId: auth.userId, requestId: c.get("requestId") };
@@ -45,6 +56,29 @@ export interface AuthorizeResource {
   branchId?: string;
   amountMinor?: number;
   discountBps?: number;
+}
+
+/**
+ * Non-throwing form of `authorize` for filtering: true when the caller would be allowed. Only the refusals `authorize`
+ * maps to 404 or 412 become false; infrastructure errors still propagate.
+ */
+export function permits(
+  c: Context<AppEnv>,
+  permission: Permission,
+  resource: AuthorizeResource = {},
+): boolean {
+  try {
+    authorize(c, permission, resource);
+    return true;
+  } catch (err) {
+    if (
+      err instanceof DomainError &&
+      (err.code === "NOT_FOUND" || err.code === "PRECONDITION_FAILED")
+    ) {
+      return false;
+    }
+    throw err;
+  }
 }
 
 /**
@@ -67,7 +101,7 @@ export function authorize(
   const decision = decide(
     state.matrix,
     {
-      tenantId: auth.tenantId,
+      tenantId: tenant.tenantId,
       roles: auth.roles,
       branchScope: auth.branchScope,
       now: at.getTime(),

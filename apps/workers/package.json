@@ -13,7 +13,7 @@
     "lint": "eslint . --max-warnings 0",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --coverage",
-    "dev": "node --watch src/main.ts",
+    "dev": "node --env-file-if-exists=../../.env --watch src/main.ts",
     "start": "node src/main.ts"
   },
   "dependencies": {
@@ -22,7 +22,9 @@
     "@wise-biz/env": "workspace:*",
     "@wise-biz/events": "workspace:*",
     "@wise-biz/ids": "workspace:*",
+    "@wise-biz/mailer": "workspace:*",
     "@wise-biz/module-audit": "workspace:*",
+    "@wise-biz/module-tenancy": "workspace:*",
     "pg": "8.23.1",
     "pino": "10.4.0"
   },
