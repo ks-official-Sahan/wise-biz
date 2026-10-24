@@ -1,3 +1,4 @@
+import { createAuditModule } from "@wise-biz/module-audit";
 import { templateModule } from "@wise-biz/module-template";
 import { createTenancyModule } from "@wise-biz/module-tenancy";
 
@@ -13,7 +14,7 @@ export function createModules(
   sessions: ActiveTenantSetter,
   tenancy: TenancyModuleOptions = {},
 ): readonly WbModule[] {
-  return [createTenancyModule(sessions, tenancy), templateModule];
+  return [createAuditModule(), createTenancyModule(sessions, tenancy), templateModule];
 }
 
 /** Route/permission shapes only (OpenAPI generation, tests): the session port is not wired and must never be called. */

@@ -103,6 +103,10 @@ Tracked in `docs/prompts/P2/README.md` order; add rows here when P2 starts.
 - [ ] (P0-09b) Visual baselines are win32 only; generate linux baselines in CI — owner: P0-12 gate
 - [ ] (P0-09b) UI theme-switch perf test is opt-in (`pnpm -F @wise-biz/ui test:perf`, vitest `--mode perf`): wall clock under turbo parallel load read 378 ms vs 44 ms alone; add a dedicated CI perf job — owner: P0-12 gate
 - [ ] (P0-09b) `@tabler/icons-react-native` also breaks depcruise resolution (`exports.require.types` → missing `.d.cts`); narrow `pathNot` exception in `.dependency-cruiser.cjs` — owner: P0-11
+- [ ] (P0-10a) Members and audit actors carry user ids only; add an identity contract (`displayNamesByIds`, one batched query) so the console shows names and member search (`q`) can work without cross-module reads — owner: P0-10b / P1-15
+- [ ] (P0-10a) Default grants: give manager/accountant `audit:read` and owner-only `audit:export` explicitly once DEFAULT_ROLE_GRANTS spans modules — owner: P1-15
+- [ ] (P0-10a) Audit CSV export is built in memory and capped at 10k rows; stream it (cursor + chunked response) for larger ranges — owner: P1-14
+- [ ] (P0-10a) Onboarding draft saves are audited (rule 5); the console must save on step change, not per keystroke — owner: P0-10b
 - [ ] (P0-09b) RN Modal on react-native-web does not inert siblings; focus trap covers keyboard, screen-reader virtual cursor can still leave — owner: P1-08
 - [ ] (P0-09a) `toDtcg` returns `{ tokens, resolver }`; emit separate token set files plus a top-level 2025.10 resolver document when theming publishing lands — owner: P1 theming module
 - [ ] (P0-09a) `resolveTheme` does not reject failing overrides (editor needs a preview); publishing must call `validateTheme` and refuse issues — owner: P1 theming module

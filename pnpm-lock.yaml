@@ -241,6 +241,9 @@ importers:
       '@wise-biz/mailer':
         specifier: workspace:*
         version: link:../../packages/mailer
+      '@wise-biz/module-audit':
+        specifier: workspace:*
+        version: link:../../modules/audit
       '@wise-biz/module-identity':
         specifier: workspace:*
         version: link:../../modules/identity
@@ -473,6 +476,9 @@ importers:
 
   modules/audit:
     dependencies:
+      '@hono/zod-openapi':
+        specifier: 1.6.3
+        version: 1.6.3(hono@4.13.13)(zod@4.6.7)
       '@wise-biz/audit-chain':
         specifier: workspace:*
         version: link:../../packages/audit-chain
@@ -485,12 +491,27 @@ importers:
       '@wise-biz/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@wise-biz/errors':
+        specifier: workspace:*
+        version: link:../../packages/errors
       '@wise-biz/ids':
         specifier: workspace:*
         version: link:../../packages/ids
+      '@wise-biz/module-kit':
+        specifier: workspace:*
+        version: link:../../packages/module-kit
+      '@wise-biz/policy':
+        specifier: workspace:*
+        version: link:../../packages/policy
+      hono:
+        specifier: 4.13.13
+        version: 4.13.13
       pg:
         specifier: 8.23.1
         version: 8.23.1
+      zod:
+        specifier: 4.6.7
+        version: 4.6.7
     devDependencies:
       '@types/node':
         specifier: 24.19.2

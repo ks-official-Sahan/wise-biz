@@ -31,6 +31,7 @@
     "@wise-biz/module-identity": "workspace:*",
     "@wise-biz/module-kit": "workspace:*",
     "@wise-biz/module-template": "workspace:*",
+    "@wise-biz/module-audit": "workspace:*",
     "@wise-biz/module-tenancy": "workspace:*",
     "@wise-biz/policy": "workspace:*",
     "hono": "4.13.13",

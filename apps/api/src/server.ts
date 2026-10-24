@@ -80,6 +80,7 @@ export async function startServer(
     },
   });
   // Fail fast instead of retrying forever silently: readiness reports Redis, the API still serves.
+  const REDIS_BOOT_WAIT_MS = 500;
   const redis = createClient({
     url: env.REDIS_URL,
     socket: { connectTimeout: 2000, reconnectStrategy: (retries) => Math.min(retries * 200, 5000) },
@@ -118,9 +119,15 @@ export async function startServer(
 
   try {
     // Not awaited: with an unreachable Redis connect() never settles. The client keeps reconnecting in the background.
-    redis.connect().catch((err: unknown) => {
+    const connecting = redis.connect().catch((err: unknown) => {
       logger.error({ err }, "redis connect failed");
     });
+    // Short bounded wait so the first requests after boot do not race the connection (no offline queue: a command
+    // sent before `ready` fails, and rate-limited routes answer 503). An unreachable Redis costs at most this wait.
+    await Promise.race([
+      connecting,
+      new Promise((resolve) => setTimeout(resolve, REDIS_BOOT_WAIT_MS)),
+    ]);
 
     const identity = createIdentity({
       pool: identityPool,

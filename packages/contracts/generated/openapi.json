@@ -2,6 +2,113 @@
   "components": {
     "parameters": {},
     "schemas": {
+      "AuditEntry": {
+        "properties": {
+          "action": {
+            "type": "string"
+          },
+          "actor": {
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              }
+            },
+            "required": ["type", "id"],
+            "type": "object"
+          },
+          "at": {
+            "type": "string"
+          },
+          "entity": {
+            "properties": {
+              "id": {
+                "type": ["string", "null"]
+              },
+              "type": {
+                "type": "string"
+              }
+            },
+            "required": ["type", "id"],
+            "type": "object"
+          },
+          "id": {
+            "type": "string"
+          },
+          "requestId": {
+            "type": "string"
+          }
+        },
+        "required": ["id", "at", "actor", "action", "entity", "requestId"],
+        "type": "object"
+      },
+      "AuditEntryDetail": {
+        "properties": {
+          "action": {
+            "type": "string"
+          },
+          "actor": {
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              }
+            },
+            "required": ["type", "id"],
+            "type": "object"
+          },
+          "after": {},
+          "at": {
+            "type": "string"
+          },
+          "before": {},
+          "chained": {
+            "type": "boolean"
+          },
+          "entity": {
+            "properties": {
+              "id": {
+                "type": ["string", "null"]
+              },
+              "type": {
+                "type": "string"
+              }
+            },
+            "required": ["type", "id"],
+            "type": "object"
+          },
+          "id": {
+            "type": "string"
+          },
+          "reason": {
+            "type": ["string", "null"]
+          },
+          "requestId": {
+            "type": "string"
+          }
+        },
+        "required": ["id", "at", "actor", "action", "entity", "requestId", "reason", "chained"],
+        "type": "object"
+      },
+      "AuditEntryList": {
+        "properties": {
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/AuditEntry"
+            },
+            "type": "array"
+          },
+          "nextCursor": {
+            "type": ["string", "null"]
+          }
+        },
+        "required": ["entries", "nextCursor"],
+        "type": "object"
+      },
       "Cursor": {
         "maxLength": 512,
         "minLength": 1,
@@ -64,6 +171,9 @@
       },
       "TenancyBranch": {
         "properties": {
+          "archived": {
+            "type": "boolean"
+          },
           "branchId": {
             "minLength": 1,
             "type": "string"
@@ -95,8 +205,42 @@
           "timezone",
           "currency",
           "taxRegion",
-          "businessDayCutoff"
+          "businessDayCutoff",
+          "archived"
         ],
+        "type": "object"
+      },
+      "TenancyBranchCreate": {
+        "properties": {
+          "businessDayCutoff": {
+            "maxLength": 5,
+            "type": "string"
+          },
+          "currency": {
+            "maxLength": 3,
+            "type": "string"
+          },
+          "id": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "kind": {
+            "enum": ["store", "warehouse", "office"],
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 1000,
+            "type": "string"
+          },
+          "taxRegion": {
+            "maxLength": 100,
+            "type": "string"
+          },
+          "timezone": {
+            "maxLength": 64,
+            "type": "string"
+          }
+        },
+        "required": ["id", "name", "kind", "timezone", "currency", "taxRegion"],
         "type": "object"
       },
       "TenancyBranchList": {
@@ -109,6 +253,99 @@
           }
         },
         "required": ["branches"],
+        "type": "object"
+      },
+      "TenancyBranchUpdate": {
+        "properties": {
+          "archived": {
+            "type": "boolean"
+          },
+          "businessDayCutoff": {
+            "maxLength": 5,
+            "type": "string"
+          },
+          "currency": {
+            "maxLength": 3,
+            "type": "string"
+          },
+          "kind": {
+            "enum": ["store", "warehouse", "office"],
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 1000,
+            "type": "string"
+          },
+          "taxRegion": {
+            "maxLength": 100,
+            "type": "string"
+          },
+          "timezone": {
+            "maxLength": 64,
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "TenancyBusinessProfile": {
+        "properties": {
+          "country": {
+            "type": ["string", "null"]
+          },
+          "currency": {
+            "type": ["string", "null"]
+          },
+          "name": {
+            "type": "string"
+          },
+          "onboardedAt": {
+            "type": ["string", "null"]
+          },
+          "taxRegion": {
+            "type": ["string", "null"]
+          },
+          "tenantId": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "timezone": {
+            "type": ["string", "null"]
+          }
+        },
+        "required": [
+          "tenantId",
+          "name",
+          "country",
+          "currency",
+          "timezone",
+          "taxRegion",
+          "onboardedAt"
+        ],
+        "type": "object"
+      },
+      "TenancyBusinessProfileUpdate": {
+        "properties": {
+          "country": {
+            "maxLength": 2,
+            "type": ["string", "null"]
+          },
+          "currency": {
+            "maxLength": 3,
+            "type": ["string", "null"]
+          },
+          "name": {
+            "maxLength": 1000,
+            "type": "string"
+          },
+          "taxRegion": {
+            "maxLength": 100,
+            "type": ["string", "null"]
+          },
+          "timezone": {
+            "maxLength": 64,
+            "type": ["string", "null"]
+          }
+        },
         "type": "object"
       },
       "TenancyEmptyBody": {
@@ -291,6 +528,75 @@
         "required": ["inviteId", "revokedAt"],
         "type": "object"
       },
+      "TenancyLocation": {
+        "properties": {
+          "archived": {
+            "type": "boolean"
+          },
+          "branchId": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "kind": {
+            "enum": ["sales_floor", "backroom", "warehouse"],
+            "type": "string"
+          },
+          "locationId": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": ["locationId", "branchId", "name", "kind", "archived"],
+        "type": "object"
+      },
+      "TenancyLocationCreate": {
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "kind": {
+            "enum": ["sales_floor", "backroom", "warehouse"],
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 1000,
+            "type": "string"
+          }
+        },
+        "required": ["id", "name"],
+        "type": "object"
+      },
+      "TenancyLocationList": {
+        "properties": {
+          "locations": {
+            "items": {
+              "$ref": "#/components/schemas/TenancyLocation"
+            },
+            "type": "array"
+          }
+        },
+        "required": ["locations"],
+        "type": "object"
+      },
+      "TenancyLocationUpdate": {
+        "properties": {
+          "archived": {
+            "type": "boolean"
+          },
+          "kind": {
+            "enum": ["sales_floor", "backroom", "warehouse"],
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 1000,
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "TenancyMember": {
         "properties": {
           "branchIds": {
@@ -395,11 +701,14 @@
           "name": {
             "type": "string"
           },
+          "onboardedAt": {
+            "type": ["string", "null"]
+          },
           "tenantId": {
             "$ref": "#/components/schemas/Uuid7"
           }
         },
-        "required": ["tenantId", "name", "membershipId"],
+        "required": ["tenantId", "name", "membershipId", "onboardedAt"],
         "type": "object"
       },
       "TenancyMyTenants": {
@@ -412,6 +721,55 @@
           }
         },
         "required": ["tenants"],
+        "type": "object"
+      },
+      "TenancyOnboarding": {
+        "properties": {
+          "draft": {
+            "$ref": "#/components/schemas/TenancyOnboardingDraft"
+          },
+          "onboardedAt": {
+            "type": ["string", "null"]
+          }
+        },
+        "required": ["onboardedAt", "draft"],
+        "type": "object"
+      },
+      "TenancyOnboardingCompleted": {
+        "properties": {
+          "onboardedAt": {
+            "type": "string"
+          }
+        },
+        "required": ["onboardedAt"],
+        "type": "object"
+      },
+      "TenancyOnboardingDraft": {
+        "properties": {
+          "step": {
+            "maximum": 20,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "values": {
+            "additionalProperties": {},
+            "type": "object"
+          }
+        },
+        "required": ["step", "values"],
+        "type": ["object", "null"]
+      },
+      "TenancyOnboardingDraftSaved": {
+        "properties": {
+          "saved": {
+            "enum": [true],
+            "type": "boolean"
+          },
+          "step": {
+            "type": "integer"
+          }
+        },
+        "required": ["saved", "step"],
         "type": "object"
       },
       "TenancyRole": {
@@ -658,6 +1016,202 @@
         "summary": "Readiness (database and redis)"
       }
     },
+    "/v1/audit/entries": {
+      "get": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "actor",
+            "required": false,
+            "schema": {
+              "maxLength": 200,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "action",
+            "required": false,
+            "schema": {
+              "maxLength": 200,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "entity",
+            "required": false,
+            "schema": {
+              "maxLength": 200,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "entityId",
+            "required": false,
+            "schema": {
+              "maxLength": 200,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "maxLength": 200,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditEntryList"
+                }
+              }
+            },
+            "description": "Entries"
+          }
+        },
+        "summary": "Audit log, newest first (keyset paginated; filters by actor, action, entity and time)",
+        "tags": ["audit"]
+      }
+    },
+    "/v1/audit/entries/{id}": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditEntryDetail"
+                }
+              }
+            },
+            "description": "Entry"
+          }
+        },
+        "summary": "One audit entry with before/after for the diff view",
+        "tags": ["audit"]
+      }
+    },
+    "/v1/audit/export": {
+      "get": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "actor",
+            "required": false,
+            "schema": {
+              "maxLength": 200,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "action",
+            "required": false,
+            "schema": {
+              "maxLength": 200,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "entity",
+            "required": false,
+            "schema": {
+              "maxLength": 200,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "entityId",
+            "required": false,
+            "schema": {
+              "maxLength": 200,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "CSV"
+          }
+        },
+        "summary": "CSV export of the filtered log (at most 10000 rows; the export is itself audited)",
+        "tags": ["audit"]
+      }
+    },
     "/v1/template/items": {
       "get": {
         "parameters": [
@@ -765,6 +1319,32 @@
         },
         "summary": "Branches this caller may see (a branch-scoped member sees only their branches)",
         "tags": ["tenancy"]
+      },
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TenancyBranchCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenancyBranch"
+                }
+              }
+            },
+            "description": "Created"
+          }
+        },
+        "summary": "Add a branch (store, warehouse or office)",
+        "tags": ["tenancy"]
       }
     },
     "/v1/tenancy/branches/{id}": {
@@ -792,6 +1372,150 @@
           }
         },
         "summary": "One branch (404 outside the caller's branch scope)",
+        "tags": ["tenancy"]
+      },
+      "patch": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Uuid7"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TenancyBranchUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenancyBranch"
+                }
+              }
+            },
+            "description": "Updated"
+          }
+        },
+        "summary": "Change a branch, or archive / restore it (branches are never deleted)",
+        "tags": ["tenancy"]
+      }
+    },
+    "/v1/tenancy/branches/{id}/locations": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Uuid7"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenancyLocationList"
+                }
+              }
+            },
+            "description": "Locations"
+          }
+        },
+        "summary": "Stock locations of a branch (sales floor, back room, warehouse)",
+        "tags": ["tenancy"]
+      },
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Uuid7"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TenancyLocationCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenancyLocation"
+                }
+              }
+            },
+            "description": "Created"
+          }
+        },
+        "summary": "Add a stock location to a branch",
+        "tags": ["tenancy"]
+      }
+    },
+    "/v1/tenancy/business": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenancyBusinessProfile"
+                }
+              }
+            },
+            "description": "Profile"
+          }
+        },
+        "summary": "Business profile: name and defaults (country, currency, time zone, tax region)",
+        "tags": ["tenancy"]
+      },
+      "patch": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TenancyBusinessProfileUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenancyBusinessProfile"
+                }
+              }
+            },
+            "description": "Updated"
+          }
+        },
+        "summary": "Change the business profile (fields present change; null clears a default)",
         "tags": ["tenancy"]
       }
     },
@@ -925,6 +1649,44 @@
         "tags": ["tenancy"]
       }
     },
+    "/v1/tenancy/locations/{id}": {
+      "patch": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Uuid7"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TenancyLocationUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenancyLocation"
+                }
+              }
+            },
+            "description": "Updated"
+          }
+        },
+        "summary": "Rename or re-kind a location, or archive / restore it",
+        "tags": ["tenancy"]
+      }
+    },
     "/v1/tenancy/me/tenants": {
       "get": {
         "responses": {
@@ -1016,6 +1778,78 @@
           }
         },
         "summary": "Replace a member's roles and, optionally, branch scope",
+        "tags": ["tenancy"]
+      }
+    },
+    "/v1/tenancy/onboarding": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenancyOnboarding"
+                }
+              }
+            },
+            "description": "Onboarding"
+          }
+        },
+        "summary": "Onboarding state and the saved wizard draft (owner only)",
+        "tags": ["tenancy"]
+      },
+      "put": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TenancyOnboardingDraft"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenancyOnboardingDraftSaved"
+                }
+              }
+            },
+            "description": "Saved"
+          }
+        },
+        "summary": "Save the wizard draft (owner only; save on step change, not per keystroke)",
+        "tags": ["tenancy"]
+      }
+    },
+    "/v1/tenancy/onboarding/complete": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TenancyEmptyBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenancyOnboardingCompleted"
+                }
+              }
+            },
+            "description": "Onboarded"
+          }
+        },
+        "summary": "Finish onboarding once the profile is complete (owner only, idempotent)",
         "tags": ["tenancy"]
       }
     },

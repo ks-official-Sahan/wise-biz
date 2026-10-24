@@ -21,7 +21,7 @@ Each module: owns a Postgres schema, exposes contracts in `@wise-biz/contracts/<
 | **billing** | Plans, subscriptions, trials, entitlements, metering, invoices to tenants | plans, plan_features, subscriptions, grants, usage_counters | `billing.subscription.*`, `billing.entitlements.changed` | `sales.sale.completed` (metering) | P2 |
 | **integrations** | Accounting, Shopify, WooCommerce, webhooks out, public API keys | connections, webhook_endpoints, webhook_deliveries, api_keys | `integrations.*` | any public event | P2 |
 | **notifications** | In-app, email, push, SMS; preferences | notifications, preferences, push_tokens | — | many | P1 |
-| **audit** | Hash-chained audit log, platform snapshots, restore jobs | audit_log (partitioned), snapshots, restore_jobs | `audit.snapshot.created` | — (written in-tx by all) | P1 |
+| **audit** | Hash-chained audit log, read API for the console viewer (`/v1/audit/entries`, CSV `/v1/audit/export`, permissions `audit:read` / `audit:export`), platform snapshots, restore jobs | audit_log (partitioned), snapshots, restore_jobs | `audit.export.requested`, `audit.snapshot.created` | — (written in-tx by all) | P1 |
 | **media** | Wraps media-kit; per-tenant folders, variants for offline cache | media_assets, media_usage | `media.asset.*` | — | P1 |
 | **theming** | Theme tokens, fonts, receipt templates, letterheads, card templates | themes, fonts, receipt_templates, letterheads | `theming.theme.published` | — | P1 |
 | **support** | Tickets, platform announcements | tickets, ticket_messages | `support.*` | — | P2 |
