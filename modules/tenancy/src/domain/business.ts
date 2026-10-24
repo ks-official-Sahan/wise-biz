@@ -9,7 +9,7 @@ export const BRANCH_KINDS = ["store", "warehouse", "office"] as const;
 export type BranchKind = (typeof BRANCH_KINDS)[number];
 
 export const DEFAULT_LOCATION_NAME = "Main";
-const CUTOFF_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+export const CUTOFF_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 /**
  * Grants every new tenant starts with. Owner is implicit (matrixFromRows grants it everything), so it has no rows.
@@ -63,13 +63,13 @@ export interface BusinessRows {
   readonly createdAt: Date;
 }
 
-function fail(path: string, message: string): never {
+export function fail(path: string, message: string): never {
   throw new DomainError("VALIDATION_FAILED", `${path}: ${message}`, {
     fieldErrors: [{ path, message }],
   });
 }
 
-function text(path: string, raw: string, max: number): string {
+export function text(path: string, raw: string, max: number): string {
   const v = raw.trim();
   if (v.length < 1 || v.length > max)
     fail(path, `must be 1-${String(max)} characters after trimming`);

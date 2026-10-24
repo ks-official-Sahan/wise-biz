@@ -17,13 +17,38 @@ import {
 } from "../../application/invites.ts";
 import { updateMemberRolesCommand } from "../../application/members.ts";
 import { createRoleCommand, setRolePermissionsCommand } from "../../application/roles.ts";
+import {
+  completeOnboardingCommand,
+  createBranchCommand,
+  createLocationCommand,
+  ONBOARDING_DRAFT_KEY,
+  saveOnboardingDraftCommand,
+  toLocationDto,
+  toProfileDto,
+  updateBranchCommand,
+  updateLocationCommand,
+  updateProfileCommand,
+} from "../../application/settings.ts";
 import { inviteStatus } from "../../domain/invites.ts";
 import { pageSize } from "../../domain/pagination.ts";
 import { inviteTokenMatches } from "../../invite-token.ts";
 import {
+  BranchCreateSchema,
   BranchListSchema,
   BranchSchema,
+  BranchUpdateSchema,
   EmptyBodySchema,
+  LocationCreateSchema,
+  LocationListSchema,
+  LocationParamSchema,
+  LocationSchema,
+  LocationUpdateSchema,
+  OnboardingCompletedSchema,
+  OnboardingDraftSavedSchema,
+  OnboardingDraftSchema,
+  OnboardingSchema,
+  ProfileSchema,
+  ProfileUpdateSchema,
   IdParamSchema,
   InviteAcceptSchema,
   InviteAcceptedSchema,
@@ -241,6 +266,152 @@ const branchRoute = createRoute({
   },
 });
 
+const branchCreateRoute = createRoute({
+  method: "post",
+  path: "/v1/tenancy/branches",
+  tags: ["tenancy"],
+  summary: "Add a branch (store, warehouse or office)",
+  middleware: [can("tenancy:manage")] as const,
+  request: {
+    body: { required: true, content: { "application/json": { schema: BranchCreateSchema } } },
+  },
+  responses: {
+    201: { description: "Created", content: { "application/json": { schema: BranchSchema } } },
+  },
+});
+
+const branchUpdateRoute = createRoute({
+  method: "patch",
+  path: "/v1/tenancy/branches/{id}",
+  tags: ["tenancy"],
+  summary: "Change a branch, or archive / restore it (branches are never deleted)",
+  middleware: [can("tenancy:manage")] as const,
+  request: {
+    params: IdParamSchema,
+    body: { required: true, content: { "application/json": { schema: BranchUpdateSchema } } },
+  },
+  responses: {
+    200: { description: "Updated", content: { "application/json": { schema: BranchSchema } } },
+  },
+});
+
+const locationsListRoute = createRoute({
+  method: "get",
+  path: "/v1/tenancy/branches/{id}/locations",
+  tags: ["tenancy"],
+  summary: "Stock locations of a branch (sales floor, back room, warehouse)",
+  request: { params: IdParamSchema },
+  responses: {
+    200: {
+      description: "Locations",
+      content: { "application/json": { schema: LocationListSchema } },
+    },
+  },
+});
+
+const locationCreateRoute = createRoute({
+  method: "post",
+  path: "/v1/tenancy/branches/{id}/locations",
+  tags: ["tenancy"],
+  summary: "Add a stock location to a branch",
+  middleware: [can("tenancy:manage")] as const,
+  request: {
+    params: IdParamSchema,
+    body: { required: true, content: { "application/json": { schema: LocationCreateSchema } } },
+  },
+  responses: {
+    201: { description: "Created", content: { "application/json": { schema: LocationSchema } } },
+  },
+});
+
+const locationUpdateRoute = createRoute({
+  method: "patch",
+  path: "/v1/tenancy/locations/{id}",
+  tags: ["tenancy"],
+  summary: "Rename or re-kind a location, or archive / restore it",
+  middleware: [can("tenancy:manage")] as const,
+  request: {
+    params: LocationParamSchema,
+    body: { required: true, content: { "application/json": { schema: LocationUpdateSchema } } },
+  },
+  responses: {
+    200: { description: "Updated", content: { "application/json": { schema: LocationSchema } } },
+  },
+});
+
+const profileRoute = createRoute({
+  method: "get",
+  path: "/v1/tenancy/business",
+  tags: ["tenancy"],
+  summary: "Business profile: name and defaults (country, currency, time zone, tax region)",
+  middleware: [can("tenancy:read")] as const,
+  responses: {
+    200: { description: "Profile", content: { "application/json": { schema: ProfileSchema } } },
+  },
+});
+
+const profileUpdateRoute = createRoute({
+  method: "patch",
+  path: "/v1/tenancy/business",
+  tags: ["tenancy"],
+  summary: "Change the business profile (fields present change; null clears a default)",
+  middleware: [can("tenancy:manage")] as const,
+  request: {
+    body: { required: true, content: { "application/json": { schema: ProfileUpdateSchema } } },
+  },
+  responses: {
+    200: { description: "Updated", content: { "application/json": { schema: ProfileSchema } } },
+  },
+});
+
+const onboardingRoute = createRoute({
+  method: "get",
+  path: "/v1/tenancy/onboarding",
+  tags: ["tenancy"],
+  summary: "Onboarding state and the saved wizard draft (owner only)",
+  middleware: [signedIn] as const,
+  responses: {
+    200: {
+      description: "Onboarding",
+      content: { "application/json": { schema: OnboardingSchema } },
+    },
+  },
+});
+
+const onboardingDraftRoute = createRoute({
+  method: "put",
+  path: "/v1/tenancy/onboarding",
+  tags: ["tenancy"],
+  summary: "Save the wizard draft (owner only; save on step change, not per keystroke)",
+  middleware: [can("tenancy:manage")] as const,
+  request: {
+    body: { required: true, content: { "application/json": { schema: OnboardingDraftSchema } } },
+  },
+  responses: {
+    200: {
+      description: "Saved",
+      content: { "application/json": { schema: OnboardingDraftSavedSchema } },
+    },
+  },
+});
+
+const onboardingCompleteRoute = createRoute({
+  method: "post",
+  path: "/v1/tenancy/onboarding/complete",
+  tags: ["tenancy"],
+  summary: "Finish onboarding once the profile is complete (owner only, idempotent)",
+  middleware: [can("tenancy:manage")] as const,
+  request: {
+    body: { required: true, content: { "application/json": { schema: EmptyBodySchema } } },
+  },
+  responses: {
+    200: {
+      description: "Onboarded",
+      content: { "application/json": { schema: OnboardingCompletedSchema } },
+    },
+  },
+});
+
 function toRoleDto(r: RoleRow) {
   return {
     roleId: r.roleId,
@@ -420,5 +591,115 @@ export function mountAdminRoutes(app: OpenAPIHono<AppEnv>, deps: AdminDeps): voi
     const row = await withTenantTx(pool, tenant, (tx) => repo.findBranch(tx, tenant.tenantId, id));
     if (row === null) throw new DomainError("NOT_FOUND", "Not found");
     return json(c, row, 200);
+  });
+
+  app.openapi(branchCreateRoute, async (c) => {
+    const res = await runCommand(c, deps.module, {
+      permission: "tenancy:manage",
+      input: BranchCreateSchema,
+      handler: (tx, input, ctx) => createBranchCommand(repo, tx, ctx, input),
+    });
+    return asRouteResponse(res);
+  });
+
+  app.openapi(branchUpdateRoute, async (c) => {
+    const { id } = c.req.valid("param");
+    authorize(c, "tenancy:manage", { branchId: id });
+    const res = await runCommand(c, deps.module, {
+      permission: "tenancy:manage",
+      input: BranchUpdateSchema,
+      handler: (tx, input, ctx) => updateBranchCommand(repo, tx, ctx, id, input),
+    });
+    return asRouteResponse(res);
+  });
+
+  app.openapi(locationsListRoute, async (c) => {
+    const tenant = requireTenant(c);
+    const { id } = c.req.valid("param");
+    authorize(c, "tenancy:read", { branchId: id });
+    const rows = await withTenantTx(pool, tenant, async (tx) => {
+      if ((await repo.findBranch(tx, tenant.tenantId, id)) === null) return null;
+      return repo.listLocations(tx, tenant.tenantId, id);
+    });
+    if (rows === null) throw new DomainError("NOT_FOUND", "Not found");
+    return json(c, { locations: rows.map(toLocationDto) }, 200);
+  });
+
+  app.openapi(locationCreateRoute, async (c) => {
+    const { id } = c.req.valid("param");
+    authorize(c, "tenancy:manage", { branchId: id });
+    const res = await runCommand(c, deps.module, {
+      permission: "tenancy:manage",
+      input: LocationCreateSchema,
+      handler: (tx, input, ctx) => createLocationCommand(repo, tx, ctx, id, input),
+    });
+    return asRouteResponse(res);
+  });
+
+  app.openapi(locationUpdateRoute, async (c) => {
+    const { id } = c.req.valid("param");
+    const res = await runCommand(c, deps.module, {
+      permission: "tenancy:manage",
+      input: LocationUpdateSchema,
+      handler: (tx, input, ctx) => updateLocationCommand(repo, tx, ctx, id, input),
+    });
+    return asRouteResponse(res);
+  });
+
+  app.openapi(profileRoute, async (c) => {
+    const tenant = requireTenant(c);
+    const row = await withTenantTx(pool, tenant, (tx) => repo.loadProfile(tx, tenant.tenantId));
+    if (row === null) throw new DomainError("NOT_FOUND", "Not found");
+    return json(c, toProfileDto(row), 200);
+  });
+
+  app.openapi(profileUpdateRoute, async (c) => {
+    const res = await runCommand(c, deps.module, {
+      permission: "tenancy:manage",
+      input: ProfileUpdateSchema,
+      handler: (tx, input, ctx) => updateProfileCommand(repo, tx, ctx, input),
+    });
+    return asRouteResponse(res);
+  });
+
+  app.openapi(onboardingRoute, async (c) => {
+    const tenant = requireTenant(c);
+    if (!isOwner(c)) throw new DomainError("NOT_FOUND", "Not found");
+    const state = await withTenantTx(pool, tenant, async (tx) => ({
+      profile: await repo.loadProfile(tx, tenant.tenantId),
+      draft: await repo.getSetting(tx, tenant.tenantId, ONBOARDING_DRAFT_KEY),
+    }));
+    if (state.profile === null) throw new DomainError("NOT_FOUND", "Not found");
+    // A stored draft that no longer matches the schema (older console) is dropped, not served.
+    const draft = OnboardingDraftSchema.safeParse(state.draft);
+    return json(
+      c,
+      {
+        onboardedAt: state.profile.onboardedAt?.toISOString() ?? null,
+        draft: draft.success ? draft.data : null,
+      },
+      200,
+    );
+  });
+
+  app.openapi(onboardingDraftRoute, async (c) => {
+    const owner = isOwner(c);
+    const res = await runCommand(c, deps.module, {
+      permission: "tenancy:manage",
+      input: OnboardingDraftSchema,
+      handler: (tx, input, ctx) =>
+        saveOnboardingDraftCommand(repo, tx, ctx, input, { isOwner: owner }),
+    });
+    return asRouteResponse(res);
+  });
+
+  app.openapi(onboardingCompleteRoute, async (c) => {
+    const owner = isOwner(c);
+    const res = await runCommand(c, deps.module, {
+      permission: "tenancy:manage",
+      input: EmptyBodySchema,
+      handler: (tx, _input, ctx) => completeOnboardingCommand(repo, tx, ctx, { isOwner: owner }),
+    });
+    return asRouteResponse(res);
   });
 }

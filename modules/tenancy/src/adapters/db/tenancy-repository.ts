@@ -1,14 +1,16 @@
 import { DomainError } from "@wise-biz/errors";
 
-import { MAX_MY_TENANTS } from "../../ports/tenancy-repository.ts";
+import { MAX_LOCATIONS_PER_BRANCH, MAX_MY_TENANTS } from "../../ports/tenancy-repository.ts";
 
 import type { BusinessRows } from "../../domain/business.ts";
 import type {
   BranchRow,
   InviteRow,
+  LocationRow,
   Membership,
   MemberRow,
   MyTenantRow,
+  ProfileRow,
   RoleRow,
   TenancyRepository,
 } from "../../ports/tenancy-repository.ts";
@@ -52,7 +54,91 @@ interface BranchDbRow {
   currency: string;
   tax_region: string;
   cutoff: string;
+  archived: boolean;
 }
+
+interface ProfileDbRow {
+  tenant_id: string;
+  name: string;
+  country: string | null;
+  currency: string | null;
+  timezone: string | null;
+  tax_region: string | null;
+  onboarded_at: Date | null;
+}
+
+interface LocationDbRow {
+  id: string;
+  branch_id: string;
+  name: string;
+  kind: string;
+  archived: boolean;
+}
+
+const BRANCH_COLS = `id, name, kind, timezone, currency, tax_region,
+  to_char(business_day_cutoff, 'HH24:MI') as cutoff, archived_at is not null as archived`;
+const PROFILE_COLS = `tenant_id, name, country, currency, timezone, tax_region, onboarded_at`;
+const LOCATION_COLS = `id, branch_id, name, kind, archived_at is not null as archived`;
+
+const toProfile = (r: ProfileDbRow): ProfileRow => ({
+  tenantId: r.tenant_id,
+  name: r.name,
+  // char(n) columns come back padded only when shorter; ISO codes are exact length, so trim is a no-op guard.
+  country: r.country?.trim() ?? null,
+  currency: r.currency?.trim() ?? null,
+  timezone: r.timezone,
+  taxRegion: r.tax_region,
+  onboardedAt: r.onboarded_at,
+});
+
+const toLocation = (r: LocationDbRow): LocationRow => ({
+  locationId: r.id,
+  branchId: r.branch_id,
+  name: r.name,
+  kind: r.kind,
+  archived: r.archived,
+});
+
+/**
+ * Builds `col = $n` pairs for the present keys only. Column names come from the fixed `columns` map, never from
+ * input, so the SQL text is constant per key set; values are always parameters.
+ */
+function setClause(
+  columns: Readonly<Record<string, string>>,
+  patch: Readonly<Record<string, unknown>>,
+  firstParam: number,
+): { sql: string; values: unknown[] } {
+  const parts: string[] = [];
+  const values: unknown[] = [];
+  for (const [key, column] of Object.entries(columns)) {
+    if (!(key in patch) || patch[key] === undefined) continue;
+    values.push(patch[key]);
+    parts.push(`${column} = $${String(firstParam + values.length - 1)}`);
+  }
+  return { sql: parts.join(", "), values };
+}
+
+const BRANCH_SET: Readonly<Record<string, string>> = {
+  name: "name",
+  kind: "kind",
+  timezone: "timezone",
+  currency: "currency",
+  taxRegion: "tax_region",
+  businessDayCutoff: "business_day_cutoff",
+  archivedAt: "archived_at",
+};
+const PROFILE_SET: Readonly<Record<string, string>> = {
+  name: "name",
+  country: "country",
+  currency: "currency",
+  timezone: "timezone",
+  taxRegion: "tax_region",
+};
+const LOCATION_SET: Readonly<Record<string, string>> = {
+  name: "name",
+  kind: "kind",
+  archivedAt: "archived_at",
+};
 
 const INVITE_COLS = `id, email, role_ids, branch_ids, invited_by, expires_at, created_at, accepted_at, revoked_at`;
 const MEMBER_SELECT = `select m.id, m.user_id, m.status, m.branch_ids, m.created_at,
@@ -90,6 +176,7 @@ const toBranch = (r: BranchDbRow): BranchRow => ({
   currency: r.currency,
   taxRegion: r.tax_region,
   businessDayCutoff: r.cutoff,
+  archived: r.archived,
 });
 
 /** Maps a unique violation to CONFLICT with `message`; every other error passes through. */
@@ -173,8 +260,13 @@ export const drizzleTenancyRepository: TenancyRepository = {
 
   async listMyTenants(tx, userId): Promise<MyTenantRow[]> {
     // Index: memberships_user_tenant_idx (user_id, tenant_id), then tenants_pkey. RLS: own_memberships / own_tenants.
-    const res = await tx.query<{ tenant_id: string; name: string; membership_id: string }>(
-      `select t.tenant_id, t.name, m.id as membership_id
+    const res = await tx.query<{
+      tenant_id: string;
+      name: string;
+      membership_id: string;
+      onboarded_at: Date | null;
+    }>(
+      `select t.tenant_id, t.name, m.id as membership_id, t.onboarded_at
        from tenancy.memberships m
        join tenancy.tenants t on t.tenant_id = m.tenant_id
        where m.user_id = $1 and m.status = 'active' and t.status = 'active'
@@ -186,6 +278,7 @@ export const drizzleTenancyRepository: TenancyRepository = {
       tenantId: x.tenant_id,
       name: x.name,
       membershipId: x.membership_id,
+      onboardedAt: x.onboarded_at,
     }));
   },
 
@@ -544,7 +637,7 @@ export const drizzleTenancyRepository: TenancyRepository = {
   async listBranches(tx, tenantId, scope, limit) {
     // ONE query. Index: branches_pkey (tenant_id, id).
     const res = await tx.query<BranchDbRow>(
-      `select id, name, kind, timezone, currency, tax_region, to_char(business_day_cutoff, 'HH24:MI') as cutoff
+      `select ${BRANCH_COLS}
        from tenancy.branches
        where tenant_id = $1 and ($2::uuid[] is null or id = any($2::uuid[]))
        order by id
@@ -557,8 +650,7 @@ export const drizzleTenancyRepository: TenancyRepository = {
   async findBranch(tx, tenantId, branchId) {
     // Index: branches_pkey (tenant_id, id).
     const res = await tx.query<BranchDbRow>(
-      `select id, name, kind, timezone, currency, tax_region, to_char(business_day_cutoff, 'HH24:MI') as cutoff
-       from tenancy.branches where tenant_id = $1 and id = $2`,
+      `select ${BRANCH_COLS} from tenancy.branches where tenant_id = $1 and id = $2`,
       [tenantId, branchId],
     );
     const row = res.rows[0];
@@ -566,21 +658,124 @@ export const drizzleTenancyRepository: TenancyRepository = {
   },
 
   async insertBranch(tx, row) {
-    await tx.query(
-      `insert into tenancy.branches
-         (tenant_id, id, name, kind, timezone, currency, tax_region, business_day_cutoff, created_at)
-       values ($1, $2, $3, $4, $5, $6, $7, $8::time, $9)`,
-      [
-        row.tenantId,
-        row.branchId,
-        row.name,
-        row.kind,
-        row.timezone,
-        row.currency,
-        row.taxRegion,
-        row.businessDayCutoff,
-        row.createdAt,
-      ],
+    await conflictOnUnique("branch already exists", () =>
+      tx.query(
+        `insert into tenancy.branches
+           (tenant_id, id, name, kind, timezone, currency, tax_region, business_day_cutoff, created_at)
+         values ($1, $2, $3, $4, $5, $6, $7, $8::time, $9)`,
+        [
+          row.tenantId,
+          row.branchId,
+          row.name,
+          row.kind,
+          row.timezone,
+          row.currency,
+          row.taxRegion,
+          row.businessDayCutoff,
+          row.createdAt,
+        ],
+      ),
     );
+  },
+
+  async updateBranch(tx, tenantId, branchId, patch) {
+    // Index: branches_pkey (tenant_id, id). Column-scoped UPDATE grants (0001, 0003).
+    const set = setClause(BRANCH_SET, patch, 3);
+    const res = await tx.query<BranchDbRow>(
+      set.sql === ""
+        ? `select ${BRANCH_COLS} from tenancy.branches where tenant_id = $1 and id = $2`
+        : `update tenancy.branches set ${set.sql} where tenant_id = $1 and id = $2
+           returning ${BRANCH_COLS}`,
+      [tenantId, branchId, ...set.values],
+    );
+    const row = res.rows[0];
+    return row === undefined ? null : toBranch(row);
+  },
+
+  async loadProfile(tx, tenantId) {
+    // Index: tenants_pkey.
+    const res = await tx.query<ProfileDbRow>(
+      `select ${PROFILE_COLS} from tenancy.tenants where tenant_id = $1`,
+      [tenantId],
+    );
+    const row = res.rows[0];
+    return row === undefined ? null : toProfile(row);
+  },
+
+  async updateProfile(tx, tenantId, patch) {
+    // Index: tenants_pkey. Column-scoped UPDATE grants (0001, 0003).
+    const set = setClause(PROFILE_SET, patch, 2);
+    const res = await tx.query<ProfileDbRow>(
+      set.sql === ""
+        ? `select ${PROFILE_COLS} from tenancy.tenants where tenant_id = $1`
+        : `update tenancy.tenants set ${set.sql} where tenant_id = $1 returning ${PROFILE_COLS}`,
+      [tenantId, ...set.values],
+    );
+    const row = res.rows[0];
+    if (row === undefined) throw new DomainError("NOT_FOUND", "Not found");
+    return toProfile(row);
+  },
+
+  async markOnboarded(tx, tenantId, at) {
+    // Index: tenants_pkey. The IS NULL guard makes a replayed or concurrent completion a no-op.
+    const res = await tx.query(
+      "update tenancy.tenants set onboarded_at = $2 where tenant_id = $1 and onboarded_at is null",
+      [tenantId, at],
+    );
+    return res.rowCount === 1;
+  },
+
+  async getSetting(tx, tenantId, key) {
+    // Index: settings_pkey (tenant_id, key).
+    const res = await tx.query<{ value: unknown }>(
+      "select value from tenancy.settings where tenant_id = $1 and key = $2",
+      [tenantId, key],
+    );
+    return res.rows[0]?.value ?? null;
+  },
+
+  async putSetting(tx, tenantId, key, value, at) {
+    // Index: settings_pkey (tenant_id, key) is the conflict target.
+    await tx.query(
+      `insert into tenancy.settings (tenant_id, key, value, updated_at) values ($1, $2, $3::jsonb, $4)
+       on conflict (tenant_id, key) do update set value = excluded.value, updated_at = excluded.updated_at`,
+      [tenantId, key, JSON.stringify(value), at],
+    );
+  },
+
+  async listLocations(tx, tenantId, branchId) {
+    // ONE query. Index: locations_tenant_branch_idx (tenant_id, branch_id, id).
+    const res = await tx.query<LocationDbRow>(
+      `select ${LOCATION_COLS} from tenancy.locations
+       where tenant_id = $1 and branch_id = $2
+       order by id
+       limit ${String(MAX_LOCATIONS_PER_BRANCH)}`,
+      [tenantId, branchId],
+    );
+    return res.rows.map(toLocation);
+  },
+
+  async insertLocation(tx, row) {
+    await conflictOnUnique("location already exists", () =>
+      tx.query(
+        `insert into tenancy.locations (tenant_id, id, branch_id, name, kind, created_at)
+         values ($1, $2, $3, $4, $5, $6)`,
+        [row.tenantId, row.locationId, row.branchId, row.name, row.kind, row.createdAt],
+      ),
+    );
+  },
+
+  async updateLocation(tx, tenantId, locationId, patch) {
+    // Index: locations_pkey (tenant_id, id). Column-scoped UPDATE grant (0003).
+    const set = setClause(LOCATION_SET, patch, 3);
+    const res = await tx.query<LocationDbRow>(
+      set.sql === ""
+        ? `select ${LOCATION_COLS} from tenancy.locations where tenant_id = $1 and id = $2`
+        : `update tenancy.locations set ${set.sql} where tenant_id = $1 and id = $2
+           returning ${LOCATION_COLS}`,
+      [tenantId, locationId, ...set.values],
+    );
+    const row = res.rows[0];
+    return row === undefined ? null : toLocation(row);
   },
 };

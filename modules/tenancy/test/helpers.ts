@@ -218,6 +218,20 @@ export const put = (
     }),
   );
 
+export const patch = (
+  app: OpenAPIHono<AppEnv>,
+  path: string,
+  body: unknown,
+  key?: string,
+): Promise<Response> =>
+  Promise.resolve(
+    app.request(path, {
+      method: "PATCH",
+      headers: { "content-type": "application/json", ...(key ? { "idempotency-key": key } : {}) },
+      body: JSON.stringify(body),
+    }),
+  );
+
 export const get = (app: OpenAPIHono<AppEnv>, path: string): Promise<Response> =>
   Promise.resolve(app.request(path, { method: "GET" }));
 

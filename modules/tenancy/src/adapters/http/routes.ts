@@ -135,6 +135,7 @@ function mountTenantRoutes(
           tenantId: toUuid7(t.tenantId),
           name: t.name,
           membershipId: toUuid7(t.membershipId),
+          onboardedAt: t.onboardedAt?.toISOString() ?? null,
         })),
       },
       200,

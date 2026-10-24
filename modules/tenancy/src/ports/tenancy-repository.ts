@@ -23,6 +23,7 @@ export interface MyTenantRow {
   tenantId: string;
   name: string;
   membershipId: string;
+  onboardedAt: Date | null;
 }
 
 export interface InviteRow {
@@ -62,7 +63,29 @@ export interface BranchRow {
   currency: string;
   taxRegion: string;
   businessDayCutoff: string;
+  archived: boolean;
 }
+
+export interface ProfileRow {
+  tenantId: string;
+  name: string;
+  country: string | null;
+  currency: string | null;
+  timezone: string | null;
+  taxRegion: string | null;
+  onboardedAt: Date | null;
+}
+
+export interface LocationRow {
+  locationId: string;
+  branchId: string;
+  name: string;
+  kind: string;
+  archived: boolean;
+}
+
+/** Hard cap on locations listed per branch (one query, no pagination: a branch has a handful). */
+export const MAX_LOCATIONS_PER_BRANCH = 200;
 
 /** Max active memberships (businesses) one user may hold; signUpBusiness refuses beyond it (409 CONFLICT). */
 export const MAX_MEMBERSHIPS_PER_USER = 20;
@@ -200,7 +223,48 @@ export interface TenancyRepository {
     limit: number,
   ): Promise<BranchRow[]>;
   findBranch(tx: Tx, tenantId: string, branchId: string): Promise<BranchRow | null>;
-  insertBranch(tx: Tx, row: BranchRow & { tenantId: string; createdAt: Date }): Promise<void>;
+  /** Throws DomainError CONFLICT when the id already exists. */
+  insertBranch(
+    tx: Tx,
+    row: Omit<BranchRow, "archived"> & { tenantId: string; createdAt: Date },
+  ): Promise<void>;
+  /** Updates the present fields (archivedAt: Date archives, null restores); returns the row, or null when absent. */
+  updateBranch(
+    tx: Tx,
+    tenantId: string,
+    branchId: string,
+    patch: Partial<Omit<BranchRow, "branchId" | "archived">> & { archivedAt?: Date | null },
+  ): Promise<BranchRow | null>;
+
+  /** ONE query. Index: tenants_pkey. */
+  loadProfile(tx: Tx, tenantId: string): Promise<ProfileRow | null>;
+  /** Updates the present fields; returns the new row. */
+  updateProfile(
+    tx: Tx,
+    tenantId: string,
+    patch: Partial<Omit<ProfileRow, "tenantId" | "onboardedAt">>,
+  ): Promise<ProfileRow>;
+  /** Sets onboarded_at only when it is still null; false when already onboarded. */
+  markOnboarded(tx: Tx, tenantId: string, at: Date): Promise<boolean>;
+
+  /** tenancy.settings value, or null. Index: settings_pkey (tenant_id, key). */
+  getSetting(tx: Tx, tenantId: string, key: string): Promise<unknown>;
+  /** Upsert (insert, or update value + updated_at). */
+  putSetting(tx: Tx, tenantId: string, key: string, value: unknown, at: Date): Promise<void>;
+
+  /** ONE query, ordered by id, capped at MAX_LOCATIONS_PER_BRANCH. Index: locations_tenant_branch_idx. */
+  listLocations(tx: Tx, tenantId: string, branchId: string): Promise<LocationRow[]>;
+  /** Throws DomainError CONFLICT when the id already exists. */
+  insertLocation(
+    tx: Tx,
+    row: Omit<LocationRow, "archived"> & { tenantId: string; createdAt: Date },
+  ): Promise<void>;
+  updateLocation(
+    tx: Tx,
+    tenantId: string,
+    locationId: string,
+    patch: { name?: string; kind?: string; archivedAt?: Date | null },
+  ): Promise<LocationRow | null>;
 }
 
 /** Narrow port to the identity module's session store; the kernel injects it (identity <- tenancy, never the reverse). */

@@ -2,6 +2,7 @@ import { Uuid7 } from "@wise-biz/contracts";
 import { z } from "zod";
 
 import { BRANCH_KINDS, isIanaTimezone } from "./domain/business.ts";
+import { LOCATION_KINDS } from "./domain/profile.ts";
 
 /** Shape only; the domain trims and enforces the business rules again (defence in depth). */
 export const SignUpBusinessSchema = z
@@ -24,7 +25,13 @@ export const TenantCreatedSchema = z
   .meta({ id: "TenancyTenantCreated" });
 
 export const MyTenantSchema = z
-  .object({ tenantId: Uuid7, name: z.string(), membershipId: Uuid7 })
+  .object({
+    tenantId: Uuid7,
+    name: z.string(),
+    membershipId: Uuid7,
+    /** null until the owner finishes onboarding; the console routes there first. */
+    onboardedAt: z.string().nullable(),
+  })
   .meta({ id: "TenancyMyTenant" });
 
 export const MyTenantsSchema = z
@@ -167,6 +174,7 @@ export const BranchSchema = z
     currency: z.string(),
     taxRegion: z.string(),
     businessDayCutoff: z.string(),
+    archived: z.boolean(),
   })
   .meta({ id: "TenancyBranch" });
 
@@ -174,11 +182,122 @@ export const BranchListSchema = z
   .object({ branches: z.array(BranchSchema) })
   .meta({ id: "TenancyBranchList" });
 
+const Short = z.string().max(1000);
+
+export const BranchCreateSchema = z
+  .object({
+    id: Uuid7,
+    name: Short,
+    kind: z.enum(BRANCH_KINDS),
+    timezone: z.string().max(64),
+    currency: z.string().max(3),
+    taxRegion: z.string().max(100),
+    businessDayCutoff: z.string().max(5).optional(),
+  })
+  .meta({ id: "TenancyBranchCreate" });
+
+/** Only the fields present change; `archived: true` archives (never deletes), `false` restores. */
+export const BranchUpdateSchema = z
+  .object({
+    name: Short.optional(),
+    kind: z.enum(BRANCH_KINDS).optional(),
+    timezone: z.string().max(64).optional(),
+    currency: z.string().max(3).optional(),
+    taxRegion: z.string().max(100).optional(),
+    businessDayCutoff: z.string().max(5).optional(),
+    archived: z.boolean().optional(),
+  })
+  .meta({ id: "TenancyBranchUpdate" });
+
+export const ProfileSchema = z
+  .object({
+    tenantId: Id,
+    name: z.string(),
+    country: z.string().nullable(),
+    currency: z.string().nullable(),
+    timezone: z.string().nullable(),
+    taxRegion: z.string().nullable(),
+    onboardedAt: z.string().nullable(),
+  })
+  .meta({ id: "TenancyBusinessProfile" });
+
+export const ProfileUpdateSchema = z
+  .object({
+    name: Short.optional(),
+    country: z.string().max(2).nullable().optional(),
+    currency: z.string().max(3).nullable().optional(),
+    timezone: z.string().max(64).nullable().optional(),
+    taxRegion: z.string().max(100).nullable().optional(),
+  })
+  .meta({ id: "TenancyBusinessProfileUpdate" });
+
+export const LocationSchema = z
+  .object({
+    locationId: Id,
+    branchId: Id,
+    name: z.string(),
+    kind: z.enum(LOCATION_KINDS),
+    archived: z.boolean(),
+  })
+  .meta({ id: "TenancyLocation" });
+
+export const LocationListSchema = z
+  .object({ locations: z.array(LocationSchema) })
+  .meta({ id: "TenancyLocationList" });
+
+export const LocationCreateSchema = z
+  .object({ id: Uuid7, name: Short, kind: z.enum(LOCATION_KINDS).optional() })
+  .meta({ id: "TenancyLocationCreate" });
+
+export const LocationUpdateSchema = z
+  .object({
+    name: Short.optional(),
+    kind: z.enum(LOCATION_KINDS).optional(),
+    archived: z.boolean().optional(),
+  })
+  .meta({ id: "TenancyLocationUpdate" });
+
+/**
+ * The wizard's autosaved draft. Loose on purpose (a half-filled form), bounded in size; nothing in it takes effect
+ * until the console calls the real endpoints and then `onboarding/complete`.
+ */
+export const OnboardingDraftSchema = z
+  .object({
+    step: z.number().int().min(0).max(20),
+    values: z
+      .record(z.string().max(64), z.unknown())
+      .refine((v) => JSON.stringify(v).length <= 16_384, "draft is too large"),
+  })
+  .meta({ id: "TenancyOnboardingDraft" });
+
+export const OnboardingSchema = z
+  .object({
+    onboardedAt: z.string().nullable(),
+    draft: OnboardingDraftSchema.nullable(),
+  })
+  .meta({ id: "TenancyOnboarding" });
+
+export const LocationParamSchema = z.object({ id: Uuid7 });
+
+export const OnboardingDraftSavedSchema = z
+  .object({ saved: z.literal(true), step: z.number().int() })
+  .meta({ id: "TenancyOnboardingDraftSaved" });
+
+export const OnboardingCompletedSchema = z
+  .object({ onboardedAt: z.string() })
+  .meta({ id: "TenancyOnboardingCompleted" });
+
 export type InviteCreateInput = z.infer<typeof InviteCreateSchema>;
 export type InviteAcceptInput = z.infer<typeof InviteAcceptSchema>;
 export type MemberRolesUpdateInput = z.infer<typeof MemberRolesUpdateSchema>;
 export type RoleCreateInput = z.infer<typeof RoleCreateSchema>;
 export type RolePermissionsInput = z.infer<typeof RolePermissionsSchema>;
 export type SignUpBusinessInput = z.infer<typeof SignUpBusinessSchema>;
+export type BranchCreateInput = z.infer<typeof BranchCreateSchema>;
+export type BranchUpdateInput = z.infer<typeof BranchUpdateSchema>;
+export type ProfileUpdateInput = z.infer<typeof ProfileUpdateSchema>;
+export type LocationCreateInput = z.infer<typeof LocationCreateSchema>;
+export type LocationUpdateInput = z.infer<typeof LocationUpdateSchema>;
+export type OnboardingDraft = z.infer<typeof OnboardingDraftSchema>;
 export type TenantCreatedDto = z.infer<typeof TenantCreatedSchema>;
 export type MyTenantDto = z.infer<typeof MyTenantSchema>;

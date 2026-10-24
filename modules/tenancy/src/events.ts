@@ -71,6 +71,54 @@ export const TenantRolePermissionsChangedV1 = defineEvent(
   }),
 );
 
+/** `changed` lists the profile fields that changed; values are in the payload (no PII in a business profile). */
+export const TenantProfileUpdatedV1 = defineEvent(
+  "tenancy.business.updated",
+  1,
+  z.object({
+    tenantId: z.string(),
+    changed: z.array(z.string()),
+    name: z.string(),
+    country: z.string().nullable(),
+    currency: z.string().nullable(),
+    timezone: z.string().nullable(),
+    taxRegion: z.string().nullable(),
+  }),
+);
+
+export const TenantOnboardedV1 = defineEvent(
+  "tenancy.business.onboarded",
+  1,
+  z.object({ tenantId: z.string(), onboardedAt: z.string() }),
+);
+
+const BranchData = z.object({
+  tenantId: z.string(),
+  branchId: z.string(),
+  name: z.string(),
+  kind: z.string(),
+  timezone: z.string(),
+  currency: z.string(),
+  taxRegion: z.string(),
+  businessDayCutoff: z.string(),
+  archived: z.boolean(),
+});
+
+export const TenantBranchCreatedV1 = defineEvent("tenancy.branch.created", 1, BranchData);
+export const TenantBranchUpdatedV1 = defineEvent("tenancy.branch.updated", 1, BranchData);
+
+const LocationData = z.object({
+  tenantId: z.string(),
+  locationId: z.string(),
+  branchId: z.string(),
+  name: z.string(),
+  kind: z.string(),
+  archived: z.boolean(),
+});
+
+export const TenantLocationCreatedV1 = defineEvent("tenancy.location.created", 1, LocationData);
+export const TenantLocationUpdatedV1 = defineEvent("tenancy.location.updated", 1, LocationData);
+
 export const TENANCY_EVENTS = [
   TenantCreatedV1,
   TenantMemberInvitedV1,
@@ -79,6 +127,12 @@ export const TENANCY_EVENTS = [
   TenantMemberRolesChangedV1,
   TenantRoleCreatedV1,
   TenantRolePermissionsChangedV1,
+  TenantProfileUpdatedV1,
+  TenantOnboardedV1,
+  TenantBranchCreatedV1,
+  TenantBranchUpdatedV1,
+  TenantLocationCreatedV1,
+  TenantLocationUpdatedV1,
 ] as const;
 
 export const TENANCY_TENANT_TOPIC = "tenancy.tenant";
