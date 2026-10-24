@@ -84,3 +84,53 @@ describe("Dialog", () => {
     });
   });
 });
+
+describe("modal focus", () => {
+  it("moves focus into the dialog, traps Tab, and returns focus on close", async () => {
+    const opener = document.createElement("button");
+    opener.textContent = "Open";
+    document.body.append(opener);
+    opener.focus();
+    const view = (visible: boolean) => (
+      <Dialog
+        visible={visible}
+        title="Void line"
+        onClose={() => undefined}
+        actions={
+          <>
+            <button type="button">Keep</button>
+            <button type="button">Void</button>
+          </>
+        }
+      />
+    );
+    const { rerender } = renderWithTheme(view(true));
+    const keep = screen.getByRole("button", { name: "Keep" });
+    const voidButton = screen.getByRole("button", { name: "Void" });
+    await waitFor(() => {
+      expect(document.activeElement).toBe(keep);
+    });
+    voidButton.focus();
+    fireEvent.keyDown(document, { key: "Tab" });
+    expect(document.activeElement).toBe(keep);
+    fireEvent.keyDown(document, { key: "Tab", shiftKey: true });
+    expect(document.activeElement).toBe(voidButton);
+
+    rerender(view(false));
+    await waitFor(() => {
+      expect(document.activeElement).toBe(opener);
+    });
+    opener.remove();
+  });
+
+  it("gives the sheet a visible close button", () => {
+    const onClose = vi.fn();
+    renderWithTheme(
+      <Sheet visible title="Tender cash" onClose={onClose}>
+        <span>Body</span>
+      </Sheet>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+});

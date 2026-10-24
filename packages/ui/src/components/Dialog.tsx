@@ -1,7 +1,8 @@
-import { useId } from "react";
+import { useId, useRef } from "react";
 import { Animated, Modal, Pressable, StyleSheet, View } from "react-native";
 
 import { useEscapeKey } from "../a11y/useEscapeKey.ts";
+import { useFocusTrap } from "../a11y/useFocusTrap.ts";
 import { useOverlayTransition } from "../motion/useOverlayTransition.ts";
 import { createStyles } from "../theme/createStyles.ts";
 import { ABSOLUTE_FILL } from "../theme/layout.ts";
@@ -10,6 +11,7 @@ import { useTheme } from "../theme/ThemeProvider.tsx";
 import { Text } from "./Text.tsx";
 
 import type { ReactNode } from "react";
+import type { HostInstance } from "react-native";
 
 /** Scale the dialog grows from. Never from 0. */
 const DIALOG_SCALE_FROM = 0.96;
@@ -54,7 +56,9 @@ export function Dialog({ visible, title, description, actions, onClose, testID }
   const descriptionId = useId();
   const transition = useOverlayTransition(visible, theme.motion, theme.motion.easeOut);
   const { progress, reduced, mounted } = transition;
+  const panelRef = useRef<HostInstance>(null);
   useEscapeKey(visible, onClose);
+  useFocusTrap(visible && mounted, panelRef);
 
   const scale = progress.interpolate({
     inputRange: [0, 1],
@@ -74,10 +78,17 @@ export function Dialog({ visible, title, description, actions, onClose, testID }
       testID={testID}
     >
       <View style={styles.root}>
-        <Pressable accessible={false} aria-hidden onPress={onClose} style={ABSOLUTE_FILL}>
+        <Pressable
+          accessible={false}
+          focusable={false}
+          aria-hidden
+          onPress={onClose}
+          style={ABSOLUTE_FILL}
+        >
           <Animated.View style={[styles.scrim, { opacity: scrimOpacity }]} />
         </Pressable>
         <Animated.View
+          ref={panelRef}
           role="dialog"
           aria-modal
           aria-labelledby={titleId}

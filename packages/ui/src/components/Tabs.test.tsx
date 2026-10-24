@@ -39,6 +39,14 @@ describe("Tabs", () => {
     expect(onChange).toHaveBeenCalledTimes(4);
   });
 
+  it("keeps only the selected tab in the tab order", () => {
+    renderWithTheme(<Tabs items={items} value="hold" onChange={() => undefined} />);
+    const tabs = screen.getAllByRole("tab");
+    expect(tabs.map((tab) => tab.getAttribute("tabindex"))).toEqual(
+      tabs.map((tab) => (tab.getAttribute("aria-selected") === "true" ? "0" : "-1")),
+    );
+  });
+
   it("wraps from the last tab forwards", () => {
     const onChange = vi.fn();
     renderWithTheme(<Tabs items={items} value="refund" onChange={onChange} />);

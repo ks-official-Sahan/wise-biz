@@ -3,6 +3,7 @@ import {
   IconCircleCheck,
   IconCircleX,
   IconInfoCircle,
+  IconX,
 } from "@tabler/icons-react-native";
 import {
   createContext,
@@ -20,6 +21,7 @@ import { ABSOLUTE_FILL } from "../theme/layout.ts";
 import { useTheme } from "../theme/ThemeProvider.tsx";
 
 import { Icon } from "./Icon.tsx";
+import { IconButton } from "./IconButton.tsx";
 import { Text } from "./Text.tsx";
 
 import type { Icon as TablerIcon } from "@tabler/icons-react-native";
@@ -30,7 +32,7 @@ export type ToastTone = "success" | "info" | "warning" | "danger";
 export interface ToastInput {
   readonly message: string;
   readonly tone: ToastTone;
-  /** ms before it dismisses. Default 4000. */
+  /** ms before it dismisses. Default 4000; danger toasts stay until dismissed unless a duration is given. */
   readonly duration?: number | undefined;
 }
 
@@ -42,6 +44,13 @@ interface ToastItem {
   readonly id: number;
   readonly message: string;
   readonly tone: ToastTone;
+}
+
+interface ToastTimer {
+  handle: ReturnType<typeof setTimeout> | undefined;
+  /** Epoch ms when it fires; undefined while paused. */
+  deadline: number | undefined;
+  remaining: number;
 }
 
 export interface ToastProviderProps {
@@ -68,57 +77,103 @@ const useRegionStyles = createStyles((t) => ({
     padding: t.space[4],
     gap: t.space[2],
   },
+  stack: { alignSelf: "stretch", gap: t.space[2] },
   toast: {
     flexDirection: "row",
     alignItems: "center",
     alignSelf: "stretch",
     gap: t.space[3],
     minHeight: t.target.min,
-    paddingHorizontal: t.space[4],
-    paddingVertical: t.space[3],
+    paddingLeft: t.space[4],
+    paddingRight: t.space[1],
+    paddingVertical: t.space[1],
     borderRadius: t.radius.card,
   },
 }));
 
-function ToastView({ item }: { readonly item: ToastItem }) {
+function ToastView({
+  item,
+  onDismiss,
+}: {
+  readonly item: ToastItem;
+  readonly onDismiss: (id: number) => void;
+}) {
   const theme = useTheme();
   const styles = useRegionStyles();
   const colors = theme.component.badge[item.tone];
-  const danger = item.tone === "danger";
   return (
     <View
-      role={danger ? "alert" : "status"}
-      aria-live={danger ? "assertive" : "polite"}
+      role={item.tone === "danger" ? "alert" : undefined}
       style={[styles.toast, { backgroundColor: colors.bg }]}
     >
       <Icon icon={ICONS[item.tone]} color={colors.fg} />
-      <Text variant="label" style={{ color: colors.fg, flexShrink: 1 }}>
+      <Text variant="label" style={{ color: colors.fg, flex: 1 }}>
         {item.message}
       </Text>
+      <IconButton
+        icon={IconX}
+        accessibilityLabel="Dismiss notification"
+        onPress={() => {
+          onDismiss(item.id);
+        }}
+      />
     </View>
   );
 }
 
-/** Hosts toasts and their timers. Mount once near the root. */
+/**
+ * Hosts toasts and their timers. Mount once near the root. The live region is always mounted so screen readers
+ * announce inserted messages (WCAG 4.1.3). Timers pause while the pointer is over the stack (WCAG 2.2.1).
+ */
 export function ToastProvider({ children }: ToastProviderProps) {
   const styles = useRegionStyles();
   const [items, setItems] = useState<readonly ToastItem[]>([]);
   const nextId = useRef(0);
-  const timers = useRef(new Map<number, ReturnType<typeof setTimeout>>());
+  const timers = useRef(new Map<number, ToastTimer>());
+  const paused = useRef(false);
 
   const dismiss = useCallback((id: number): void => {
     const timer = timers.current.get(id);
-    if (timer !== undefined) clearTimeout(timer);
+    if (timer?.handle !== undefined) clearTimeout(timer.handle);
     timers.current.delete(id);
     setItems((previous) => previous.filter((item) => item.id !== id));
   }, []);
+
+  const arm = useCallback(
+    (id: number, timer: ToastTimer): void => {
+      timer.deadline = Date.now() + timer.remaining;
+      timer.handle = setTimeout(() => {
+        dismiss(id);
+      }, timer.remaining);
+    },
+    [dismiss],
+  );
+
+  const pause = useCallback((): void => {
+    paused.current = true;
+    const now = Date.now();
+    for (const timer of timers.current.values()) {
+      if (timer.handle === undefined || timer.deadline === undefined) continue;
+      clearTimeout(timer.handle);
+      timer.remaining = Math.max(0, timer.deadline - now);
+      timer.handle = undefined;
+      timer.deadline = undefined;
+    }
+  }, []);
+
+  const resume = useCallback((): void => {
+    paused.current = false;
+    for (const [id, timer] of timers.current) {
+      if (timer.handle === undefined) arm(id, timer);
+    }
+  }, [arm]);
 
   // Timers of toasts that left the stack (overflow) are cleared here, so nothing fires for a hidden toast.
   useEffect(() => {
     const live = new Set(items.map((item) => item.id));
     for (const [id, timer] of timers.current) {
       if (!live.has(id)) {
-        clearTimeout(timer);
+        if (timer.handle !== undefined) clearTimeout(timer.handle);
         timers.current.delete(id);
       }
     }
@@ -127,24 +182,25 @@ export function ToastProvider({ children }: ToastProviderProps) {
   useEffect(() => {
     const pending = timers.current;
     return () => {
-      for (const timer of pending.values()) clearTimeout(timer);
+      for (const timer of pending.values()) {
+        if (timer.handle !== undefined) clearTimeout(timer.handle);
+      }
       pending.clear();
     };
   }, []);
 
   const show = useCallback(
-    ({ message, tone, duration = DEFAULT_DURATION_MS }: ToastInput): void => {
+    ({ message, tone, duration }: ToastInput): void => {
       const id = nextId.current;
       nextId.current += 1;
       setItems((previous) => [...previous, { id, message, tone }].slice(-MAX_STACK));
-      timers.current.set(
-        id,
-        setTimeout(() => {
-          dismiss(id);
-        }, duration),
-      );
+      const ms = duration ?? (tone === "danger" ? undefined : DEFAULT_DURATION_MS);
+      if (ms === undefined) return;
+      const timer: ToastTimer = { handle: undefined, deadline: undefined, remaining: ms };
+      timers.current.set(id, timer);
+      if (!paused.current) arm(id, timer);
     },
-    [dismiss],
+    [arm],
   );
 
   const api = useMemo<ToastApi>(() => ({ show }), [show]);
@@ -153,9 +209,17 @@ export function ToastProvider({ children }: ToastProviderProps) {
     <ToastContext.Provider value={api}>
       {children}
       <View pointerEvents="box-none" style={styles.region}>
-        {items.map((item) => (
-          <ToastView key={item.id} item={item} />
-        ))}
+        <View
+          role="status"
+          aria-live="polite"
+          onPointerEnter={pause}
+          onPointerLeave={resume}
+          style={styles.stack}
+        >
+          {items.map((item) => (
+            <ToastView key={item.id} item={item} onDismiss={dismiss} />
+          ))}
+        </View>
       </View>
     </ToastContext.Provider>
   );

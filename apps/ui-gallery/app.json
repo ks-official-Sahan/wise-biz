@@ -1,0 +1,17 @@
+{
+  "expo": {
+    "name": "wise-biz UI gallery",
+    "slug": "wise-biz-ui-gallery",
+    "version": "0.0.0",
+    "orientation": "default",
+    "userInterfaceStyle": "automatic",
+    "plugins": ["expo-status-bar", "expo-font"],
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    },
+    "experiments": {
+      "tsconfigPaths": false
+    }
+  }
+}

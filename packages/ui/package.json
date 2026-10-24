@@ -12,7 +12,8 @@
   "scripts": {
     "lint": "eslint . --max-warnings 0",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --coverage"
+    "test": "vitest run --coverage",
+    "test:perf": "vitest run --mode perf test/perf.test.tsx"
   },
   "dependencies": {
     "@wise-biz/money": "workspace:*",

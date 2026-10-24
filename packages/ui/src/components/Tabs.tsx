@@ -59,11 +59,14 @@ export function Tabs({ items, value, onChange, accessibilityLabel, testID }: Tab
     >
       {items.map((item, index) => {
         const selected = item.key === value;
+        // Roving tabindex: only the selected tab (or the first, when none matches) is in the tab order.
+        const tabbable = selected || (index === 0 && !items.some((other) => other.key === value));
         return (
           <Pressable
             key={item.key}
             role="tab"
             aria-selected={selected}
+            tabIndex={tabbable ? 0 : -1}
             ref={(node: unknown) => {
               if (node) nodes.current.set(item.key, node);
               else nodes.current.delete(item.key);

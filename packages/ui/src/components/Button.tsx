@@ -157,7 +157,8 @@ export function Button({
           return (
             <>
               {loading ? (
-                <ActivityIndicator color={palette.label} />
+                // The button already announces aria-busy; the spinner is decoration.
+                <ActivityIndicator aria-hidden color={palette.label} />
               ) : icon === undefined ? null : (
                 <Icon icon={icon} color={palette.label} />
               )}

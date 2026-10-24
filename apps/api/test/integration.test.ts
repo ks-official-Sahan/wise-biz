@@ -87,8 +87,14 @@ describe("startServer", () => {
       expect(server.port).toBe(port);
       const health = await fetch(`http://127.0.0.1:${String(port)}/health`);
       expect(health.status).toBe(200);
-      const ready = await fetch(`http://127.0.0.1:${String(port)}/ready`);
-      expect(ready.status).toBe(200);
+      // Readiness is false until Redis has connected (no offline queue), so poll briefly instead of racing boot.
+      let readyStatus = 0;
+      for (const deadline = Date.now() + 3000; Date.now() < deadline;) {
+        readyStatus = (await fetch(`http://127.0.0.1:${String(port)}/ready`)).status;
+        if (readyStatus === 200) break;
+        await new Promise((resolve) => setTimeout(resolve, 1100)); // past the 1 s ready cache
+      }
+      expect(readyStatus).toBe(200);
     } finally {
       await server.close();
     }

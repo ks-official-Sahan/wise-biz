@@ -41,14 +41,12 @@ function iconPalette(
   inactive: boolean,
   lifted: boolean,
 ): { background: string; border: string; glyph: string } {
-  if (inactive) {
-    return {
-      background: theme.color.surfaceSunken,
-      border: theme.color.border,
-      glyph: theme.color.textMuted,
-    };
-  }
   const tokens = theme.component.button[variant];
+  // Disabled keeps the variant's own shape (a ghost stays borderless); only the glyph is muted, so a stepper at its
+  // bound does not suddenly look like a different control.
+  if (inactive) {
+    return { background: tokens.bg, border: tokens.border, glyph: theme.color.textMuted };
+  }
   return {
     background: lifted ? tokens.bgPressed : tokens.bg,
     border: tokens.border,

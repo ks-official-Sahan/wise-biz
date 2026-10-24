@@ -67,4 +67,19 @@ describe("NumberPad", () => {
     expect(onKey).not.toHaveBeenCalled();
     field.remove();
   });
+
+  it("leaves Enter and Backspace to a focused control but still takes digits", () => {
+    const onKey = vi.fn();
+    const onSubmit = vi.fn();
+    renderWithTheme(<NumberPad onKey={onKey} onSubmit={onSubmit} active />);
+    const control = document.createElement("button");
+    document.body.append(control);
+    fireEvent.keyDown(control, { key: "Enter" });
+    fireEvent.keyDown(control, { key: "Backspace" });
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(onKey).not.toHaveBeenCalled();
+    fireEvent.keyDown(control, { key: "4" });
+    expect(onKey).toHaveBeenLastCalledWith("4");
+    control.remove();
+  });
 });

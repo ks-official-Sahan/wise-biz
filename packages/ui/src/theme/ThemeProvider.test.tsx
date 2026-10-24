@@ -85,7 +85,12 @@ describe("ThemeProvider", () => {
     expect(result.current.mode.mode).toBe("dark");
     expect(result.current.theme.mode).toBe("dark");
     expect(result.current.theme.color.canvas).not.toBe(lightBg);
-    expect(result.current.theme).toBe(toNativeTheme(TEST_THEME, "dark"));
+    // Web adds a sans-serif fallback stack to each family; every other token is the theme package's object.
+    const raw = toNativeTheme(TEST_THEME, "dark");
+    expect(result.current.theme.color).toBe(raw.color);
+    expect(result.current.theme.fontFamily.body).toMatch(
+      new RegExp(`^"${raw.fontFamily.body}", .*sans-serif$`),
+    );
     expect(onModeChange).toHaveBeenCalledWith("dark");
   });
 

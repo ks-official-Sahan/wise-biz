@@ -20,7 +20,10 @@ export interface NumberPadProps {
   readonly onSubmit?: () => void;
   /** Shows a decimal key in place of 00. */
   readonly allowDecimal?: boolean;
-  /** Listens to physical keys on web while true. Keep false while a text field has focus. */
+  /**
+   * Listens to physical keys on web while true (digits anywhere outside text fields; Enter and Backspace only
+   * when no control has focus). This is the off switch for the single-key shortcuts (WCAG 2.1.4).
+   */
   readonly active?: boolean;
   readonly testID?: string;
 }
@@ -58,6 +61,15 @@ function isEditable(target: EventTarget | null): boolean {
   return target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName);
 }
 
+/** A focused control (button, link, tab, checkbox...) owns Enter and Backspace; the pad must not steal them. */
+function isControl(target: EventTarget | null): boolean {
+  if (typeof HTMLElement === "undefined" || !(target instanceof HTMLElement)) return false;
+  if (target === document.body || target === document.documentElement) return false;
+  return (
+    ["BUTTON", "A"].includes(target.tagName) || target.hasAttribute("role") || target.tabIndex >= 0
+  );
+}
+
 /** 4 x 3 keypad. Keys change background on press and do not animate: keypad input is keyboard-like. */
 export function NumberPad({
   onKey,
@@ -85,8 +97,10 @@ export function NumberPad({
       } else if (event.key === "." || event.key === ",") {
         if (current.allowDecimal) current.onKey(".");
       } else if (event.key === "Backspace") {
+        if (isControl(event.target)) return;
         current.onKey("delete");
       } else if (event.key === "Enter") {
+        if (isControl(event.target)) return;
         current.onSubmit?.();
       } else {
         return;

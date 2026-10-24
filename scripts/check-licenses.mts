@@ -6,6 +6,8 @@ const ALLOWED = new Set([
   // MIT without the attribution clause (nodemailer, postal-mime): strictly more permissive than MIT.
   "MIT-0",
   "Apache-2.0",
+  // SIL Open Font License: bundled fonts (theming.md mandates OFL fonts); permits embedding and redistribution.
+  "OFL-1.1",
   "BSD-2-Clause",
   "BSD-3-Clause",
   "ISC",
@@ -21,6 +23,8 @@ const ALLOWED = new Set([
 const EXCEPTIONS = new Map<string, string>([
   // Browser-support data table (browserslist), not shipped in app bundles.
   ["caniuse-lite", "CC-BY-4.0"],
+  // js-yaml dependency pulled in by Expo CLI config tooling; PSF-style permissive license, build-time only.
+  ["argparse", "Python-2.0"],
 ]);
 
 type LicenseEntry = { name: string; versions?: string[] };

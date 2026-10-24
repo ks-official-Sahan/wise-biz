@@ -104,14 +104,21 @@ export function TextField({
           {helper}
         </Text>
       )}
-      {error === undefined ? null : (
-        <View style={styles.note}>
-          <Icon icon={IconAlertTriangle} color={theme.color.dangerText} size={theme.fontSize.md} />
-          <Text nativeID={errorId} variant="label" tone="danger">
-            {error}
-          </Text>
-        </View>
-      )}
+      {/* Always mounted so a new error is announced (WCAG 4.1.3). */}
+      <View aria-live="polite">
+        {error === undefined ? null : (
+          <View style={styles.note}>
+            <Icon
+              icon={IconAlertTriangle}
+              color={theme.color.dangerText}
+              size={theme.fontSize.md}
+            />
+            <Text nativeID={errorId} variant="label" tone="danger">
+              {error}
+            </Text>
+          </View>
+        )}
+      </View>
     </View>
   );
 }

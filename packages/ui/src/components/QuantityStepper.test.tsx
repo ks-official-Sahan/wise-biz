@@ -40,4 +40,23 @@ describe("QuantityStepper", () => {
     fireEvent.click(plus);
     expect(onChange).not.toHaveBeenCalled();
   });
+
+  it("steps with the APG spinbutton keys and stays in range", () => {
+    const onChange = vi.fn();
+    renderWithTheme(<QuantityStepper value={5} min={1} max={20} onChange={onChange} />);
+    const spin = screen.getByRole("spinbutton", { name: "Quantity" });
+    expect(spin.getAttribute("tabindex")).toBe("0");
+    fireEvent.keyDown(spin, { key: "ArrowUp" });
+    expect(onChange).toHaveBeenLastCalledWith(6);
+    fireEvent.keyDown(spin, { key: "ArrowDown" });
+    expect(onChange).toHaveBeenLastCalledWith(4);
+    fireEvent.keyDown(spin, { key: "PageUp" });
+    expect(onChange).toHaveBeenLastCalledWith(15);
+    fireEvent.keyDown(spin, { key: "PageDown" });
+    expect(onChange).toHaveBeenLastCalledWith(1);
+    fireEvent.keyDown(spin, { key: "End" });
+    expect(onChange).toHaveBeenLastCalledWith(20);
+    fireEvent.keyDown(spin, { key: "Home" });
+    expect(onChange).toHaveBeenLastCalledWith(1);
+  });
 });

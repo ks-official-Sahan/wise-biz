@@ -15,8 +15,8 @@ export interface ChipProps {
   readonly label: string;
   readonly selected: boolean;
   readonly onPress: () => void;
-  /** Sets role and aria-checked. Defaults to "checkbox". */
-  readonly kind?: "checkbox" | "radio";
+  /** Sets role and aria-checked. Defaults to "checkbox". Use "switch" for an on/off setting. */
+  readonly kind?: "checkbox" | "radio" | "switch";
   readonly testID?: string;
 }
 

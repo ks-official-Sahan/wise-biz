@@ -8,10 +8,32 @@ import {
   useRef,
   useState,
 } from "react";
-import { useColorScheme } from "react-native";
+import { Platform, useColorScheme } from "react-native";
 
 import type { Mode, NativeTheme, ResolvedTheme } from "@wise-biz/theme";
 import type { ReactNode } from "react";
+
+const SANS_FALLBACK = 'system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", sans-serif';
+const webFonts = new WeakMap<NativeTheme, NativeTheme>();
+
+/**
+ * On web an unknown family falls back to the browser default (serif), so each family gets a sans-serif fallback
+ * stack until its font file has loaded. Native keeps the bare family names it registers. Cached per theme object.
+ */
+function withPlatformFonts(native: NativeTheme): NativeTheme {
+  if (Platform.OS !== "web") return native;
+  const cached = webFonts.get(native);
+  if (cached !== undefined) return cached;
+  const stacked: NativeTheme = Object.freeze({
+    ...native,
+    fontFamily: Object.freeze({
+      body: `"${native.fontFamily.body}", ${SANS_FALLBACK}`,
+      numeric: `"${native.fontFamily.numeric}", "${native.fontFamily.body}", ${SANS_FALLBACK}`,
+    }),
+  });
+  webFonts.set(native, stacked);
+  return stacked;
+}
 
 /** What the user asked for. "system" follows the device setting. */
 export type ModePreference = Mode | "system";
@@ -65,7 +87,10 @@ export function ThemeProvider({
   const { available } = theme.modes;
   const canToggle = available.length > 1;
   const effective = resolveEffectiveMode(theme, preference, systemScheme);
-  const native = useMemo(() => toNativeTheme(theme, effective), [theme, effective]);
+  const native = useMemo(
+    () => withPlatformFonts(toNativeTheme(theme, effective)),
+    [theme, effective],
+  );
 
   // Read the latest callback without re-creating setPreference (and the mode context) on every render.
   const onChangeRef = useRef(onModeChange);

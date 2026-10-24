@@ -37,7 +37,10 @@ function themed(mode: ModePreference) {
   );
 }
 
-const SKIP = process.env.WB_SKIP_PERF === "1";
+// Wall-clock budget: meaningless under turbo's parallel `check` load (measured 378 ms there vs 44 ms alone), so it
+// runs only through `pnpm -F @wise-biz/ui test:perf` (vitest --mode perf) on an idle machine or a CI perf job.
+const SKIP =
+  (import.meta as ImportMeta & { readonly env: { readonly MODE: string } }).env.MODE !== "perf";
 
 describe("theme switch performance", () => {
   it.skipIf(SKIP)("re-renders a 200-control tree in under 100 ms (median of 5)", () => {

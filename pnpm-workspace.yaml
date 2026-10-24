@@ -24,6 +24,7 @@ minimumReleaseAgeExclude:
   - "@commitlint/lint@21.2.4"
   - "@commitlint/load@21.2.4"
   - "@commitlint/rules@21.2.4"
+  - expo-font@58.0.10
 
 auditConfig:
   ignoreGhsas:

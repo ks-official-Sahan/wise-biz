@@ -84,7 +84,9 @@ module.exports = {
       comment: "Import that cannot be resolved: missing dependency or typo.",
       severity: "error",
       from: {},
-      to: { couldNotResolve: true },
+      // @tabler/icons-react-native 3.49 lists exports.require.types = *.d.cts but ships none; it resolves at
+      // runtime (Metro, Vite) and in tsc (paths). Drop the exception when upstream fixes it (P0-09b follow-up).
+      to: { couldNotResolve: true, pathNot: "^@tabler/icons-react-native$" },
     },
   ],
   options: {

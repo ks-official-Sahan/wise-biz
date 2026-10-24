@@ -46,20 +46,47 @@ describe("Toast", () => {
     vi.useRealTimers();
   });
 
-  it("shows a polite status for non-danger tones", () => {
+  it("inserts messages into an always-mounted polite live region", () => {
     setup();
-    fireEvent.click(screen.getByRole("button", { name: "show Saved" }));
     const status = screen.getByRole("status");
     expect(status.getAttribute("aria-live")).toBe("polite");
-    expect(screen.getByText("Saved")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "show Saved" }));
+    expect(screen.getByRole("status").textContent).toContain("Saved");
   });
 
-  it("announces danger assertively", () => {
+  it("announces danger as an alert and keeps it until dismissed", () => {
     setup();
     fireEvent.click(screen.getByRole("button", { name: "show Card declined" }));
-    const alert = screen.getByRole("alert");
-    expect(alert.getAttribute("aria-live")).toBe("assertive");
-    expect(alert.textContent).toContain("Card declined");
+    expect(screen.getByRole("alert").textContent).toContain("Card declined");
+    act(() => {
+      vi.advanceTimersByTime(60_000);
+    });
+    expect(screen.getByText("Card declined")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Dismiss notification" }));
+    expect(screen.queryByText("Card declined")).toBeNull();
+  });
+
+  it("pauses timers while the pointer is over the stack", () => {
+    setup();
+    fireEvent.click(screen.getByRole("button", { name: "show Saved" }));
+    const stack = screen.getByRole("status");
+    act(() => {
+      vi.advanceTimersByTime(3000);
+    });
+    fireEvent.pointerEnter(stack);
+    act(() => {
+      vi.advanceTimersByTime(10_000);
+    });
+    expect(screen.getByText("Saved")).toBeTruthy();
+    fireEvent.pointerLeave(stack);
+    act(() => {
+      vi.advanceTimersByTime(999);
+    });
+    expect(screen.getByText("Saved")).toBeTruthy();
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+    expect(screen.queryByText("Saved")).toBeNull();
   });
 
   it("dismisses after its duration (default 4 s)", () => {
@@ -92,7 +119,7 @@ describe("Toast", () => {
     fireEvent.click(screen.getByRole("button", { name: "show Synced" }));
     expect(screen.queryByText("Saved")).toBeNull();
     expect(screen.getByText("Synced")).toBeTruthy();
-    expect(screen.getAllByRole("status").length + screen.getAllByRole("alert").length).toBe(3);
+    expect(screen.getAllByRole("button", { name: "Dismiss notification" })).toHaveLength(3);
   });
 
   it("throws outside the provider", () => {
