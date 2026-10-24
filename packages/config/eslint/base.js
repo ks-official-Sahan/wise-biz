@@ -1,5 +1,5 @@
 // @ts-check
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { builtinModules } from "node:module";
 import { join } from "node:path";
 
@@ -93,7 +93,13 @@ export function base({ root }) {
     importX.flatConfigs.typescript,
     {
       settings: {
-        "import-x/resolver-next": [createTypeScriptImportResolver()],
+        // Resolve against this package's tsconfig, not the process cwd: lint-staged runs ESLint from the repo root,
+        // and package-level tsconfig settings (paths, customConditions) must still apply.
+        "import-x/resolver-next": [
+          createTypeScriptImportResolver(
+            existsSync(join(root, "tsconfig.json")) ? { project: join(root, "tsconfig.json") } : {},
+          ),
+        ],
       },
       rules: {
         "import-x/order": [
