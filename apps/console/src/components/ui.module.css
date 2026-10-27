@@ -1,0 +1,301 @@
+/* Console primitives. Tokens only (--wb-*); 48px targets on touch, 8px gaps, one focus ring (globals.css). */
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--wb-space-3);
+  min-height: 44px;
+  padding: 0 var(--wb-space-5);
+  border: 1px solid transparent;
+  border-radius: var(--wb-radius-control);
+  font: inherit;
+  font-weight: 600;
+  font-size: var(--wb-font-size-sm);
+  cursor: pointer;
+  text-decoration: none;
+  transition:
+    background-color var(--wb-motion-press) var(--wb-motion-ease-out),
+    transform var(--wb-motion-press) var(--wb-motion-ease-out);
+}
+
+.button:active:not([aria-disabled="true"]) {
+  transform: scale(0.97);
+}
+
+.button[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+@media (pointer: coarse) {
+  .button {
+    min-height: 48px;
+  }
+}
+
+.primary {
+  background: var(--wb-color-accent);
+  color: var(--wb-color-text-on-accent);
+}
+
+.primary:hover:not([aria-disabled="true"]) {
+  background: var(--wb-color-accent-hover);
+}
+
+.secondary {
+  background: var(--wb-color-surface);
+  color: var(--wb-color-text);
+  border-color: var(--wb-color-border-strong);
+}
+
+.secondary:hover:not([aria-disabled="true"]) {
+  background: var(--wb-color-surface-raised);
+}
+
+.ghost {
+  background: transparent;
+  color: var(--wb-color-text);
+}
+
+.ghost:hover:not([aria-disabled="true"]) {
+  background: var(--wb-color-surface-sunken);
+}
+
+.danger {
+  background: var(--wb-color-danger);
+  color: var(--wb-color-on-danger);
+}
+
+.field {
+  display: grid;
+  gap: var(--wb-space-2);
+}
+
+.label {
+  font-size: var(--wb-font-size-sm);
+  font-weight: 600;
+}
+
+.input {
+  min-height: 44px;
+  width: 100%;
+  padding: 0 var(--wb-space-4);
+  border: 1px solid var(--wb-color-border-strong);
+  border-radius: var(--wb-radius-control);
+  background: var(--wb-color-surface);
+  color: var(--wb-color-text);
+  font: inherit;
+}
+
+.input:focus {
+  border-color: var(--wb-color-accent);
+}
+
+.input[aria-invalid="true"] {
+  border-color: var(--wb-color-danger);
+}
+
+select.input {
+  padding-right: var(--wb-space-8);
+}
+
+.help {
+  font-size: var(--wb-font-size-sm);
+  color: var(--wb-color-text-muted);
+}
+
+.error {
+  display: flex;
+  gap: var(--wb-space-2);
+  align-items: baseline;
+  font-size: var(--wb-font-size-sm);
+  color: var(--wb-color-danger-text);
+}
+
+.card {
+  background: var(--wb-color-surface);
+  border: 1px solid var(--wb-color-border);
+  border-radius: var(--wb-radius-card);
+  padding: var(--wb-space-6);
+}
+
+.stack {
+  display: grid;
+  gap: var(--wb-space-5);
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--wb-space-3);
+  align-items: center;
+}
+
+.spread {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--wb-space-3);
+  align-items: center;
+  justify-content: space-between;
+}
+
+.muted {
+  color: var(--wb-color-text-muted);
+}
+
+.alert {
+  padding: var(--wb-space-4) var(--wb-space-5);
+  border-radius: var(--wb-radius-control);
+  font-size: var(--wb-font-size-sm);
+}
+
+.alertDanger {
+  background: var(--wb-color-danger-subtle);
+  color: var(--wb-color-danger-text);
+}
+
+.alertSuccess {
+  background: var(--wb-color-success-subtle);
+  color: var(--wb-color-success-text);
+}
+
+.alertInfo {
+  background: var(--wb-color-info-subtle);
+  color: var(--wb-color-info-text);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 var(--wb-space-3);
+  border-radius: var(--wb-radius-pill);
+  font-size: var(--wb-font-size-xs);
+  font-weight: 600;
+  background: var(--wb-color-surface-sunken);
+  color: var(--wb-color-text);
+}
+
+.badgeAccent {
+  background: var(--wb-color-accent-subtle);
+  color: var(--wb-color-accent-text);
+}
+
+.badgeWarning {
+  background: var(--wb-color-warning-subtle);
+  color: var(--wb-color-warning-text);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--wb-font-size-sm);
+}
+
+.table th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--wb-color-text-muted);
+  padding: var(--wb-space-3) var(--wb-space-4);
+  border-bottom: 1px solid var(--wb-color-border);
+}
+
+.table td {
+  padding: var(--wb-space-3) var(--wb-space-4);
+  border-bottom: 1px solid var(--wb-color-border);
+  vertical-align: top;
+}
+
+.table tbody tr:hover {
+  background: var(--wb-color-surface-raised);
+}
+
+.tableWrap {
+  overflow-x: auto;
+}
+
+.skeleton {
+  display: block;
+  border-radius: var(--wb-radius-control);
+  background: var(--wb-color-surface-sunken);
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.55;
+  }
+}
+
+.empty {
+  display: grid;
+  gap: var(--wb-space-3);
+  justify-items: start;
+  padding: var(--wb-space-8) var(--wb-space-6);
+  border: 1px dashed var(--wb-color-border-strong);
+  border-radius: var(--wb-radius-card);
+}
+
+.dialog {
+  width: min(560px, calc(100vw - 2 * var(--wb-space-5)));
+  max-height: calc(100dvh - 2 * var(--wb-space-8));
+  padding: var(--wb-space-6);
+  border: 1px solid var(--wb-color-border);
+  border-radius: var(--wb-radius-card);
+  background: var(--wb-color-surface);
+  color: var(--wb-color-text);
+}
+
+.dialog::backdrop {
+  background: color-mix(in oklab, var(--wb-color-overlay) 55%, transparent);
+}
+
+.dialog[open] {
+  animation: dialogIn var(--wb-motion-enter) var(--wb-motion-ease-out);
+}
+
+@keyframes dialogIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+
+.drawer {
+  margin: 0 0 0 auto;
+  height: 100dvh;
+  max-height: 100dvh;
+  width: min(640px, 100vw);
+  padding: var(--wb-space-6);
+  border: 0;
+  border-left: 1px solid var(--wb-color-border);
+  background: var(--wb-color-surface);
+  color: var(--wb-color-text);
+}
+
+.drawer::backdrop {
+  background: color-mix(in oklab, var(--wb-color-overlay) 45%, transparent);
+}
+
+.drawer[open] {
+  animation: drawerIn var(--wb-motion-enter) var(--wb-motion-ease-sheet);
+}
+
+@keyframes drawerIn {
+  from {
+    transform: translateX(24px);
+    opacity: 0;
+  }
+}
+
+.code {
+  font-family: "Geist Mono", ui-monospace, monospace;
+  font-size: var(--wb-font-size-xs);
+  white-space: pre-wrap;
+  word-break: break-word;
+  padding: var(--wb-space-4);
+  border-radius: var(--wb-radius-control);
+  background: var(--wb-color-surface-sunken);
+  margin: 0;
+}

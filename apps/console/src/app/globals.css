@@ -1,0 +1,97 @@
+/*
+ * Console base styles. Every color, size and duration comes from the --wb-* tokens that the theme engine emits
+ * (layout.tsx injects them with the CSP nonce). Rules: docs/design/ui-principles.md.
+ */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  background: var(--wb-color-canvas);
+  color: var(--wb-color-text);
+  font-family:
+    "Geist",
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    "Noto Sans",
+    sans-serif;
+  font-size: var(--wb-font-size-md);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3 {
+  margin: 0;
+  line-height: 1.25;
+  font-weight: 600;
+  text-wrap: balance;
+}
+
+h1 {
+  font-size: var(--wb-font-size-xl);
+}
+
+h2 {
+  font-size: var(--wb-font-size-lg);
+}
+
+h3 {
+  font-size: var(--wb-font-size-md);
+}
+
+p {
+  margin: 0;
+  text-wrap: pretty;
+}
+
+a {
+  color: var(--wb-color-accent-text);
+}
+
+.num {
+  font-family: "Geist Mono", "Geist", ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+:focus-visible {
+  outline: 2px solid var(--wb-color-focus-ring);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: var(--wb-color-accent-subtle);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    transition-duration: 1ms !important;
+  }
+}

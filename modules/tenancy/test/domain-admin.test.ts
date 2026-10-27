@@ -74,12 +74,12 @@ describe("invite token", () => {
     expect(inviteTokenMatches(undefined, T, I, inviteToken(SECRET, T, I))).toBe(false);
   });
 
-  it("builds the accept link with encoded query parameters and no double slash", () => {
+  it("builds the accept link with encoded fragment parameters and no double slash", () => {
     expect(inviteAcceptLink("http://localhost:3001/", "a", "b", "c d+e")).toBe(
-      "http://localhost:3001/invite/accept?t=a&i=b&k=c+d%2Be",
+      "http://localhost:3001/invite/accept#t=a&i=b&k=c+d%2Be",
     );
     expect(inviteAcceptLink("https://console.example///", T, I, "k")).toBe(
-      `https://console.example/invite/accept?t=${T}&i=${I}&k=k`,
+      `https://console.example/invite/accept#t=${T}&i=${I}&k=k`,
     );
   });
 });
@@ -124,9 +124,11 @@ describe("invite consumer", () => {
     const link = /https:?\/\/\S+|http:\/\/\S+/.exec(sent?.text ?? "")?.[0] ?? "";
     const url = new URL(link);
     expect(url.pathname).toBe("/invite/accept");
-    expect(url.searchParams.get("t")).toBe(T);
-    expect(url.searchParams.get("i")).toBe(I);
-    expect(inviteTokenMatches(SECRET, T, I, url.searchParams.get("k") ?? "")).toBe(true);
+    const params = new URLSearchParams(url.hash.slice(1));
+    expect(url.search).toBe("");
+    expect(params.get("t")).toBe(T);
+    expect(params.get("i")).toBe(I);
+    expect(inviteTokenMatches(SECRET, T, I, params.get("k") ?? "")).toBe(true);
   });
 
   it("escapes the tenant name in the html part", async () => {

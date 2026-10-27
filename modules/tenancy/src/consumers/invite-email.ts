@@ -32,7 +32,10 @@ const escapeHtml = (s: string): string =>
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
 
-/** The accept link. Only the consumer knows the token; the link never reaches a log line. */
+/**
+ * The accept link. Only the consumer knows the token; the link never reaches a log line. The parameters ride in the
+ * fragment, which browsers never send, so the token stays out of proxy and access logs.
+ */
 export function inviteAcceptLink(
   consoleUrl: string,
   tenantId: string,
@@ -41,7 +44,7 @@ export function inviteAcceptLink(
 ): string {
   const base = consoleUrl.replace(/\/+$/, "");
   const query = new URLSearchParams({ t: tenantId, i: inviteId, k: token });
-  return `${base}/invite/accept?${query.toString()}`;
+  return `${base}/invite/accept#${query.toString()}`;
 }
 
 /**

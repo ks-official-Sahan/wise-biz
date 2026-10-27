@@ -1,0 +1,47 @@
+.shell {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: var(--wb-space-6) var(--wb-space-5);
+}
+
+.panel {
+  width: min(420px, 100%);
+  display: grid;
+  gap: var(--wb-space-6);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: var(--wb-space-3);
+  font-weight: 700;
+  font-size: var(--wb-font-size-lg);
+}
+
+.mark {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--wb-radius-control);
+  background: var(--wb-color-accent);
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  gap: var(--wb-space-3);
+  color: var(--wb-color-text-muted);
+  font-size: var(--wb-font-size-sm);
+}
+
+.divider::before,
+.divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--wb-color-border);
+}
+
+.full {
+  width: 100%;
+}
