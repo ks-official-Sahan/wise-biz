@@ -149,4 +149,6 @@ export const LIMITS = {
   acceptInvitePerUser: { limit: 10, windowMs: MINUTE },
   /** Every other unsafe /v1/auth/* route (change-password, update-user, revoke-*, sign-out...). */
   authWritePerSession: { limit: 10, windowMs: MINUTE },
+  /** Same routes per client IP, whatever cookie is sent: a varied junk cookie must not buy a fresh bucket. */
+  authWritePerIp: { limit: 30, windowMs: MINUTE },
 } as const;

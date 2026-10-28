@@ -548,6 +548,10 @@ async function createInvite(
 }
 
 /** Runs the invite consumer on the stored event and returns the (t, i, k) parsed from the captured invite mail. */
+/** The accept link carries its parameters in the fragment (never sent to a server). */
+const inviteParams = (url: URL | undefined): URLSearchParams | undefined =>
+  url === undefined ? undefined : new URLSearchParams(url.hash.slice(1));
+
 async function deliverInvite(stack: Stack, inviteId: string): Promise<InviteLink> {
   const rows = await stack.admin.query<{ payload: unknown }>(
     "select payload from infra.outbox where type = 'tenancy.member.invited' and payload::text like $1",
@@ -567,14 +571,14 @@ async function deliverInvite(stack: Stack, inviteId: string): Promise<InviteLink
   const mail = await stack.mail.waitFor(
     (m) =>
       m.subject.startsWith(SUBJECT_INVITE_PREFIX) &&
-      urlIn(m.text, "/invite/accept")?.searchParams.get("i") === inviteId,
+      inviteParams(urlIn(m.text, "/invite/accept"))?.get("i") === inviteId,
   );
-  const link = must(urlIn(mail.text, "/invite/accept"), "invite link");
+  const link = must(inviteParams(urlIn(mail.text, "/invite/accept")), "invite link");
   return {
     to: mail.to,
-    tenantId: must(link.searchParams.get("t"), "t"),
-    inviteId: must(link.searchParams.get("i"), "i"),
-    token: must(link.searchParams.get("k"), "k"),
+    tenantId: must(link.get("t"), "t"),
+    inviteId: must(link.get("i"), "i"),
+    token: must(link.get("k"), "k"),
   };
 }
 

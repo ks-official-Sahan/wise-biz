@@ -92,7 +92,9 @@ module.exports = {
   options: {
     doNotFollow: { path: "node_modules" },
     // node_modules stays in the graph (not followed) so domain-no-infra can see resolved npm deps.
-    exclude: { path: "(^|/)(dist|coverage|\\.turbo)/|/test/fixtures/" },
+    exclude: { path: "(^|/)(dist|coverage|\\.turbo|\\.next)/|/test/fixtures/|next-env\\.d\\.ts$" },
+    // Resolves the console's `@/*` path alias (the only tsconfig paths alias in app code).
+    tsConfig: { fileName: "tsconfig.depcruise.json" },
     tsPreCompilationDeps: true,
     combinedDependencies: true,
     enhancedResolveOptions: {

@@ -400,7 +400,23 @@ describe("rate limiter (fail closed, writes only)", () => {
     // GET and sign-in never hit the generic bucket
     await app.request("/v1/auth/get-session");
     await signIn(app);
-    expect([...redis.counts.keys()].filter((k) => k.startsWith("rl:auth-write"))).toHaveLength(3);
+    expect([...redis.counts.keys()].filter((k) => k.startsWith("rl:auth-write:"))).toHaveLength(3);
+    expect([...redis.counts.keys()].filter((k) => k.startsWith("rl:auth-write-ip:"))).toHaveLength(
+      1,
+    );
+  });
+
+  it("varying the cookie does not escape the per-IP auth-write bucket (30/min)", async () => {
+    const redis = fakeRedis();
+    const { app } = build({ identity, kernelRedis: redis });
+    const call = (n: number) =>
+      app.request("/v1/auth/send-verification-email", {
+        method: "POST",
+        headers: { cookie: `${COOKIE}=junk${String(n)}`, origin: "https://app.test" },
+        body: "{}",
+      });
+    for (let i = 0; i < 30; i++) expect((await call(i)).status).toBe(200);
+    expect((await call(30)).status).toBe(429);
   });
 
   it("Redis down: other unsafe auth routes are 503 too", async () => {

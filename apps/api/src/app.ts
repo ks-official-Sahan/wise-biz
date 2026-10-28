@@ -186,6 +186,16 @@ export function createApp(opts: CreateAppOptions): OpenAPIHono<AppEnv> {
               : `session:${sha256Hex(cookie)}`;
           },
         },
+        {
+          // The cookie is client-chosen, so the session bucket alone can be dodged (for example to mail
+          // send-verification-email to any address). Every unsafe auth route also counts per IP.
+          name: "auth-write-ip",
+          ...LIMITS.authWritePerIp,
+          subject: (c) =>
+            c.req.path.startsWith("/v1/auth/sign-in/") || c.req.path.startsWith("/v1/auth/sign-up/")
+              ? null
+              : ipOf(c),
+        },
       ],
       { redis: opts.kernelRedis, unsafeOnly: true },
     ),

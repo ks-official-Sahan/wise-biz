@@ -182,6 +182,9 @@ export function createIdentity(opts: CreateIdentityOptions): IdentityPort {
       // false: Better Auth must not prepend "__Secure-" (it would yield "__Secure-__Host-..."). The Secure attribute
       // is forced below instead.
       useSecureCookies: false,
+      // Every other Better Auth cookie (two-factor, trust-device, passkey challenge, dont-remember) gets the same
+      // attributes as the session cookie instead of the library default (no Secure, SameSite=Lax).
+      defaultCookieAttributes: { secure: true, httpOnly: true, sameSite: "strict", path: "/" },
       cookies: {
         session_token: {
           name: SESSION_COOKIE_NAME,
