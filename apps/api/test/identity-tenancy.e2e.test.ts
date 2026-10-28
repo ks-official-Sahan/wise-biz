@@ -272,6 +272,7 @@ async function bootStack(): Promise<Stack> {
       CORS_ORIGINS: ORIGIN,
       CONSOLE_URL,
       INVITE_SECRET,
+      PIN_PEPPER: "test-pin-pepper-".padEnd(40, "x"),
       MAIL_FROM,
       MAIL_SMTP_HOST: "127.0.0.1",
       MAIL_SMTP_PORT: String(mail.port),

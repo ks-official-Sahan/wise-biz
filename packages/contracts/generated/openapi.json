@@ -286,6 +286,49 @@
         "required": ["status", "serverTime"],
         "type": "object"
       },
+      "OperatorSession": {
+        "properties": {
+          "expiresAt": {
+            "type": "string"
+          },
+          "sessionId": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "string"
+          }
+        },
+        "required": ["sessionId", "userId", "expiresAt"],
+        "type": "object"
+      },
+      "PinLogin": {
+        "additionalProperties": false,
+        "properties": {
+          "pin": {
+            "maxLength": 16,
+            "minLength": 1,
+            "type": "string"
+          },
+          "userId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          }
+        },
+        "required": ["userId", "pin"],
+        "type": "object"
+      },
+      "SetPin": {
+        "additionalProperties": false,
+        "properties": {
+          "pin": {
+            "maxLength": 16,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": ["pin"],
+        "type": "object"
+      },
       "TemplateChild": {
         "properties": {
           "createdAt": {
@@ -1501,6 +1544,117 @@
           }
         },
         "summary": "Terminal: report health; the reply carries the device status and server time",
+        "tags": ["devices"]
+      }
+    },
+    "/v1/devices/operators/{userId}/pin/unlock": {
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "userId",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "reset": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": ["reset"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Unlocked"
+          }
+        },
+        "summary": "Supervisor: unlock an operator PIN after 5 failed tries",
+        "tags": ["devices"]
+      }
+    },
+    "/v1/devices/pin": {
+      "put": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetPin"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "set": {
+                      "type": "boolean"
+                    },
+                    "setAt": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["set", "setAt"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Set"
+          }
+        },
+        "summary": "Set or change my operator PIN for the active business",
+        "tags": ["devices"]
+      }
+    },
+    "/v1/devices/pin-login": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PinLogin"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorSession"
+                }
+              }
+            },
+            "description": "Operator session on this terminal"
+          }
+        },
+        "summary": "Terminal: unlock for one operator with their PIN (request signed by an active terminal)",
+        "tags": ["devices"]
+      }
+    },
+    "/v1/devices/pin-logout": {
+      "post": {
+        "responses": {
+          "204": {
+            "description": "Ended"
+          }
+        },
+        "summary": "Terminal: end the operator session",
         "tags": ["devices"]
       }
     },

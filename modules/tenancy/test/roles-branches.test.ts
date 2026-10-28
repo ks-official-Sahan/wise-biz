@@ -92,6 +92,10 @@ describe("GET /v1/tenancy/roles", () => {
       isSystem: true,
     });
     expect(roles.find((r) => r.name === "manager")?.grants).toEqual([
+      { permission: "devices:manage", conditions: null },
+      { permission: "devices:pin", conditions: null },
+      { permission: "devices:read", conditions: null },
+      { permission: "devices:unlock", conditions: null },
       { permission: "tenancy:read", conditions: null },
     ]);
   });

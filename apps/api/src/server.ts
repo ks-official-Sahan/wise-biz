@@ -9,6 +9,7 @@ import {
   httpEnv,
   identityDbEnv,
   inviteEnv,
+  pinEnv,
   mailEnv,
   observabilityEnv,
   redisEnv,
@@ -41,6 +42,7 @@ export const API_ENV = {
   ...httpEnv,
   ...mailEnv,
   ...inviteEnv,
+  ...pinEnv,
   ...consoleEnv,
   ...webauthnEnv,
 };
@@ -146,7 +148,7 @@ export async function startServer(
       modules: createModules(
         identity,
         { inviteSecret: env.INVITE_SECRET },
-        { nonces: deviceNonces(kernelRedis) },
+        { nonces: deviceNonces(kernelRedis), pinPepper: env.PIN_PEPPER },
       ),
       pool,
       redis,

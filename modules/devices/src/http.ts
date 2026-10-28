@@ -10,6 +10,7 @@ import {
   updateDeviceCommand,
 } from "./application/devices.ts";
 import { ENROLL_PATH, verifyEnrollSignature } from "./device-auth.ts";
+import { mountPinRoutes } from "./pin-http.ts";
 import {
   CreateEnrollmentCodeSchema,
   DeviceListSchema,
@@ -22,6 +23,7 @@ import {
 } from "./schemas.ts";
 
 import type { BranchExists } from "./application/devices.ts";
+import type { PinDeps } from "./application/pins.ts";
 import type { DeviceAuthDeps } from "./device-auth.ts";
 import type { OpenAPIHono } from "@hono/zod-openapi";
 import type { AppEnv, ModuleDeps } from "@wise-biz/module-kit";
@@ -30,6 +32,8 @@ import type { MiddlewareHandler } from "hono";
 export interface DevicesHttpOptions {
   branchExists: BranchExists;
   nonces: DeviceAuthDeps["nonces"];
+  /** Operator PINs: the server pepper and a membership check (tenancy owns memberships). */
+  pin: PinDeps;
 }
 
 /** authorize runs BEFORE validation, so an unauthorized caller gets 404 without learning the body shape. */
@@ -157,4 +161,5 @@ export function mountRoutes(
     );
     return c.json({ status: device.status, serverTime: now.toISOString() }, 200);
   });
+  mountPinRoutes(app, deps, opts.pin);
 }

@@ -80,6 +80,13 @@ Overrides: when an operator lacks permission (edit qty after add, price override
 - **Signed requests:** kernel `deviceAuth` verifies every request that carries `signature` (RFC 9421 profile in `@wise-biz/http-signatures`: `@method`, `@path`, `content-digest`, `x-wb-timestamp`, `x-wb-nonce`, `x-wb-device-id`; Ed25519; ±5 min). The nonce is claimed last (`SET dn:{device}:{nonce} NX EX 660`), fail closed. The device row is read on every signed request, so revocation applies to the next one. `requireDevice` returns 401 `DEVICE_REVOKED` (wipe) for revoked/blacklisted; `requireTerminal` also refuses `suspended`/`pending` with `DEVICE_INACTIVE`.
 - Revoked and blacklisted are terminal states (409 on any change). Heartbeats are telemetry: not audited per beat.
 
+### Operator PIN (P1-01b)
+
+- An operator sets their own PIN (`PUT /v1/devices/pin`, 4–8 digits, no repeated or straight runs). Stored as: Argon2id **online** hash (m=19 MiB, t=2, p=1, `PIN_PEPPER` as the Argon2 secret, ~20 ms on the API); an HMAC-SHA256(pepper, tenant:pin) lookup that makes PINs unique per business; and an **offline verifier** (Argon2id m=8 MiB, t=1, no pepper, ≤ 150 ms on a low-end Android) for the signed policy snapshot.
+- **Trade-off of the offline verifier:** the terminal has no pepper, so a stolen snapshot can be brute-forced (10^4–10^8 PINs at this cost: hours to days on a GPU). Mitigations: the snapshot is signed and expires, it is rotated on every PIN change, and a stolen terminal is revoked (its key stops working online at once).
+- `POST /v1/devices/pin-login` needs an **active terminal** (signed) and an active membership. Wrong PINs are counted per operator; the counter and the audit row commit before the 401; the 5th failure locks the PIN until a supervisor (`devices:unlock`) unlocks it (audited). Unknown operators cost the same Argon2 time as a wrong PIN.
+- A successful unlock opens a 12 h operator session bound to that terminal (`devices.operator_sessions`) and ends any previous one there; every request still carries the device signature.
+
 ## Request and transaction signing
 
 - **Request signing** (devices, MCP platform): header `Signature-Input`/`Signature` per RFC 9421 over method, path, `content-digest`, `x-pos-timestamp`, `x-pos-nonce`. Server rejects skew > 5 min and replayed nonces (Redis SET with TTL).

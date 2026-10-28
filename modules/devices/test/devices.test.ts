@@ -23,6 +23,8 @@ const T = uuidv7();
 const BRANCH = uuidv7();
 const OTHER_BRANCH = uuidv7();
 const OWNER = uuidv7();
+const GONE = uuidv7();
+let userId = OWNER;
 let nowMs = Date.UTC(2026, 9, 28, 12);
 const clock = { now: () => nowMs };
 const ids = { uuidv7 };
@@ -41,6 +43,10 @@ function nonceStore(): NonceStore {
 const devicesModule = createDevicesModule({
   branchExists: (_tx, tenantId, branchId) => Promise.resolve(tenantId === T && branchId === BRANCH),
   nonces: nonceStore(),
+  pin: {
+    pepper: new TextEncoder().encode("test-pepper-test-pepper-test-pepper!"),
+    isActiveMember: (_tx, tenantId, userId) => Promise.resolve(tenantId === T && userId !== GONE),
+  },
 });
 const catalog = createCatalog(devicesModule.permissions);
 const matrix = matrixFromRows(catalog, [
@@ -79,7 +85,7 @@ beforeAll(async () => {
         ? { kind: "anonymous" }
         : {
             kind: "user",
-            userId: OWNER,
+            userId,
             sessionId: "01900000-0000-7000-8000-0000000000aa",
             tenantId: T,
             roles: [role],
@@ -339,5 +345,97 @@ describe("signed requests", () => {
       "devices.device.enrolled",
       "devices.device.suspended",
     ]);
+  });
+});
+
+describe("operator PIN", () => {
+  const setPin = (pin: string, as = OWNER) => {
+    role = "owner";
+    userId = as;
+    return app.request("/v1/devices/pin", {
+      method: "PUT",
+      headers: { "content-type": "application/json", "idempotency-key": `k-${uuidv7()}` },
+      body: JSON.stringify({ pin }),
+    });
+  };
+  const login = (t: Terminal, uid: string, pin: string) =>
+    signed(t, "POST", "/v1/devices/pin-login", { userId: uid, pin });
+
+  it("refuses short, long, repeated and sequential PINs", async () => {
+    for (const pin of ["123", "123456789", "1111", "4567", "98765", "12ab"]) {
+      expect((await setPin(pin)).status).toBe(422);
+    }
+  });
+
+  it("is unique per business", async () => {
+    const a = uuidv7();
+    const b = uuidv7();
+    expect((await setPin("4826", a)).status).toBe(200);
+    expect((await setPin("4826", b)).status).toBe(422);
+    expect((await setPin("4826", a)).status).toBe(200); // the same operator may set it again
+  });
+
+  it("unlocks an active terminal, and one operator at a time", async () => {
+    const op = uuidv7();
+    expect((await setPin("7391", op)).status).toBe(200);
+    const t = await enrollTerminal();
+    const first = await login(t, op, "7391");
+    expect(first.status).toBe(201);
+    const second = await login(t, op, "7391");
+    const s2 = await json<{ sessionId: string }>(second);
+    const open = await withTenantTx(pool, { tenantId: T, requestId: "r" }, (tx) =>
+      tx.query<{ id: string }>(
+        "select id from devices.operator_sessions where device_id = $1 and ended_at is null",
+        [t.deviceId],
+      ),
+    );
+    expect(open.rows.map((r) => r.id)).toEqual([s2.sessionId]);
+    expect((await signed(t, "POST", "/v1/devices/pin-logout")).status).toBe(204);
+  });
+
+  it("locks after 5 wrong PINs; a supervisor unlock is audited", async () => {
+    const op = uuidv7();
+    await setPin("5072", op);
+    const t = await enrollTerminal();
+    for (let i = 0; i < 5; i++) expect((await login(t, op, "0000")).status).toBe(401);
+    const locked = await login(t, op, "5072");
+    expect(locked.status).toBe(401);
+    expect((await json<{ detail: string }>(locked)).detail).toMatch(/locked/i);
+
+    role = "owner";
+    userId = OWNER;
+    const unlock = await app.request(`/v1/devices/operators/${op}/pin/unlock`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{}",
+    });
+    expect(unlock.status).toBe(200);
+    expect((await login(t, op, "5072")).status).toBe(201);
+    const audit = await withTenantTx(pool, { tenantId: T, requestId: "r" }, (tx) =>
+      tx.query<{ action: string }>(
+        "select action from audit.audit_log where entity_id = $1 order by at, id",
+        [op],
+      ),
+    );
+    expect(audit.rows.map((r) => r.action)).toEqual([
+      "devices.pin.set",
+      ...Array.from({ length: 4 }, () => "devices.pin.failed"),
+      "devices.pin.locked",
+      "devices.pin.reset",
+      "devices.operator.signed_in",
+    ]);
+  });
+
+  it("refuses unknown operators, removed members and suspended terminals", async () => {
+    const t = await enrollTerminal();
+    expect((await login(t, uuidv7(), "7391")).status).toBe(401);
+    await setPin("6183", GONE);
+    expect((await login(t, GONE, "6183")).status).toBe(401);
+    const op = uuidv7();
+    await setPin("2958", op);
+    await setStatus(t.deviceId, "suspended");
+    const res = await login(t, op, "2958");
+    expect(res.status).toBe(401);
+    expect(await json<{ code: string }>(res)).toMatchObject({ code: "DEVICE_INACTIVE" });
   });
 });

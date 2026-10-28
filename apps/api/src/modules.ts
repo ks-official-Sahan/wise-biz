@@ -4,7 +4,7 @@ import { templateModule } from "@wise-biz/module-template";
 import { createTenancyModule } from "@wise-biz/module-tenancy";
 
 import type { NonceStore } from "@wise-biz/http-signatures";
-import type { BranchExists } from "@wise-biz/module-devices";
+import type { BranchExists, IsActiveMember } from "@wise-biz/module-devices";
 import type { WbModule } from "@wise-biz/module-kit";
 import type { ActiveTenantSetter, TenancyModuleOptions } from "@wise-biz/module-tenancy";
 
@@ -16,12 +16,19 @@ import type { ActiveTenantSetter, TenancyModuleOptions } from "@wise-biz/module-
 export function createModules(
   sessions: ActiveTenantSetter,
   tenancy: TenancyModuleOptions = {},
-  devices: { nonces: NonceStore } = { nonces: unwiredNonces },
+  devices: { nonces: NonceStore; pinPepper: string } = {
+    nonces: unwiredNonces,
+    pinPepper: "docs-only-pepper-never-used-for-real-pins",
+  },
 ): readonly WbModule[] {
   return [
     createAuditModule(),
     createTenancyModule(sessions, tenancy),
-    createDevicesModule({ branchExists, nonces: devices.nonces }),
+    createDevicesModule({
+      branchExists,
+      nonces: devices.nonces,
+      pin: { pepper: new TextEncoder().encode(devices.pinPepper), isActiveMember },
+    }),
     templateModule,
   ];
 }
@@ -34,6 +41,15 @@ const branchExists: BranchExists = async (tx, tenantId, branchId) => {
   const r = await tx.query(
     "select 1 from tenancy.branches where tenant_id = $1 and id = $2 and archived_at is null",
     [tenantId, branchId],
+  );
+  return r.rowCount === 1;
+};
+
+/** PIN logins need an ACTIVE membership in the terminal's business (tenancy owns memberships). */
+const isActiveMember: IsActiveMember = async (tx, tenantId, userId) => {
+  const r = await tx.query(
+    "select 1 from tenancy.memberships where tenant_id = $1 and user_id = $2 and status = 'active'",
+    [tenantId, userId],
   );
   return r.rowCount === 1;
 };

@@ -55,6 +55,7 @@ beforeAll(async () => {
     AUTH_URL: "http://localhost:3001",
     MAIL_FROM: "no-reply@wise-biz.local",
     INVITE_SECRET: "wiring-invite-secret-".padEnd(40, "x"),
+    PIN_PEPPER: "wiring-pin-pepper-".padEnd(40, "x"),
     CONSOLE_URL: "http://localhost:3001",
     CORS_ORIGINS: ORIGIN,
     REDIS_URL: redis.url,

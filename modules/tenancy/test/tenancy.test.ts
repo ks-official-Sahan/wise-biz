@@ -58,7 +58,7 @@ describe("POST /v1/tenancy/tenants (signUpBusiness)", () => {
     expect(c).toMatchObject({
       "tenancy.tenants": 1,
       "tenancy.roles": 6,
-      "tenancy.role_permissions": 3,
+      "tenancy.role_permissions": 12,
       "tenancy.branches": 1,
       "tenancy.locations": 1,
       "tenancy.memberships": 1,
@@ -353,7 +353,16 @@ describe("kernel ports", () => {
     expect(count).toBe(1);
     expect(rows.map((r) => `${r.role}:${r.permission}`).sort()).toEqual([
       "accountant:tenancy:read",
+      "cashier:devices:pin",
+      "inventory_clerk:devices:pin",
+      "manager:devices:manage",
+      "manager:devices:pin",
+      "manager:devices:read",
+      "manager:devices:unlock",
       "manager:tenancy:read",
+      "supervisor:devices:pin",
+      "supervisor:devices:read",
+      "supervisor:devices:unlock",
       "supervisor:tenancy:read",
     ]);
   });

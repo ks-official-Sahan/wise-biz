@@ -69,6 +69,12 @@ export const inviteEnv = {
   INVITE_SECRET: z.string().min(32),
 };
 
+/** Pepper for operator PINs (devices): the Argon2 secret and the uniqueness HMAC key. Never log it; rotating it
+ * invalidates every PIN. */
+export const pinEnv = {
+  PIN_PEPPER: z.string().min(32),
+};
+
 /** Public console base URL; email links (verify, invite) point here. */
 export const consoleEnv = {
   CONSOLE_URL: z.url(),

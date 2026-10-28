@@ -13,6 +13,7 @@ export {
   httpEnv,
   identityDbEnv,
   inviteEnv,
+  pinEnv,
   kafkaEnv,
   mailEnv,
   observabilityEnv,

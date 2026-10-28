@@ -158,7 +158,7 @@ describe(`query plans (${String(TENANTS)} tenants)`, () => {
     const run = <T>(fn: (tx: TxHandle) => Promise<T>) =>
       withTenantTx(pool, { tenantId, requestId: "x" }, fn);
     const rows = await run((tx) => repo.loadPolicyRows(recording(tx, seen), tenantId));
-    expect(rows).toHaveLength(3);
+    expect(rows).toHaveLength(12);
     const nodes = await explain(run, only(seen));
     console.info(`loadPolicyRows: ${used(nodes).join(", ")}`);
     // (tenant_id, role_id, id) index or the (tenant_id, role_id, permission) unique key: both lead with tenant_id.
