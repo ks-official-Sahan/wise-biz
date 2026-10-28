@@ -1,0 +1,30 @@
+import { join } from "node:path";
+
+import { defineModule } from "@wise-biz/module-kit";
+import { definePermissions } from "@wise-biz/policy";
+
+import { CATALOG_EVENTS } from "./events.ts";
+import { mountRoutes } from "./http.ts";
+
+import type { WbModule } from "@wise-biz/module-kit";
+
+export {
+  BarcodeChangedV1,
+  ProductUpsertedV1,
+  VariantArchivedV1,
+  VariantUpsertedV1,
+} from "./events.ts";
+export { gs1CheckDigitOk, normaliseBarcode } from "./domain/barcode.ts";
+
+/** Products, variants, barcodes, units, categories, tags. Emits catalog.* for search, pricing and the POS cache. */
+export function createCatalogModule(): WbModule {
+  return defineModule({
+    name: "catalog",
+    migrationsDir: join(import.meta.dirname, "..", "migrations"),
+    permissions: definePermissions("catalog", ["read", "write"]),
+    events: [...CATALOG_EVENTS],
+    routes: (app, deps) => {
+      mountRoutes(app, deps);
+    },
+  });
+}

@@ -109,6 +109,116 @@
         "required": ["entries", "nextCursor"],
         "type": "object"
       },
+      "Barcode": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "format": {
+            "type": "string"
+          }
+        },
+        "required": ["code", "format"],
+        "type": "object"
+      },
+      "BarcodeInput": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "maxLength": 64,
+            "minLength": 1,
+            "type": "string"
+          },
+          "format": {
+            "enum": [
+              "ean13",
+              "ean8",
+              "upca",
+              "upce",
+              "code128",
+              "code39",
+              "qr",
+              "datamatrix",
+              "gs1_128",
+              "other"
+            ],
+            "type": "string"
+          }
+        },
+        "required": ["code"],
+        "type": "object"
+      },
+      "BarcodeLookup": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "format": {
+            "type": "string"
+          },
+          "product": {
+            "properties": {
+              "categoryId": {
+                "type": ["string", "null"]
+              },
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": ["id", "name", "categoryId"],
+            "type": "object"
+          },
+          "variant": {
+            "$ref": "#/components/schemas/Variant"
+          }
+        },
+        "required": ["code", "format", "variant", "product"],
+        "type": "object"
+      },
+      "Category": {
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "parentId": {
+            "type": ["string", "null"]
+          },
+          "path": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": ["id", "parentId", "name", "path"],
+        "type": "object"
+      },
+      "CreateCategory": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "type": "string"
+          },
+          "parentId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": ["string", "null"]
+          }
+        },
+        "required": ["name"],
+        "type": "object"
+      },
       "CreateEnrollmentCode": {
         "additionalProperties": false,
         "properties": {
@@ -123,6 +233,106 @@
           }
         },
         "required": ["branchId", "name"],
+        "type": "object"
+      },
+      "CreateProduct": {
+        "additionalProperties": false,
+        "properties": {
+          "categoryId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": ["string", "null"]
+          },
+          "description": {
+            "maxLength": 4000,
+            "type": "string"
+          },
+          "id": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "tagIds": {
+            "items": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            },
+            "maxItems": 50,
+            "type": "array"
+          },
+          "variants": {
+            "items": {
+              "$ref": "#/components/schemas/VariantInput"
+            },
+            "maxItems": 100,
+            "minItems": 1,
+            "type": "array"
+          }
+        },
+        "required": ["name", "variants"],
+        "type": "object"
+      },
+      "CreateTag": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 60,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": ["name"],
+        "type": "object"
+      },
+      "CreateUnit": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "pattern": "^[a-z0-9_.-]{1,16}$",
+            "type": "string"
+          },
+          "decimals": {
+            "maximum": 4,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "id": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 60,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": ["code", "name"],
+        "type": "object"
+      },
+      "CreateUnitConversion": {
+        "additionalProperties": false,
+        "properties": {
+          "factor": {
+            "pattern": "^(?!0+(\\.0+)?$)\\d{1,12}(\\.\\d{1,6})?$",
+            "type": "string"
+          },
+          "fromUnitId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "toUnitId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          }
+        },
+        "required": ["fromUnitId", "toUnitId", "factor"],
         "type": "object"
       },
       "Cursor": {
@@ -317,6 +527,114 @@
         "required": ["userId", "pin"],
         "type": "object"
       },
+      "Product": {
+        "properties": {
+          "archived": {
+            "type": "boolean"
+          },
+          "categoryId": {
+            "type": ["string", "null"]
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "description": {
+            "type": ["string", "null"]
+          },
+          "id": {
+            "type": "string"
+          },
+          "media": {
+            "items": {
+              "$ref": "#/components/schemas/ProductMedia"
+            },
+            "type": "array"
+          },
+          "name": {
+            "type": "string"
+          },
+          "tagIds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "variants": {
+            "items": {
+              "$ref": "#/components/schemas/Variant"
+            },
+            "type": "array"
+          },
+          "version": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "description",
+          "categoryId",
+          "tagIds",
+          "version",
+          "archived",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object"
+      },
+      "ProductMedia": {
+        "properties": {
+          "alt": {
+            "type": ["string", "null"]
+          },
+          "assetKey": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "position": {
+            "type": "number"
+          },
+          "variantId": {
+            "type": ["string", "null"]
+          }
+        },
+        "required": ["id", "variantId", "assetKey", "position", "alt"],
+        "type": "object"
+      },
+      "ProductPage": {
+        "properties": {
+          "next": {
+            "type": ["string", "null"]
+          },
+          "products": {
+            "items": {
+              "$ref": "#/components/schemas/Product"
+            },
+            "type": "array"
+          }
+        },
+        "required": ["products", "next"],
+        "type": "object"
+      },
+      "SetBarcodes": {
+        "additionalProperties": false,
+        "properties": {
+          "barcodes": {
+            "items": {
+              "$ref": "#/components/schemas/BarcodeInput"
+            },
+            "maxItems": 20,
+            "type": "array"
+          }
+        },
+        "required": ["barcodes"],
+        "type": "object"
+      },
       "SetPin": {
         "additionalProperties": false,
         "properties": {
@@ -327,6 +645,18 @@
           }
         },
         "required": ["pin"],
+        "type": "object"
+      },
+      "Tag": {
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": ["id", "name"],
         "type": "object"
       },
       "TemplateChild": {
@@ -1124,6 +1454,57 @@
         "format": "date-time",
         "type": "string"
       },
+      "Unit": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "decimals": {
+            "type": "number"
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": ["id", "code", "name", "decimals"],
+        "type": "object"
+      },
+      "UnitConversion": {
+        "properties": {
+          "factor": {
+            "type": "string"
+          },
+          "fromUnitId": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "toUnitId": {
+            "type": "string"
+          }
+        },
+        "required": ["id", "fromUnitId", "toUnitId", "factor"],
+        "type": "object"
+      },
+      "UpdateCategory": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "type": "string"
+          },
+          "parentId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": ["string", "null"]
+          }
+        },
+        "type": "object"
+      },
       "UpdateDevice": {
         "additionalProperties": false,
         "properties": {
@@ -1143,10 +1524,209 @@
         },
         "type": "object"
       },
+      "UpdateProduct": {
+        "additionalProperties": false,
+        "properties": {
+          "archived": {
+            "type": "boolean"
+          },
+          "categoryId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": ["string", "null"]
+          },
+          "description": {
+            "maxLength": 4000,
+            "type": ["string", "null"]
+          },
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "tagIds": {
+            "items": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            },
+            "maxItems": 50,
+            "type": "array"
+          },
+          "version": {
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": ["version"],
+        "type": "object"
+      },
+      "UpdateVariant": {
+        "additionalProperties": false,
+        "properties": {
+          "archived": {
+            "type": "boolean"
+          },
+          "attributes": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                }
+              ]
+            },
+            "type": "object"
+          },
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "sku": {
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]{0,63}$",
+            "type": "string"
+          },
+          "taxCategory": {
+            "pattern": "^[a-z][a-z0-9_]{0,31}$",
+            "type": "string"
+          },
+          "tracksBatches": {
+            "type": "boolean"
+          },
+          "unitId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": ["string", "null"]
+          },
+          "version": {
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": ["version"],
+        "type": "object"
+      },
       "Uuid7": {
         "format": "uuid",
         "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
         "type": "string"
+      },
+      "Variant": {
+        "properties": {
+          "archived": {
+            "type": "boolean"
+          },
+          "attributes": {
+            "additionalProperties": {},
+            "type": "object"
+          },
+          "barcodes": {
+            "items": {
+              "$ref": "#/components/schemas/Barcode"
+            },
+            "type": "array"
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "productId": {
+            "type": "string"
+          },
+          "sku": {
+            "type": "string"
+          },
+          "taxCategory": {
+            "type": "string"
+          },
+          "tracksBatches": {
+            "type": "boolean"
+          },
+          "unitId": {
+            "type": ["string", "null"]
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "version": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "productId",
+          "sku",
+          "name",
+          "unitId",
+          "tracksBatches",
+          "taxCategory",
+          "attributes",
+          "version",
+          "archived",
+          "updatedAt"
+        ],
+        "type": "object"
+      },
+      "VariantInput": {
+        "additionalProperties": false,
+        "properties": {
+          "attributes": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                }
+              ]
+            },
+            "type": "object"
+          },
+          "barcodes": {
+            "items": {
+              "$ref": "#/components/schemas/BarcodeInput"
+            },
+            "maxItems": 20,
+            "type": "array"
+          },
+          "id": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "sku": {
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]{0,63}$",
+            "type": "string"
+          },
+          "taxCategory": {
+            "pattern": "^[a-z][a-z0-9_]{0,31}$",
+            "type": "string"
+          },
+          "tracksBatches": {
+            "type": "boolean"
+          },
+          "unitId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": ["string", "null"]
+          }
+        },
+        "required": ["sku", "name"],
+        "type": "object"
       }
     }
   },
@@ -1443,6 +2023,588 @@
         },
         "summary": "CSV export of the filtered log (at most 10000 rows; the export is itself audited)",
         "tags": ["audit"]
+      }
+    },
+    "/v1/catalog/barcodes/{code}": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "code",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BarcodeLookup"
+                }
+              }
+            },
+            "description": "Sellable variant"
+          }
+        },
+        "summary": "Exact barcode lookup for an active terminal (signed) or a user with catalog:read",
+        "tags": ["catalog"]
+      }
+    },
+    "/v1/catalog/categories": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "categories": {
+                      "items": {
+                        "$ref": "#/components/schemas/Category"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": ["categories"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Categories"
+          }
+        },
+        "summary": "The category tree, flat, ordered by path",
+        "tags": ["catalog"]
+      },
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCategory"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Category"
+                }
+              }
+            },
+            "description": "Created"
+          }
+        },
+        "summary": "Create a category",
+        "tags": ["catalog"]
+      }
+    },
+    "/v1/catalog/categories/{id}": {
+      "patch": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCategory"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Category"
+                }
+              }
+            },
+            "description": "Updated"
+          }
+        },
+        "summary": "Rename or move a category (its subtree moves with it)",
+        "tags": ["catalog"]
+      }
+    },
+    "/v1/catalog/products": {
+      "get": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "after",
+            "required": false,
+            "schema": {
+              "maxLength": 64,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Includes the whole subtree",
+            "in": "query",
+            "name": "categoryId",
+            "required": false,
+            "schema": {
+              "description": "Includes the whole subtree",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "tagId",
+            "required": false,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "archived",
+            "required": false,
+            "schema": {
+              "enum": ["false", "true", "all"],
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "updatedSince",
+            "required": false,
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Comma list: variants, barcodes (implies variants), media",
+            "in": "query",
+            "name": "include",
+            "required": false,
+            "schema": {
+              "description": "Comma list: variants, barcodes (implies variants), media",
+              "pattern": "^(variants|barcodes|media)(,(variants|barcodes|media))*$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductPage"
+                }
+              }
+            },
+            "description": "Page"
+          }
+        },
+        "summary": "List products (keyset pages); include=variants,barcodes,media adds one query per relation",
+        "tags": ["catalog"]
+      },
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateProduct"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Product"
+                }
+              }
+            },
+            "description": "Created"
+          }
+        },
+        "summary": "Create a product with its variants and barcodes",
+        "tags": ["catalog"]
+      }
+    },
+    "/v1/catalog/products/{id}": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Comma list: variants, barcodes (implies variants), media",
+            "in": "query",
+            "name": "include",
+            "required": false,
+            "schema": {
+              "description": "Comma list: variants, barcodes (implies variants), media",
+              "pattern": "^(variants|barcodes|media)(,(variants|barcodes|media))*$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Product"
+                }
+              }
+            },
+            "description": "Product"
+          }
+        },
+        "summary": "One product",
+        "tags": ["catalog"]
+      },
+      "patch": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProduct"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Product"
+                }
+              }
+            },
+            "description": "Updated"
+          }
+        },
+        "summary": "Edit, archive or restore a product (optimistic lock on version)",
+        "tags": ["catalog"]
+      }
+    },
+    "/v1/catalog/products/{id}/variants": {
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VariantInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Variant"
+                }
+              }
+            },
+            "description": "Created"
+          }
+        },
+        "summary": "Add a variant to a product",
+        "tags": ["catalog"]
+      }
+    },
+    "/v1/catalog/tags": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "tags": {
+                      "items": {
+                        "$ref": "#/components/schemas/Tag"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": ["tags"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Tags"
+          }
+        },
+        "summary": "Tags",
+        "tags": ["catalog"]
+      },
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTag"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Tag"
+                }
+              }
+            },
+            "description": "Created"
+          }
+        },
+        "summary": "Create a tag",
+        "tags": ["catalog"]
+      }
+    },
+    "/v1/catalog/unit-conversions": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUnitConversion"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnitConversion"
+                }
+              }
+            },
+            "description": "Created"
+          }
+        },
+        "summary": "Create a unit conversion (1 from = factor to)",
+        "tags": ["catalog"]
+      }
+    },
+    "/v1/catalog/units": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "conversions": {
+                      "items": {
+                        "$ref": "#/components/schemas/UnitConversion"
+                      },
+                      "type": "array"
+                    },
+                    "units": {
+                      "items": {
+                        "$ref": "#/components/schemas/Unit"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": ["units", "conversions"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Units"
+          }
+        },
+        "summary": "Units and conversions (no unit = each)",
+        "tags": ["catalog"]
+      },
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUnit"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Unit"
+                }
+              }
+            },
+            "description": "Created"
+          }
+        },
+        "summary": "Create a unit",
+        "tags": ["catalog"]
+      }
+    },
+    "/v1/catalog/variants/{id}": {
+      "patch": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateVariant"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Variant"
+                }
+              }
+            },
+            "description": "Updated"
+          }
+        },
+        "summary": "Edit, archive or restore a variant (optimistic lock on version)",
+        "tags": ["catalog"]
+      }
+    },
+    "/v1/catalog/variants/{id}/barcodes": {
+      "put": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetBarcodes"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "barcodes": {
+                      "items": {
+                        "$ref": "#/components/schemas/Barcode"
+                      },
+                      "type": "array"
+                    },
+                    "variantId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["variantId", "barcodes"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Barcodes"
+          }
+        },
+        "summary": "Replace a variant's barcodes (unique per business, archived variants included)",
+        "tags": ["catalog"]
       }
     },
     "/v1/devices": {

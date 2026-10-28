@@ -17,11 +17,19 @@ export const CUTOFF_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
  */
 export const DEFAULT_ROLE_GRANTS: Readonly<Record<SystemRole, readonly Permission[]>> = {
   owner: [],
-  manager: ["tenancy:read", "devices:read", "devices:manage", "devices:pin", "devices:unlock"],
-  supervisor: ["tenancy:read", "devices:read", "devices:pin", "devices:unlock"],
-  cashier: ["devices:pin"],
-  inventory_clerk: ["devices:pin"],
-  accountant: ["tenancy:read"],
+  manager: [
+    "tenancy:read",
+    "devices:read",
+    "devices:manage",
+    "devices:pin",
+    "devices:unlock",
+    "catalog:read",
+    "catalog:write",
+  ],
+  supervisor: ["tenancy:read", "devices:read", "devices:pin", "devices:unlock", "catalog:read"],
+  cashier: ["devices:pin", "catalog:read"],
+  inventory_clerk: ["devices:pin", "catalog:read", "catalog:write"],
+  accountant: ["tenancy:read", "catalog:read"],
 };
 
 export interface NewBusinessInput {

@@ -1,4 +1,5 @@
 import { createAuditModule } from "@wise-biz/module-audit";
+import { createCatalogModule } from "@wise-biz/module-catalog";
 import { createDevicesModule } from "@wise-biz/module-devices";
 import { templateModule } from "@wise-biz/module-template";
 import { createTenancyModule } from "@wise-biz/module-tenancy";
@@ -29,6 +30,7 @@ export function createModules(
       nonces: devices.nonces,
       pin: { pepper: new TextEncoder().encode(devices.pinPepper), isActiveMember },
     }),
+    createCatalogModule(),
     templateModule,
   ];
 }

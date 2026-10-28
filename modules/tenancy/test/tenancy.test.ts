@@ -3,6 +3,7 @@ import { uuidv7 } from "@wise-biz/ids";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { drizzleTenancyRepository } from "../src/adapters/db/tenancy-repository.ts";
+import { DEFAULT_ROLE_GRANTS } from "../src/domain/business.ts";
 import { createTenancyPorts } from "../src/index.ts";
 
 import {
@@ -58,7 +59,7 @@ describe("POST /v1/tenancy/tenants (signUpBusiness)", () => {
     expect(c).toMatchObject({
       "tenancy.tenants": 1,
       "tenancy.roles": 6,
-      "tenancy.role_permissions": 12,
+      "tenancy.role_permissions": Object.values(DEFAULT_ROLE_GRANTS).flat().length,
       "tenancy.branches": 1,
       "tenancy.locations": 1,
       "tenancy.memberships": 1,
@@ -351,20 +352,11 @@ describe("kernel ports", () => {
       ports().loadPolicyRows(t.tenantId, "r"),
     );
     expect(count).toBe(1);
-    expect(rows.map((r) => `${r.role}:${r.permission}`).sort()).toEqual([
-      "accountant:tenancy:read",
-      "cashier:devices:pin",
-      "inventory_clerk:devices:pin",
-      "manager:devices:manage",
-      "manager:devices:pin",
-      "manager:devices:read",
-      "manager:devices:unlock",
-      "manager:tenancy:read",
-      "supervisor:devices:pin",
-      "supervisor:devices:read",
-      "supervisor:devices:unlock",
-      "supervisor:tenancy:read",
-    ]);
+    expect(rows.map((r) => `${r.role}:${r.permission}`).sort()).toEqual(
+      Object.entries(DEFAULT_ROLE_GRANTS)
+        .flatMap(([role, perms]) => perms.map((p) => `${role}:${p}`))
+        .sort(),
+    );
   });
 });
 

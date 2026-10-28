@@ -3,6 +3,7 @@ import { uuidv7 } from "@wise-biz/ids";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { drizzleTenancyRepository } from "../src/adapters/db/tenancy-repository.ts";
+import { DEFAULT_ROLE_GRANTS } from "../src/domain/business.ts";
 
 import {
   appFor,
@@ -91,13 +92,11 @@ describe("GET /v1/tenancy/roles", () => {
       implicitAll: true,
       isSystem: true,
     });
-    expect(roles.find((r) => r.name === "manager")?.grants).toEqual([
-      { permission: "devices:manage", conditions: null },
-      { permission: "devices:pin", conditions: null },
-      { permission: "devices:read", conditions: null },
-      { permission: "devices:unlock", conditions: null },
-      { permission: "tenancy:read", conditions: null },
-    ]);
+    expect(roles.find((r) => r.name === "manager")?.grants).toEqual(
+      [...DEFAULT_ROLE_GRANTS.manager]
+        .sort()
+        .map((permission) => ({ permission, conditions: null })),
+    );
   });
 
   it("404 for a caller without tenancy:read; the list is tenant-scoped", async () => {
