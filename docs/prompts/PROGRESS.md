@@ -25,7 +25,7 @@ Legend: ⬜ todo · 🟡 in progress · ✅ done · ⛔ blocked
 
 | Step | Status | Date | Commit | Notes / deviations |
 |---|---|---|---|---|
-| P1-01 Devices | ⬜ | | | |
+| P1-01 Devices | 🟨 | 2026-10-28 | 8ca3bcb, 8289019 (01a) | Split 01a/01b. **01a ✅** `@wise-biz/http-signatures` (RFC 9421 profile + RFC 9530 digest; unsigned, wrong-key, tampered-body, replay and skew tests; verify p95 < 2 ms opt-in perf test); `modules/devices` (enrollment by owner one-time code redeemed with proof of possession, `withLookupTx` single-row lookups, kernel `deviceAuth`, nonces in Redis fail closed, `requireDevice`/`requireTerminal` with `DEVICE_REVOKED` wipe and `DEVICE_INACTIVE`, heartbeat). Deviation: owner creates the code (approval) instead of approving a pending device, so no unauthenticated pending rows; no `device_keys`/`device_events` tables yet (one key per device; audit_log holds events). **01b ⬜**: operator PIN (Argon2id + pepper, lockout, supervisor reset), offline verifier, missed-heartbeat job, heartbeat retention. |
 | P1-02 Catalog + search | ⬜ | | | |
 | P1-03 Pricing + tax | ⬜ | | | |
 | P1-04 Inventory | ⬜ | | | |
@@ -141,6 +141,8 @@ Tracked in `docs/prompts/P2/README.md` order; add rows here when P2 starts.
 - [ ] (P0-08b) Sign-up timing differs for new vs existing email (extra writes); add a timing assertion or constant-time padding — owner: P1-15
 - [ ] (P0-08b) `scripts/seed-demo.mts` is linted but not type-checked (no root tsconfig); add `scripts/tsconfig.json` — owner: P0-12 gate
 - [ ] (P0-08b) Flakes under full parallel `pnpm check`: e2e sign-up 503 `RATE_LIMIT_UNAVAILABLE` (200 ms Redis timeout), tenancy container "Health check not healthy after 120000ms" — owner: P0-12 gate
+- [ ] (P1-01a) Heartbeat retention (90 days): monthly partitions or a per-tenant prune; missed-heartbeat job emits `devices.heartbeat.missed` — owner: P1-01b
+- [ ] (P1-01a) Console screens for devices (codes, QR, list, suspend/revoke) — owner: P1-13b
 - [ ] (P0-11) Push Sahan `feat/wise-biz-upstream`, release email-kit 0.6.0, then switch `@wise-biz/mailer` to `createGenericSmtpProvider` and drop its own nodemailer path — owner: P1-15
 - [ ] (P0-11) auth-kit scoped RBAC/ID injection, media-kit tenant prefix + quota hook, ai-core budget/audit hooks: do when wise-biz first consumes those packages — owner: P1 media step / P2 AI step
 - [x] (P0-08b) Upstream gaps found in Sahan packages (auth-kit IDs, Upstash limiter, Next peers, WebAuthn UV, email-kit generic SMTP) — see `docs/research/sahan-packages.md` #15–20 — owner: P0-11
