@@ -2,7 +2,8 @@ import { fileURLToPath } from "node:url";
 
 import { defineConfig, devices } from "@playwright/test";
 
-const HOST = "127.0.0.1";
+// Must match the API's trusted origin (CONSOLE_URL, http://localhost:3000): Better Auth rejects other origins.
+const HOST = "localhost";
 const PORT = "3000";
 const packageDir = fileURLToPath(new URL(".", import.meta.url));
 

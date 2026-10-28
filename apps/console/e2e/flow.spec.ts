@@ -1,7 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 
-import type { APIRequestContext, Page } from "@playwright/test";
+import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
 /**
  * Owner journey against the real API: sign up, verify by email, create the business, finish onboarding,
@@ -43,6 +43,14 @@ async function mailLink(request: APIRequestContext, to: string): Promise<string>
   return link ?? "";
 }
 
+/** Fills a controlled input and retries until the value sticks (a fill before hydration is reset by React). */
+async function fill(field: Locator, value: string): Promise<void> {
+  await expect(async () => {
+    await field.fill(value);
+    await expect(field).toHaveValue(value, { timeout: 1_000 });
+  }).toPass({ timeout: 15_000 });
+}
+
 async function noAxeViolations(page: Page): Promise<void> {
   const result = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag22aa"])
@@ -52,32 +60,36 @@ async function noAxeViolations(page: Page): Promise<void> {
 
 test("owner signs up, verifies and sets up the business", async ({ page, request }) => {
   await page.goto("/sign-up");
-  await page.getByLabel("Your name").fill(owner.name);
-  await page.getByLabel("Email").fill(owner.email);
-  await page.getByLabel("Password").fill(owner.password);
+  await fill(page.getByLabel("Your name"), owner.name);
+  await fill(page.getByLabel("Email"), owner.email);
+  await fill(page.getByLabel("Password"), owner.password);
   await page.getByRole("button", { name: "Create account" }).click();
-  await expect(page.getByRole("heading", { name: "Check your email" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Check your email", exact: true })).toBeVisible();
 
   await page.goto(await mailLink(request, owner.email));
 
   await page.goto("/sign-in");
-  await page.getByLabel("Email").fill(owner.email);
-  await page.getByLabel("Password").fill(owner.password);
+  await fill(page.getByLabel("Email"), owner.email);
+  await fill(page.getByLabel("Password"), owner.password);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
 
-  await expect(page.getByRole("heading", { name: "Set up your business" })).toBeVisible();
-  await page.getByLabel("Business name").fill(`E2E Store ${run}`);
+  await expect(
+    page.getByRole("heading", { name: "Set up your business", exact: true }),
+  ).toBeVisible({
+    timeout: 20_000,
+  });
+  await fill(page.getByLabel("Business name"), `E2E Store ${run}`);
   await page.getByRole("button", { name: "Create business" }).click();
 
   // Onboarding: business, branch, invites (skipped), finish.
-  await expect(page.getByRole("heading", { name: "Business" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Business", exact: true })).toBeVisible();
   await noAxeViolations(page);
   await page.getByRole("button", { name: "Continue" }).click();
-  await expect(page.getByRole("heading", { name: "First branch" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "First branch", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Continue" }).click();
-  await expect(page.getByRole("heading", { name: "Invite your team" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Invite your team", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Skip for now" }).click();
-  await expect(page.getByRole("heading", { name: "Finish" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Finish", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Open the console" }).click();
   await expect(page).toHaveURL(/\/$/);
 
@@ -85,14 +97,14 @@ test("owner signs up, verifies and sets up the business", async ({ page, request
   await page.goto("/people");
   await page.getByRole("button", { name: "Invite a person" }).first().click();
   const dialog = page.getByRole("dialog", { name: "Invite a person" });
-  await dialog.getByLabel("Email").fill(`staff-${run}@example.test`);
+  await fill(dialog.getByLabel("Email"), `staff-${run}@example.test`);
   await dialog.getByRole("button", { name: "Send invite" }).click();
   await expect(page.getByText(`staff-${run}@example.test`)).toBeVisible();
   await noAxeViolations(page);
 
   // Every change above is in the audit log.
   await page.goto("/audit");
-  await expect(page.getByRole("heading", { name: "Audit log" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Audit log", exact: true })).toBeVisible();
   await expect(page.getByRole("row").nth(1)).toBeVisible();
   await noAxeViolations(page);
 });

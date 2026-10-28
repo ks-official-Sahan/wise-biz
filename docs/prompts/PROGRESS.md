@@ -103,7 +103,10 @@ Tracked in `docs/prompts/P2/README.md` order; add rows here when P2 starts.
 - [ ] (P0-09b) Visual baselines are win32 only; generate linux baselines in CI — owner: P0-12 gate
 - [ ] (P0-09b) UI theme-switch perf test is opt-in (`pnpm -F @wise-biz/ui test:perf`, vitest `--mode perf`): wall clock under turbo parallel load read 378 ms vs 44 ms alone; add a dedicated CI perf job — owner: P0-12 gate
 - [ ] (P0-09b) `@tabler/icons-react-native` also breaks depcruise resolution (`exports.require.types` → missing `.d.cts`); narrow `pathNot` exception in `.dependency-cruiser.cjs` — owner: P0-11
-- [ ] (P0-10b) Run the gated owner-journey e2e (`E2E_FULL=1`: compose stack, Mailpit, API) and add the "assign role" step — owner: P0-12 gate
+- [x] (P0-10b) Gated owner-journey e2e (`E2E_FULL=1`) passes: sign up, Mailpit verify, sign in, setup, onboarding, invite, audit — found and fixed a setup→shell bounce from a stale tenant list
+- [ ] (P0-10b) Owner-journey e2e lacks an "assign role" step (needs a second, accepted member) — owner: P0-12 gate
+- [ ] (P0-10b) A field typed before hydration is reset on slow loads (controlled inputs); render forms after hydration or use uncontrolled defaults — owner: P1-15
+- [ ] (P0-10b) `pnpm -F api dev` restart-loops on Windows: `node --watch` fires on node_modules changes; scope the watch paths — owner: P0-12 gate
 - [ ] (P0-10b) Lighthouse mobile (a11y ≥ 95, best practices ≥ 95) on dashboard, people, audit — owner: P0-12 gate
 - [ ] (P0-10b) Sign-in answers "verify your email first" for unverified accounts (Better Auth 403), which reveals the account exists; make the API answer uniformly — owner: P1-15
 - [ ] (P0-10b) Members keyset pagination + search in the console waits on the identity names contract (below); prefetch on hover not wired yet — owner: P1-15

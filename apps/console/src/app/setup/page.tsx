@@ -53,8 +53,9 @@ export default function SetupPage() {
           },
         },
       });
-      await session.refetch();
-      await qc.invalidateQueries({ queryKey: keys.me });
+      // The shell's tenant list is not mounted here, so invalidating would leave its stale empty copy to render
+      // first and bounce back to /setup. Drop it so the shell fetches the new business.
+      qc.removeQueries({ queryKey: keys.me });
       router.replace("/onboarding");
     } catch (err) {
       setBusy(false);
