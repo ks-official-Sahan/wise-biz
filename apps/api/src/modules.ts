@@ -1,7 +1,10 @@
 import { createAuditModule } from "@wise-biz/module-audit";
+import { createDevicesModule } from "@wise-biz/module-devices";
 import { templateModule } from "@wise-biz/module-template";
 import { createTenancyModule } from "@wise-biz/module-tenancy";
 
+import type { NonceStore } from "@wise-biz/http-signatures";
+import type { BranchExists } from "@wise-biz/module-devices";
 import type { WbModule } from "@wise-biz/module-kit";
 import type { ActiveTenantSetter, TenancyModuleOptions } from "@wise-biz/module-tenancy";
 
@@ -13,9 +16,31 @@ import type { ActiveTenantSetter, TenancyModuleOptions } from "@wise-biz/module-
 export function createModules(
   sessions: ActiveTenantSetter,
   tenancy: TenancyModuleOptions = {},
+  devices: { nonces: NonceStore } = { nonces: unwiredNonces },
 ): readonly WbModule[] {
-  return [createAuditModule(), createTenancyModule(sessions, tenancy), templateModule];
+  return [
+    createAuditModule(),
+    createTenancyModule(sessions, tenancy),
+    createDevicesModule({ branchExists, nonces: devices.nonces }),
+    templateModule,
+  ];
 }
+
+/**
+ * Devices needs "does this branch exist in the tenant?" and tenancy owns branches. The composition root bridges the
+ * two with one indexed query in the caller's tenant transaction (RLS applies), so neither module reads the other.
+ */
+const branchExists: BranchExists = async (tx, tenantId, branchId) => {
+  const r = await tx.query(
+    "select 1 from tenancy.branches where tenant_id = $1 and id = $2 and archived_at is null",
+    [tenantId, branchId],
+  );
+  return r.rowCount === 1;
+};
+
+const unwiredNonces: NonceStore = {
+  claim: () => Promise.reject(new Error("device nonces are not wired")),
+};
 
 /** Route/permission shapes only (OpenAPI generation, tests): the session port is not wired and must never be called. */
 export const docModules: readonly WbModule[] = createModules({

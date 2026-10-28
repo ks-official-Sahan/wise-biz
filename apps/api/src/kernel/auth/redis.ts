@@ -13,7 +13,7 @@ export interface NodeRedisLike {
   set(
     key: string,
     value: string,
-    options: { expiration: { type: "EX"; value: number } },
+    options: { expiration: { type: "EX"; value: number }; condition?: "NX" },
   ): Promise<unknown>;
   multi(): Multi;
 }
@@ -23,6 +23,13 @@ export function nodeRedisKernel(client: NodeRedisLike): KernelRedis {
     get: (key) => client.get(key),
     async set(key, value, ttlSeconds) {
       await client.set(key, value, { expiration: { type: "EX", value: ttlSeconds } });
+    },
+    async claim(key, ttlSeconds) {
+      const reply = await client.set(key, "1", {
+        expiration: { type: "EX", value: ttlSeconds },
+        condition: "NX",
+      });
+      return reply === "OK";
     },
     async hit(key, windowMs) {
       const reply = await client.multi().incr(key).pExpire(key, windowMs, "NX").pTTL(key).exec();

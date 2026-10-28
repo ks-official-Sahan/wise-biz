@@ -109,11 +109,182 @@
         "required": ["entries", "nextCursor"],
         "type": "object"
       },
+      "CreateEnrollmentCode": {
+        "additionalProperties": false,
+        "properties": {
+          "branchId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 80,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": ["branchId", "name"],
+        "type": "object"
+      },
       "Cursor": {
         "maxLength": 512,
         "minLength": 1,
         "pattern": "^[A-Za-z0-9_-]+$",
         "type": ["string", "null"]
+      },
+      "Device": {
+        "properties": {
+          "appVersion": {
+            "type": "string"
+          },
+          "branchId": {
+            "type": "string"
+          },
+          "deviceId": {
+            "type": "string"
+          },
+          "enrolledAt": {
+            "type": "string"
+          },
+          "lastSeenAt": {
+            "type": ["string", "null"]
+          },
+          "name": {
+            "type": "string"
+          },
+          "platform": {
+            "enum": ["android", "ios", "windows", "macos", "linux", "web"],
+            "type": "string"
+          },
+          "status": {
+            "enum": ["pending", "active", "suspended", "revoked", "blacklisted"],
+            "type": "string"
+          },
+          "tenantId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "deviceId",
+          "tenantId",
+          "branchId",
+          "name",
+          "platform",
+          "appVersion",
+          "status",
+          "enrolledAt",
+          "lastSeenAt"
+        ],
+        "type": "object"
+      },
+      "DeviceList": {
+        "properties": {
+          "devices": {
+            "items": {
+              "$ref": "#/components/schemas/Device"
+            },
+            "type": "array"
+          }
+        },
+        "required": ["devices"],
+        "type": "object"
+      },
+      "Enroll": {
+        "additionalProperties": false,
+        "properties": {
+          "appVersion": {
+            "maxLength": 32,
+            "minLength": 1,
+            "type": "string"
+          },
+          "code": {
+            "maxLength": 16,
+            "minLength": 8,
+            "type": "string"
+          },
+          "deviceId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "platform": {
+            "enum": ["android", "ios", "windows", "macos", "linux", "web"],
+            "type": "string"
+          },
+          "publicKey": {
+            "pattern": "^[A-Za-z0-9_-]{43}$",
+            "type": "string"
+          }
+        },
+        "required": ["code", "deviceId", "publicKey", "platform", "appVersion"],
+        "type": "object"
+      },
+      "EnrollmentCode": {
+        "properties": {
+          "branchId": {
+            "type": "string"
+          },
+          "code": {
+            "description": "Shown once. Type it on the terminal or scan the QR payload.",
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "qr": {
+            "type": "string"
+          }
+        },
+        "required": ["code", "qr", "expiresAt", "branchId", "name"],
+        "type": "object"
+      },
+      "Heartbeat": {
+        "additionalProperties": false,
+        "properties": {
+          "appVersion": {
+            "maxLength": 32,
+            "minLength": 1,
+            "type": "string"
+          },
+          "batteryPct": {
+            "maximum": 100,
+            "minimum": 0,
+            "type": ["integer", "null"]
+          },
+          "connection": {
+            "enum": ["wifi", "ethernet", "cellular", "offline", "unknown"],
+            "type": "string"
+          },
+          "oldestUnsyncedAt": {
+            "format": "date-time",
+            "type": ["string", "null"]
+          },
+          "operatorId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": ["string", "null"]
+          },
+          "unsyncedCount": {
+            "maximum": 1000000,
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": ["appVersion", "unsyncedCount"],
+        "type": "object"
+      },
+      "HeartbeatReply": {
+        "properties": {
+          "serverTime": {
+            "type": "string"
+          },
+          "status": {
+            "enum": ["pending", "active", "suspended", "revoked", "blacklisted"],
+            "type": "string"
+          }
+        },
+        "required": ["status", "serverTime"],
+        "type": "object"
       },
       "TemplateChild": {
         "properties": {
@@ -910,6 +1081,25 @@
         "format": "date-time",
         "type": "string"
       },
+      "UpdateDevice": {
+        "additionalProperties": false,
+        "properties": {
+          "branchId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 80,
+            "minLength": 1,
+            "type": "string"
+          },
+          "status": {
+            "enum": ["active", "suspended", "revoked", "blacklisted"],
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "Uuid7": {
         "format": "uuid",
         "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
@@ -1210,6 +1400,147 @@
         },
         "summary": "CSV export of the filtered log (at most 10000 rows; the export is itself audited)",
         "tags": ["audit"]
+      }
+    },
+    "/v1/devices": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceList"
+                }
+              }
+            },
+            "description": "Terminals"
+          }
+        },
+        "summary": "List the business's terminals",
+        "tags": ["devices"]
+      }
+    },
+    "/v1/devices/enroll": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Enroll"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Device"
+                }
+              }
+            },
+            "description": "Enrolled and active"
+          }
+        },
+        "summary": "Terminal: redeem a code with a new Ed25519 key (request signed with that key)",
+        "tags": ["devices"]
+      }
+    },
+    "/v1/devices/enrollment-codes": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateEnrollmentCode"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnrollmentCode"
+                }
+              }
+            },
+            "description": "Code, shown once"
+          }
+        },
+        "summary": "Create a one-time code that enrolls one terminal into a branch (15 minutes)",
+        "tags": ["devices"]
+      }
+    },
+    "/v1/devices/heartbeat": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Heartbeat"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HeartbeatReply"
+                }
+              }
+            },
+            "description": "Recorded"
+          }
+        },
+        "summary": "Terminal: report health; the reply carries the device status and server time",
+        "tags": ["devices"]
+      }
+    },
+    "/v1/devices/{id}": {
+      "patch": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateDevice"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Device"
+                }
+              }
+            },
+            "description": "Updated"
+          }
+        },
+        "summary": "Rename, move, suspend, reactivate, revoke or blacklist a terminal",
+        "tags": ["devices"]
       }
     },
     "/v1/template/items": {

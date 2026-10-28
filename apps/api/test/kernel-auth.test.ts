@@ -49,6 +49,11 @@ function fakeRedis(): KernelRedis & {
       counts.set(k, n);
       return Promise.resolve({ count: n, ttlMs: windowMs });
     },
+    claim: (k) => {
+      if (store.has(k)) return Promise.resolve(false);
+      store.set(k, "1");
+      return Promise.resolve(true);
+    },
   };
 }
 
@@ -56,11 +61,13 @@ const downRedis: KernelRedis = {
   get: () => Promise.reject(new Error("redis down")),
   set: () => Promise.reject(new Error("redis down")),
   hit: () => Promise.reject(new Error("redis down")),
+  claim: () => Promise.reject(new Error("redis down")),
 };
 const hungRedis: KernelRedis = {
   get: () => new Promise(() => undefined),
   set: () => new Promise(() => undefined),
   hit: () => new Promise(() => undefined),
+  claim: () => new Promise(() => undefined),
 };
 
 describe("sessionResolver (fail closed)", () => {

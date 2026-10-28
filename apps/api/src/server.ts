@@ -22,6 +22,7 @@ import { createClient } from "redis";
 import { createApp } from "./app.ts";
 import { redisIdempotencyCache } from "./idempotency-cache.ts";
 import { nodeRedisKernel, sessionResolver } from "./kernel/auth/index.ts";
+import { deviceNonces } from "./kernel/device/nonces.ts";
 import { createLogger } from "./logger.ts";
 import { createModules } from "./modules.ts";
 
@@ -140,8 +141,13 @@ export async function startServer(
       rpOrigins: origins,
     });
     const tenancy = createTenancyPorts(pool);
+    const kernelRedis = nodeRedisKernel(redis);
     const app = createApp({
-      modules: createModules(identity, { inviteSecret: env.INVITE_SECRET }),
+      modules: createModules(
+        identity,
+        { inviteSecret: env.INVITE_SECRET },
+        { nonces: deviceNonces(kernelRedis) },
+      ),
       pool,
       redis,
       env,
@@ -152,7 +158,7 @@ export async function startServer(
         cookieName: SESSION_COOKIE_NAME,
       }),
       policyRows: (tenantId, requestId) => tenancy.loadPolicyRows(tenantId, requestId),
-      kernelRedis: nodeRedisKernel(redis),
+      kernelRedis,
       identity,
       idempotencyCache: redisIdempotencyCache(redis, logger, { onMetric: hooks.onMetric }),
     });

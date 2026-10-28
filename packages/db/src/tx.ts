@@ -120,3 +120,33 @@ export async function withUserTx<T>(
   if (!isUuidV7(ctx.userId)) throw new Error("withUserTx: userId must be a UUIDv7");
   return run(pool, SETTINGS_SQL, ["", ctx.userId, ctx.requestId], fn);
 }
+
+export type LookupCtx = Readonly<{
+  /** Which single-row lookup policy to unlock. */
+  key: "device_id" | "enrollment_code";
+  /** device_id: a UUIDv7. enrollment_code: the lowercase hex SHA-256 of the code. */
+  value: string;
+  requestId: string;
+}>;
+
+const LOOKUP_SQL: Record<LookupCtx["key"], string> = {
+  device_id:
+    "select set_config('app.tenant_id', '', true), set_config('app.device_id', $1, true), set_config('app.request_id', $2, true)",
+  enrollment_code:
+    "select set_config('app.tenant_id', '', true), set_config('app.enrollment_code', $1, true), set_config('app.request_id', $2, true)",
+};
+
+/**
+ * BEGIN -> no tenant, one lookup key (local) -> fn -> COMMIT. For the moment before a tenant is known: a signed terminal
+ * request names only its device, an enrollment names only its code. The devices schema has SELECT policies keyed on
+ * these settings that expose exactly that one row (to learn its tenant); everything else returns zero rows.
+ */
+export async function withLookupTx<T>(
+  pool: pg.Pool,
+  ctx: LookupCtx,
+  fn: (tx: TxHandle) => Promise<T>,
+): Promise<T> {
+  const valid = ctx.key === "device_id" ? isUuidV7(ctx.value) : /^[0-9a-f]{64}$/.test(ctx.value);
+  if (!valid) throw new Error(`withLookupTx: invalid ${ctx.key}`);
+  return run(pool, LOOKUP_SQL[ctx.key], [ctx.value, ctx.requestId], fn);
+}

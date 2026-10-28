@@ -9,6 +9,10 @@ export const ERROR_CODES = Object.freeze({
   VALIDATION_FAILED: { status: 422, title: "Validation failed", slug: "validation/failed" },
   NOT_FOUND: { status: 404, title: "Not found", slug: "not-found" },
   UNAUTHENTICATED: { status: 401, title: "Authentication required", slug: "unauthenticated" },
+  /** The terminal was revoked or blacklisted: it must wipe local data and enroll again. */
+  DEVICE_REVOKED: { status: 401, title: "Device revoked", slug: "device/revoked" },
+  /** The terminal is enrolled but may not sell now (suspended or pending). */
+  DEVICE_INACTIVE: { status: 401, title: "Device inactive", slug: "device/inactive" },
   CONFLICT: { status: 409, title: "Conflict", slug: "conflict" },
   IDEMPOTENCY_MISMATCH: {
     status: 422,

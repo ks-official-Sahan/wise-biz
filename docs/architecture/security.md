@@ -73,6 +73,13 @@ Overrides: when an operator lacks permission (edit qty after add, price override
 5. Heartbeat every 60 s online: battery, app version, unsynced count, last user, connection type, IP. Stored for 90 days; missed heartbeats alert.
 6. Lost device: revoke → key rejected; on next contact device wipes local data.
 
+### Implementation (P1-01a)
+
+- **Enrollment inverts step 2:** the owner creates a one-time code in the console (branch + name, 15 min, 40 bits of Crockford base32, only its SHA-256 stored, never audited or idempotency-cached). The terminal redeems it with its public key, and the enroll request is signed by that key (proof of possession). Redeeming makes the device `active`: creating the code was the approval. So every row is tenant-scoped from the start and no unauthenticated "pending" table exists. Every refusal (unknown, expired, used, unsigned code) is the same 404; enroll is limited to 10/min per IP.
+- **Lookup before tenant:** `withLookupTx` sets one transaction-local key (`app.device_id` or `app.enrollment_code`) and a SELECT-only policy exposes that single row while no tenant is active.
+- **Signed requests:** kernel `deviceAuth` verifies every request that carries `signature` (RFC 9421 profile in `@wise-biz/http-signatures`: `@method`, `@path`, `content-digest`, `x-wb-timestamp`, `x-wb-nonce`, `x-wb-device-id`; Ed25519; ±5 min). The nonce is claimed last (`SET dn:{device}:{nonce} NX EX 660`), fail closed. The device row is read on every signed request, so revocation applies to the next one. `requireDevice` returns 401 `DEVICE_REVOKED` (wipe) for revoked/blacklisted; `requireTerminal` also refuses `suspended`/`pending` with `DEVICE_INACTIVE`.
+- Revoked and blacklisted are terminal states (409 on any change). Heartbeats are telemetry: not audited per beat.
+
 ## Request and transaction signing
 
 - **Request signing** (devices, MCP platform): header `Signature-Input`/`Signature` per RFC 9421 over method, path, `content-digest`, `x-pos-timestamp`, `x-pos-nonce`. Server rejects skew > 5 min and replayed nonces (Redis SET with TTL).

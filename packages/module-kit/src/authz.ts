@@ -1,7 +1,7 @@
 import { DomainError } from "@wise-biz/errors";
 import { decide } from "@wise-biz/policy";
 
-import type { AppEnv } from "./types.ts";
+import type { AppEnv, DeviceContext } from "./types.ts";
 import type { TenantCtx } from "@wise-biz/db";
 import type { Permission, PolicyMatrix } from "@wise-biz/policy";
 import type { Context, MiddlewareHandler } from "hono";
@@ -126,4 +126,27 @@ export function authorize(
         details: { permission, reason: decision.reason, override: decision.override },
       });
   }
+}
+
+/**
+ * The signing terminal. Unsigned requests get UNAUTHENTICATED (401). A revoked or blacklisted device gets 401
+ * DEVICE_REVOKED: the terminal must erase local data and enroll again. A suspended device passes (it can still send a
+ * heartbeat and learn its status); selling routes use requireTerminal.
+ */
+export function requireDevice(c: Context<AppEnv>): DeviceContext {
+  const device = c.get("device");
+  if (device === undefined) throw new DomainError("UNAUTHENTICATED", "Device signature required");
+  if (device.status === "revoked" || device.status === "blacklisted") {
+    throw new DomainError("DEVICE_REVOKED", "Device is no longer enrolled");
+  }
+  return device;
+}
+
+/** An active terminal assigned to a branch: required by sales and sync routes. Suspended or pending → 401 DEVICE_INACTIVE. */
+export function requireTerminal(c: Context<AppEnv>): DeviceContext {
+  const device = requireDevice(c);
+  if (device.status !== "active") {
+    throw new DomainError("DEVICE_INACTIVE", `Device is ${device.status}`);
+  }
+  return device;
 }

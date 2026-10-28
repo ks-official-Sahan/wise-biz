@@ -68,7 +68,7 @@ const version = (tenantId: string): Promise<number> =>
 
 describe("registry + migrations", () => {
   it("registry lists identity and tenancy in order, identity is global", () => {
-    expect(allSchemas).toEqual(["infra", "audit", "identity", "tenancy", "template"]);
+    expect(allSchemas).toEqual(["infra", "audit", "identity", "tenancy", "devices", "template"]);
     expect(globals).toEqual(["identity"]);
   });
 

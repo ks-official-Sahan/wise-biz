@@ -42,4 +42,6 @@ export interface KernelRedis {
   set(key: string, value: string, ttlSeconds: number): Promise<void>;
   /** Fixed window: INCR + PEXPIRE NX + PTTL in one MULTI. */
   hit(key: string, windowMs: number): Promise<{ count: number; ttlMs: number }>;
+  /** SET key 1 NX EX ttl: true when the key was new (device-signature nonces). */
+  claim(key: string, ttlSeconds: number): Promise<boolean>;
 }

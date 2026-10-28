@@ -1,6 +1,7 @@
 import { getConnInfo } from "@hono/node-server/conninfo";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { uuidv7 } from "@wise-biz/ids";
+import { deviceAuth } from "@wise-biz/module-devices";
 import { CLIENT_IP_HEADER } from "@wise-biz/module-identity";
 import { setPolicy } from "@wise-biz/module-kit";
 import { createCatalog, matrixFromRows } from "@wise-biz/policy";
@@ -19,6 +20,7 @@ import {
   rateLimit,
   sha256Hex,
 } from "./kernel/auth/index.ts";
+import { deviceNonces } from "./kernel/device/nonces.ts";
 import { createLogger } from "./logger.ts";
 import { bodyLimit } from "./middleware/body-limit.ts";
 import { corsAllowlist } from "./middleware/cors.ts";
@@ -141,9 +143,15 @@ export function createApp(opts: CreateAppOptions): OpenAPIHono<AppEnv> {
   app.use("*", resolveAuth);
   app.use("*", tenantResolver());
   app.use("*", policyContext);
+  // Signed terminal requests (RFC 9421): verified against the enrolled device on every request, nonces in Redis.
+  app.use("*", deviceAuth({ pool, nonces: deviceNonces(opts.kernelRedis), clock }));
 
   // Rate limits: Redis, FAIL CLOSED (503) and ONLY on these writes; reads never touch the limiter.
   const limited = { redis: opts.kernelRedis, method: "POST" } as const;
+  app.use(
+    "/v1/devices/enroll",
+    rateLimit([{ name: "enroll:ip", ...LIMITS.enrollPerIp, subject: ipOf }], limited),
+  );
   app.use(
     "/v1/auth/sign-in/*",
     rateLimit(

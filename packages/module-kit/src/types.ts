@@ -28,7 +28,17 @@ export interface AppEnv {
     logger: Logger;
     auth: AuthContext;
     tenant: TenantCtx | undefined;
+    /** Set by the kernel when the request carries a valid device signature (RFC 9421); else undefined. */
+    device: DeviceContext | undefined;
   };
+}
+
+/** A terminal that signed this request. Status is read fresh on every request, so a revoke applies at once. */
+export interface DeviceContext {
+  readonly deviceId: string;
+  readonly tenantId: string;
+  readonly branchId: string;
+  readonly status: "pending" | "active" | "suspended" | "revoked" | "blacklisted";
 }
 
 /**

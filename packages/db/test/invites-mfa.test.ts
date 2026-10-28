@@ -67,7 +67,7 @@ const insertInvite = (tx: TxHandle, tenantId: string, email: string) =>
 
 describe("migrations and lint", () => {
   it("registry order matches the migrated schemas; identity is the only global schema", () => {
-    expect(allSchemas).toEqual(["infra", "audit", "identity", "tenancy", "template"]);
+    expect(allSchemas).toEqual(["infra", "audit", "identity", "tenancy", "devices", "template"]);
     expect(globals).toEqual(["identity"]);
   });
 
