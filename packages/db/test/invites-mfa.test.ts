@@ -74,6 +74,7 @@ describe("migrations and lint", () => {
       "tenancy",
       "devices",
       "catalog",
+      "pricing",
       "search",
       "template",
     ]);

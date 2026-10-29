@@ -199,6 +199,30 @@
         "required": ["id", "parentId", "name", "path"],
         "type": "object"
       },
+      "Coupon": {
+        "properties": {
+          "active": {
+            "type": "boolean"
+          },
+          "code": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "maxUses": {
+            "type": ["integer", "null"]
+          },
+          "promotionId": {
+            "type": "string"
+          },
+          "uses": {
+            "type": "integer"
+          }
+        },
+        "required": ["id", "promotionId", "code", "maxUses", "uses", "active"],
+        "type": "object"
+      },
       "CreateCategory": {
         "additionalProperties": false,
         "properties": {
@@ -219,6 +243,24 @@
         "required": ["name"],
         "type": "object"
       },
+      "CreateCoupon": {
+        "properties": {
+          "code": {
+            "pattern": "^[A-Za-z0-9_-]{3,32}$",
+            "type": "string"
+          },
+          "id": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "maxUses": {
+            "minimum": 1,
+            "type": ["integer", "null"]
+          }
+        },
+        "required": ["code"],
+        "type": "object"
+      },
       "CreateEnrollmentCode": {
         "additionalProperties": false,
         "properties": {
@@ -233,6 +275,64 @@
           }
         },
         "required": ["branchId", "name"],
+        "type": "object"
+      },
+      "CreateFee": {
+        "properties": {
+          "active": {
+            "default": true,
+            "type": "boolean"
+          },
+          "id": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "kind": {
+            "enum": ["percent", "amount"],
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 60,
+            "minLength": 1,
+            "type": "string"
+          },
+          "taxCategory": {
+            "pattern": "^(\\*|[a-z0-9_.-]{1,40})$",
+            "type": "string"
+          },
+          "value": {
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": ["name", "kind", "value", "taxCategory"],
+        "type": "object"
+      },
+      "CreateFxRate": {
+        "properties": {
+          "base": {
+            "example": "LKR",
+            "type": "string"
+          },
+          "id": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "quote": {
+            "example": "LKR",
+            "type": "string"
+          },
+          "rate": {
+            "pattern": "^(?!0+(\\.0+)?$)\\d{1,10}(\\.\\d{1,10})?$",
+            "type": "string"
+          },
+          "validFrom": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": ["base", "quote", "rate"],
         "type": "object"
       },
       "CreateImport": {
@@ -254,6 +354,51 @@
           }
         },
         "required": ["fileName", "sizeBytes", "sha256"],
+        "type": "object"
+      },
+      "CreatePriceList": {
+        "properties": {
+          "branchId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": ["string", "null"]
+          },
+          "cashIncrementMinor": {
+            "maximum": 100000,
+            "minimum": 1,
+            "type": ["integer", "null"]
+          },
+          "currency": {
+            "example": "LKR",
+            "type": "string"
+          },
+          "customerGroup": {
+            "maxLength": 60,
+            "minLength": 1,
+            "type": ["string", "null"]
+          },
+          "id": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "type": "string"
+          },
+          "taxRegionId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "validFrom": {
+            "format": "date-time",
+            "type": ["string", "null"]
+          },
+          "validTo": {
+            "format": "date-time",
+            "type": ["string", "null"]
+          }
+        },
+        "required": ["name", "currency", "taxRegionId"],
         "type": "object"
       },
       "CreateProduct": {
@@ -340,6 +485,213 @@
         "required": ["contentType", "sizes"],
         "type": "object"
       },
+      "CreatePromotion": {
+        "properties": {
+          "customerGroups": {
+            "items": {
+              "maxLength": 60,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 20,
+            "minItems": 1,
+            "type": ["array", "null"]
+          },
+          "effect": {
+            "oneOf": [
+              {
+                "properties": {
+                  "bps": {
+                    "maximum": 10000,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "kind": {
+                    "enum": ["percent"],
+                    "type": "string"
+                  }
+                },
+                "required": ["kind", "bps"],
+                "type": "object"
+              },
+              {
+                "properties": {
+                  "amountMinor": {
+                    "maximum": 9007199254740991,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "kind": {
+                    "enum": ["amount"],
+                    "type": "string"
+                  }
+                },
+                "required": ["kind", "amountMinor"],
+                "type": "object"
+              },
+              {
+                "properties": {
+                  "kind": {
+                    "enum": ["fixed-price"],
+                    "type": "string"
+                  },
+                  "unitPriceMinor": {
+                    "maximum": 9007199254740991,
+                    "minimum": 0,
+                    "type": "integer"
+                  }
+                },
+                "required": ["kind", "unitPriceMinor"],
+                "type": "object"
+              },
+              {
+                "properties": {
+                  "buy": {
+                    "maximum": 100,
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "get": {
+                    "maximum": 100,
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "getBps": {
+                    "maximum": 10000,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "kind": {
+                    "enum": ["bxgy"],
+                    "type": "string"
+                  }
+                },
+                "required": ["kind", "buy", "get", "getBps"],
+                "type": "object"
+              },
+              {
+                "properties": {
+                  "components": {
+                    "items": {
+                      "properties": {
+                        "qty": {
+                          "maximum": 100,
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "variantId": {
+                          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                          "type": "string"
+                        }
+                      },
+                      "required": ["variantId", "qty"],
+                      "type": "object"
+                    },
+                    "maxItems": 20,
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "kind": {
+                    "enum": ["bundle"],
+                    "type": "string"
+                  },
+                  "priceMinor": {
+                    "maximum": 9007199254740991,
+                    "minimum": 0,
+                    "type": "integer"
+                  }
+                },
+                "required": ["kind", "components", "priceMinor"],
+                "type": "object"
+              }
+            ]
+          },
+          "endsAt": {
+            "format": "date-time",
+            "type": ["string", "null"]
+          },
+          "id": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "minAmountMinor": {
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "type": ["integer", "null"]
+          },
+          "minQty": {
+            "pattern": "^\\d{1,14}(\\.\\d{1,4})?$",
+            "type": ["string", "null"]
+          },
+          "name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "type": "string"
+          },
+          "priority": {
+            "default": 0,
+            "maximum": 1000,
+            "minimum": -1000,
+            "type": "integer"
+          },
+          "requiresCoupon": {
+            "default": false,
+            "type": "boolean"
+          },
+          "stackable": {
+            "default": true,
+            "type": "boolean"
+          },
+          "startsAt": {
+            "format": "date-time",
+            "type": ["string", "null"]
+          },
+          "target": {
+            "oneOf": [
+              {
+                "properties": {
+                  "kind": {
+                    "enum": ["cart"],
+                    "type": "string"
+                  }
+                },
+                "required": ["kind"],
+                "type": "object"
+              },
+              {
+                "properties": {
+                  "categoryIds": {
+                    "items": {
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                      "type": "string"
+                    },
+                    "maxItems": 500,
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "kind": {
+                    "enum": ["items"],
+                    "type": "string"
+                  },
+                  "variantIds": {
+                    "items": {
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                      "type": "string"
+                    },
+                    "maxItems": 500,
+                    "minItems": 1,
+                    "type": "array"
+                  }
+                },
+                "required": ["kind"],
+                "type": "object"
+              }
+            ]
+          }
+        },
+        "required": ["name", "target", "effect"],
+        "type": "object"
+      },
       "CreateTag": {
         "additionalProperties": false,
         "properties": {
@@ -354,6 +706,79 @@
           }
         },
         "required": ["name"],
+        "type": "object"
+      },
+      "CreateTaxRegion": {
+        "properties": {
+          "code": {
+            "pattern": "^[a-z0-9_.-]{1,32}$",
+            "type": "string"
+          },
+          "id": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "inclusive": {
+            "type": "boolean"
+          },
+          "name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "type": "string"
+          },
+          "roundingMode": {
+            "default": "half-even",
+            "enum": ["half-even", "half-up", "up", "down"],
+            "type": "string"
+          },
+          "rules": {
+            "items": {
+              "properties": {
+                "categories": {
+                  "items": {
+                    "pattern": "^(\\*|[a-z0-9_.-]{1,40})$",
+                    "type": "string"
+                  },
+                  "maxItems": 50,
+                  "minItems": 1,
+                  "type": "array"
+                },
+                "compound": {
+                  "default": false,
+                  "type": "boolean"
+                },
+                "id": {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                  "type": "string"
+                },
+                "name": {
+                  "maxLength": 60,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "order": {
+                  "maximum": 99,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "rateBps": {
+                  "maximum": 100000,
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": ["name", "rateBps", "categories", "order"],
+              "type": "object"
+            },
+            "maxItems": 20,
+            "type": "array"
+          },
+          "strategy": {
+            "enum": ["per-line", "per-document"],
+            "type": "string"
+          }
+        },
+        "required": ["code", "name", "inclusive", "strategy", "rules"],
         "type": "object"
       },
       "CreateUnit": {
@@ -512,6 +937,58 @@
           }
         },
         "required": ["code", "qr", "expiresAt", "branchId", "name"],
+        "type": "object"
+      },
+      "Fee": {
+        "properties": {
+          "active": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": ["percent", "amount"],
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "taxCategory": {
+            "type": "string"
+          },
+          "value": {
+            "type": "integer"
+          },
+          "version": {
+            "type": "integer"
+          }
+        },
+        "required": ["id", "name", "kind", "value", "taxCategory", "active", "version"],
+        "type": "object"
+      },
+      "FxRate": {
+        "properties": {
+          "base": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "quote": {
+            "type": "string"
+          },
+          "rate": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "validFrom": {
+            "type": "string"
+          }
+        },
+        "required": ["id", "base", "quote", "rate", "validFrom", "source"],
         "type": "object"
       },
       "Heartbeat": {
@@ -679,6 +1156,81 @@
         "required": ["userId", "pin"],
         "type": "object"
       },
+      "PriceList": {
+        "properties": {
+          "archived": {
+            "type": "boolean"
+          },
+          "branchId": {
+            "type": ["string", "null"]
+          },
+          "cashIncrementMinor": {
+            "type": ["integer", "null"]
+          },
+          "currency": {
+            "type": "string"
+          },
+          "customerGroup": {
+            "type": ["string", "null"]
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "taxRegionId": {
+            "type": "string"
+          },
+          "validFrom": {
+            "type": ["string", "null"]
+          },
+          "validTo": {
+            "type": ["string", "null"]
+          },
+          "version": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "currency",
+          "taxRegionId",
+          "branchId",
+          "customerGroup",
+          "validFrom",
+          "validTo",
+          "cashIncrementMinor",
+          "version",
+          "archived"
+        ],
+        "type": "object"
+      },
+      "PricePage": {
+        "properties": {
+          "items": {
+            "items": {
+              "properties": {
+                "priceMinor": {
+                  "type": "integer"
+                },
+                "variantId": {
+                  "type": "string"
+                }
+              },
+              "required": ["variantId", "priceMinor"],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "nextCursor": {
+            "type": ["string", "null"]
+          }
+        },
+        "required": ["items", "nextCursor"],
+        "type": "object"
+      },
       "Product": {
         "properties": {
           "archived": {
@@ -819,6 +1371,498 @@
         "required": ["products", "next"],
         "type": "object"
       },
+      "Promotion": {
+        "properties": {
+          "customerGroups": {
+            "items": {
+              "type": "string"
+            },
+            "type": ["array", "null"]
+          },
+          "effect": {
+            "oneOf": [
+              {
+                "properties": {
+                  "bps": {
+                    "maximum": 10000,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "kind": {
+                    "enum": ["percent"],
+                    "type": "string"
+                  }
+                },
+                "required": ["kind", "bps"],
+                "type": "object"
+              },
+              {
+                "properties": {
+                  "amountMinor": {
+                    "maximum": 9007199254740991,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "kind": {
+                    "enum": ["amount"],
+                    "type": "string"
+                  }
+                },
+                "required": ["kind", "amountMinor"],
+                "type": "object"
+              },
+              {
+                "properties": {
+                  "kind": {
+                    "enum": ["fixed-price"],
+                    "type": "string"
+                  },
+                  "unitPriceMinor": {
+                    "maximum": 9007199254740991,
+                    "minimum": 0,
+                    "type": "integer"
+                  }
+                },
+                "required": ["kind", "unitPriceMinor"],
+                "type": "object"
+              },
+              {
+                "properties": {
+                  "buy": {
+                    "maximum": 100,
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "get": {
+                    "maximum": 100,
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "getBps": {
+                    "maximum": 10000,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "kind": {
+                    "enum": ["bxgy"],
+                    "type": "string"
+                  }
+                },
+                "required": ["kind", "buy", "get", "getBps"],
+                "type": "object"
+              },
+              {
+                "properties": {
+                  "components": {
+                    "items": {
+                      "properties": {
+                        "qty": {
+                          "maximum": 100,
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "variantId": {
+                          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                          "type": "string"
+                        }
+                      },
+                      "required": ["variantId", "qty"],
+                      "type": "object"
+                    },
+                    "maxItems": 20,
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "kind": {
+                    "enum": ["bundle"],
+                    "type": "string"
+                  },
+                  "priceMinor": {
+                    "maximum": 9007199254740991,
+                    "minimum": 0,
+                    "type": "integer"
+                  }
+                },
+                "required": ["kind", "components", "priceMinor"],
+                "type": "object"
+              }
+            ]
+          },
+          "endsAt": {
+            "type": ["string", "null"]
+          },
+          "id": {
+            "type": "string"
+          },
+          "minAmountMinor": {
+            "type": ["integer", "null"]
+          },
+          "minQty": {
+            "type": ["string", "null"]
+          },
+          "name": {
+            "type": "string"
+          },
+          "priority": {
+            "type": "integer"
+          },
+          "publishedAt": {
+            "type": ["string", "null"]
+          },
+          "requiresCoupon": {
+            "type": "boolean"
+          },
+          "stackable": {
+            "type": "boolean"
+          },
+          "startsAt": {
+            "type": ["string", "null"]
+          },
+          "status": {
+            "enum": ["draft", "published", "archived"],
+            "type": "string"
+          },
+          "target": {
+            "oneOf": [
+              {
+                "properties": {
+                  "kind": {
+                    "enum": ["cart"],
+                    "type": "string"
+                  }
+                },
+                "required": ["kind"],
+                "type": "object"
+              },
+              {
+                "properties": {
+                  "categoryIds": {
+                    "items": {
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                      "type": "string"
+                    },
+                    "maxItems": 500,
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "kind": {
+                    "enum": ["items"],
+                    "type": "string"
+                  },
+                  "variantIds": {
+                    "items": {
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                      "type": "string"
+                    },
+                    "maxItems": 500,
+                    "minItems": 1,
+                    "type": "array"
+                  }
+                },
+                "required": ["kind"],
+                "type": "object"
+              }
+            ]
+          },
+          "version": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "status",
+          "priority",
+          "stackable",
+          "target",
+          "effect",
+          "requiresCoupon",
+          "customerGroups",
+          "startsAt",
+          "endsAt",
+          "minQty",
+          "minAmountMinor",
+          "version",
+          "publishedAt"
+        ],
+        "type": "object"
+      },
+      "Quote": {
+        "properties": {
+          "cashRoundingMinor": {
+            "type": "integer"
+          },
+          "coupons": {
+            "items": {
+              "properties": {
+                "code": {
+                  "type": "string"
+                },
+                "status": {
+                  "enum": ["applied", "unknown", "inactive", "exhausted"],
+                  "type": "string"
+                }
+              },
+              "required": ["code", "status"],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "discountMinor": {
+            "type": "integer"
+          },
+          "engine": {
+            "type": "string"
+          },
+          "feeMinor": {
+            "type": "integer"
+          },
+          "fees": {
+            "items": {
+              "properties": {
+                "amountMinor": {
+                  "type": "integer"
+                },
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "netMinor": {
+                  "type": "integer"
+                },
+                "taxMinor": {
+                  "type": "integer"
+                },
+                "totalMinor": {
+                  "type": "integer"
+                }
+              },
+              "required": ["id", "name", "amountMinor", "netMinor", "taxMinor", "totalMinor"],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "lines": {
+            "items": {
+              "properties": {
+                "amountMinor": {
+                  "type": "integer"
+                },
+                "baseMinor": {
+                  "type": "integer"
+                },
+                "cartDiscounts": {
+                  "items": {
+                    "properties": {
+                      "amountMinor": {
+                        "type": "integer"
+                      },
+                      "promotionId": {
+                        "type": "string"
+                      }
+                    },
+                    "required": ["promotionId", "amountMinor"],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "id": {
+                  "type": "string"
+                },
+                "lineDiscounts": {
+                  "items": {
+                    "properties": {
+                      "amountMinor": {
+                        "type": "integer"
+                      },
+                      "promotionId": {
+                        "type": "string"
+                      }
+                    },
+                    "required": ["promotionId", "amountMinor"],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "netMinor": {
+                  "type": "integer"
+                },
+                "priceSource": {
+                  "enum": ["override", "batch", "list"],
+                  "type": "string"
+                },
+                "qty": {
+                  "type": "string"
+                },
+                "taxMinor": {
+                  "type": "integer"
+                },
+                "taxes": {
+                  "items": {
+                    "properties": {
+                      "amountMinor": {
+                        "type": "integer"
+                      },
+                      "ruleId": {
+                        "type": "string"
+                      }
+                    },
+                    "required": ["ruleId", "amountMinor"],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "totalMinor": {
+                  "type": "integer"
+                },
+                "unitPriceMinor": {
+                  "type": "integer"
+                },
+                "variantId": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "variantId",
+                "qty",
+                "unitPriceMinor",
+                "priceSource",
+                "baseMinor",
+                "lineDiscounts",
+                "cartDiscounts",
+                "amountMinor",
+                "netMinor",
+                "taxMinor",
+                "taxes",
+                "totalMinor"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "payableMinor": {
+            "type": "integer"
+          },
+          "priceListId": {
+            "type": "string"
+          },
+          "subtotalMinor": {
+            "type": "integer"
+          },
+          "taxMinor": {
+            "type": "integer"
+          },
+          "taxes": {
+            "items": {
+              "properties": {
+                "amountMinor": {
+                  "type": "integer"
+                },
+                "baseMinor": {
+                  "type": "integer"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "rateBps": {
+                  "type": "integer"
+                },
+                "ruleId": {
+                  "type": "string"
+                }
+              },
+              "required": ["ruleId", "name", "rateBps", "baseMinor", "amountMinor"],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "totalMinor": {
+            "type": "integer"
+          },
+          "trace": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "engine",
+          "currency",
+          "priceListId",
+          "lines",
+          "fees",
+          "taxes",
+          "subtotalMinor",
+          "discountMinor",
+          "feeMinor",
+          "taxMinor",
+          "totalMinor",
+          "cashRoundingMinor",
+          "payableMinor",
+          "trace",
+          "coupons"
+        ],
+        "type": "object"
+      },
+      "QuoteRequest": {
+        "properties": {
+          "coupons": {
+            "items": {
+              "maxLength": 32,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 10,
+            "type": "array"
+          },
+          "customerGroup": {
+            "maxLength": 60,
+            "minLength": 1,
+            "type": "string"
+          },
+          "lines": {
+            "items": {
+              "properties": {
+                "id": {
+                  "maxLength": 64,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "priceOverrideMinor": {
+                  "maximum": 9007199254740991,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "qty": {
+                  "pattern": "^\\d{1,14}(\\.\\d{1,4})?$",
+                  "type": "string"
+                },
+                "variantId": {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                  "type": "string"
+                }
+              },
+              "required": ["id", "variantId", "qty"],
+              "type": "object"
+            },
+            "maxItems": 500,
+            "type": "array"
+          },
+          "priceListId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          }
+        },
+        "required": ["priceListId", "lines"],
+        "type": "object"
+      },
       "SearchHit": {
         "properties": {
           "barcodes": {
@@ -872,6 +1916,36 @@
         "required": ["pin"],
         "type": "object"
       },
+      "SetPrices": {
+        "properties": {
+          "prices": {
+            "items": {
+              "properties": {
+                "priceMinor": {
+                  "maximum": 9007199254740991,
+                  "minimum": 0,
+                  "type": ["integer", "null"]
+                },
+                "variantId": {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                  "type": "string"
+                }
+              },
+              "required": ["variantId", "priceMinor"],
+              "type": "object"
+            },
+            "maxItems": 1000,
+            "minItems": 1,
+            "type": "array"
+          },
+          "version": {
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": ["version", "prices"],
+        "type": "object"
+      },
       "Tag": {
         "properties": {
           "id": {
@@ -882,6 +1956,85 @@
           }
         },
         "required": ["id", "name"],
+        "type": "object"
+      },
+      "TaxRegion": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "inclusive": {
+            "type": "boolean"
+          },
+          "name": {
+            "type": "string"
+          },
+          "roundingMode": {
+            "enum": ["half-even", "half-up", "up", "down"],
+            "type": "string"
+          },
+          "rules": {
+            "items": {
+              "properties": {
+                "categories": {
+                  "items": {
+                    "pattern": "^(\\*|[a-z0-9_.-]{1,40})$",
+                    "type": "string"
+                  },
+                  "maxItems": 50,
+                  "minItems": 1,
+                  "type": "array"
+                },
+                "compound": {
+                  "default": false,
+                  "type": "boolean"
+                },
+                "id": {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                  "type": "string"
+                },
+                "name": {
+                  "maxLength": 60,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "order": {
+                  "maximum": 99,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "rateBps": {
+                  "maximum": 100000,
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": ["id", "name", "rateBps", "categories", "order"],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "strategy": {
+            "enum": ["per-line", "per-document"],
+            "type": "string"
+          },
+          "version": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "inclusive",
+          "strategy",
+          "roundingMode",
+          "version",
+          "rules"
+        ],
         "type": "object"
       },
       "TemplateChild": {
@@ -1749,6 +2902,81 @@
         },
         "type": "object"
       },
+      "UpdateFee": {
+        "properties": {
+          "active": {
+            "type": "boolean"
+          },
+          "kind": {
+            "enum": ["percent", "amount"],
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 60,
+            "minLength": 1,
+            "type": "string"
+          },
+          "taxCategory": {
+            "pattern": "^(\\*|[a-z0-9_.-]{1,40})$",
+            "type": "string"
+          },
+          "value": {
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "version": {
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": ["version"],
+        "type": "object"
+      },
+      "UpdatePriceList": {
+        "properties": {
+          "archived": {
+            "type": "boolean"
+          },
+          "branchId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": ["string", "null"]
+          },
+          "cashIncrementMinor": {
+            "maximum": 100000,
+            "minimum": 1,
+            "type": ["integer", "null"]
+          },
+          "customerGroup": {
+            "maxLength": 60,
+            "minLength": 1,
+            "type": ["string", "null"]
+          },
+          "name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "type": "string"
+          },
+          "taxRegionId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "validFrom": {
+            "format": "date-time",
+            "type": ["string", "null"]
+          },
+          "validTo": {
+            "format": "date-time",
+            "type": ["string", "null"]
+          },
+          "version": {
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": ["version"],
+        "type": "object"
+      },
       "UpdateProduct": {
         "additionalProperties": false,
         "properties": {
@@ -1782,6 +3010,279 @@
           }
         },
         "required": ["version"],
+        "type": "object"
+      },
+      "UpdatePromotion": {
+        "properties": {
+          "customerGroups": {
+            "items": {
+              "maxLength": 60,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 20,
+            "minItems": 1,
+            "type": ["array", "null"]
+          },
+          "effect": {
+            "oneOf": [
+              {
+                "properties": {
+                  "bps": {
+                    "maximum": 10000,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "kind": {
+                    "enum": ["percent"],
+                    "type": "string"
+                  }
+                },
+                "required": ["kind", "bps"],
+                "type": "object"
+              },
+              {
+                "properties": {
+                  "amountMinor": {
+                    "maximum": 9007199254740991,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "kind": {
+                    "enum": ["amount"],
+                    "type": "string"
+                  }
+                },
+                "required": ["kind", "amountMinor"],
+                "type": "object"
+              },
+              {
+                "properties": {
+                  "kind": {
+                    "enum": ["fixed-price"],
+                    "type": "string"
+                  },
+                  "unitPriceMinor": {
+                    "maximum": 9007199254740991,
+                    "minimum": 0,
+                    "type": "integer"
+                  }
+                },
+                "required": ["kind", "unitPriceMinor"],
+                "type": "object"
+              },
+              {
+                "properties": {
+                  "buy": {
+                    "maximum": 100,
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "get": {
+                    "maximum": 100,
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "getBps": {
+                    "maximum": 10000,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "kind": {
+                    "enum": ["bxgy"],
+                    "type": "string"
+                  }
+                },
+                "required": ["kind", "buy", "get", "getBps"],
+                "type": "object"
+              },
+              {
+                "properties": {
+                  "components": {
+                    "items": {
+                      "properties": {
+                        "qty": {
+                          "maximum": 100,
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "variantId": {
+                          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                          "type": "string"
+                        }
+                      },
+                      "required": ["variantId", "qty"],
+                      "type": "object"
+                    },
+                    "maxItems": 20,
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "kind": {
+                    "enum": ["bundle"],
+                    "type": "string"
+                  },
+                  "priceMinor": {
+                    "maximum": 9007199254740991,
+                    "minimum": 0,
+                    "type": "integer"
+                  }
+                },
+                "required": ["kind", "components", "priceMinor"],
+                "type": "object"
+              }
+            ]
+          },
+          "endsAt": {
+            "format": "date-time",
+            "type": ["string", "null"]
+          },
+          "minAmountMinor": {
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "type": ["integer", "null"]
+          },
+          "minQty": {
+            "pattern": "^\\d{1,14}(\\.\\d{1,4})?$",
+            "type": ["string", "null"]
+          },
+          "name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "type": "string"
+          },
+          "priority": {
+            "maximum": 1000,
+            "minimum": -1000,
+            "type": "integer"
+          },
+          "requiresCoupon": {
+            "type": "boolean"
+          },
+          "stackable": {
+            "type": "boolean"
+          },
+          "startsAt": {
+            "format": "date-time",
+            "type": ["string", "null"]
+          },
+          "target": {
+            "oneOf": [
+              {
+                "properties": {
+                  "kind": {
+                    "enum": ["cart"],
+                    "type": "string"
+                  }
+                },
+                "required": ["kind"],
+                "type": "object"
+              },
+              {
+                "properties": {
+                  "categoryIds": {
+                    "items": {
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                      "type": "string"
+                    },
+                    "maxItems": 500,
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "kind": {
+                    "enum": ["items"],
+                    "type": "string"
+                  },
+                  "variantIds": {
+                    "items": {
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                      "type": "string"
+                    },
+                    "maxItems": 500,
+                    "minItems": 1,
+                    "type": "array"
+                  }
+                },
+                "required": ["kind"],
+                "type": "object"
+              }
+            ]
+          },
+          "version": {
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": ["version"],
+        "type": "object"
+      },
+      "UpdateTaxRegion": {
+        "properties": {
+          "inclusive": {
+            "type": "boolean"
+          },
+          "name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "type": "string"
+          },
+          "roundingMode": {
+            "default": "half-even",
+            "enum": ["half-even", "half-up", "up", "down"],
+            "type": "string"
+          },
+          "rules": {
+            "items": {
+              "properties": {
+                "categories": {
+                  "items": {
+                    "pattern": "^(\\*|[a-z0-9_.-]{1,40})$",
+                    "type": "string"
+                  },
+                  "maxItems": 50,
+                  "minItems": 1,
+                  "type": "array"
+                },
+                "compound": {
+                  "default": false,
+                  "type": "boolean"
+                },
+                "id": {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                  "type": "string"
+                },
+                "name": {
+                  "maxLength": 60,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "order": {
+                  "maximum": 99,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "rateBps": {
+                  "maximum": 100000,
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": ["name", "rateBps", "categories", "order"],
+              "type": "object"
+            },
+            "maxItems": 20,
+            "type": "array"
+          },
+          "strategy": {
+            "enum": ["per-line", "per-document"],
+            "type": "string"
+          },
+          "version": {
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": ["name", "inclusive", "strategy", "rules", "version"],
         "type": "object"
       },
       "UpdateVariant": {
@@ -1951,6 +3452,16 @@
           }
         },
         "required": ["sku", "name"],
+        "type": "object"
+      },
+      "Version": {
+        "properties": {
+          "version": {
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": ["version"],
         "type": "object"
       }
     }
@@ -3293,6 +4804,792 @@
         },
         "summary": "Rename, move, suspend, reactivate, revoke or blacklist a terminal",
         "tags": ["devices"]
+      }
+    },
+    "/v1/pricing/fees": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "fees": {
+                      "items": {
+                        "$ref": "#/components/schemas/Fee"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": ["fees"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Fees (service charge, bag fee…)",
+        "tags": ["pricing"]
+      },
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateFee"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Fee"
+                }
+              }
+            },
+            "description": "Created"
+          }
+        },
+        "summary": "Create a fee",
+        "tags": ["pricing"]
+      }
+    },
+    "/v1/pricing/fees/{id}": {
+      "patch": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateFee"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Fee"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Edit or deactivate a fee (optimistic lock on version)",
+        "tags": ["pricing"]
+      }
+    },
+    "/v1/pricing/fx-rates": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "fxRates": {
+                      "items": {
+                        "$ref": "#/components/schemas/FxRate"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": ["fxRates"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "FX rates in force now (latest per pair)",
+        "tags": ["pricing"]
+      },
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateFxRate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FxRate"
+                }
+              }
+            },
+            "description": "Created"
+          }
+        },
+        "summary": "Record an FX rate (append-only; 1 base = rate quote)",
+        "tags": ["pricing"]
+      }
+    },
+    "/v1/pricing/price-lists": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "priceLists": {
+                      "items": {
+                        "$ref": "#/components/schemas/PriceList"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": ["priceLists"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Price lists (archived last)",
+        "tags": ["pricing"]
+      },
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePriceList"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PriceList"
+                }
+              }
+            },
+            "description": "Created"
+          }
+        },
+        "summary": "Create a price list (currency, tax region, optional branch, customer group and validity)",
+        "tags": ["pricing"]
+      }
+    },
+    "/v1/pricing/price-lists/{id}": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PriceList"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "One price list",
+        "tags": ["pricing"]
+      },
+      "patch": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePriceList"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PriceList"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Edit, archive or restore a price list (optimistic lock on version)",
+        "tags": ["pricing"]
+      }
+    },
+    "/v1/pricing/price-lists/{id}/prices": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "after",
+            "required": false,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "maximum": 500,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PricePage"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Prices of a list (keyset pages by variant id)",
+        "tags": ["pricing"]
+      },
+      "put": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetPrices"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "changed": {
+                      "type": "integer"
+                    },
+                    "priceListId": {
+                      "type": "string"
+                    },
+                    "version": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": ["priceListId", "version", "changed"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Set or remove (null) up to 1000 prices; bumps the list version once",
+        "tags": ["pricing"]
+      }
+    },
+    "/v1/pricing/promotions": {
+      "get": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "after",
+            "required": false,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "maximum": 500,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "enum": ["draft", "published", "archived"],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "items": {
+                      "items": {
+                        "$ref": "#/components/schemas/Promotion"
+                      },
+                      "type": "array"
+                    },
+                    "nextCursor": {
+                      "type": ["string", "null"]
+                    }
+                  },
+                  "required": ["items", "nextCursor"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Promotions (keyset pages; filter by status)",
+        "tags": ["pricing"]
+      },
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePromotion"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Promotion"
+                }
+              }
+            },
+            "description": "Created"
+          }
+        },
+        "summary": "Create a draft promotion",
+        "tags": ["pricing"]
+      }
+    },
+    "/v1/pricing/promotions/{id}": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Promotion"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "One promotion",
+        "tags": ["pricing"]
+      },
+      "patch": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePromotion"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Promotion"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Edit a draft promotion (optimistic lock on version)",
+        "tags": ["pricing"]
+      }
+    },
+    "/v1/pricing/promotions/{id}/archive": {
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Version"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Promotion"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Archive a promotion (stops applying everywhere)",
+        "tags": ["pricing"]
+      }
+    },
+    "/v1/pricing/promotions/{id}/coupons": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "coupons": {
+                      "items": {
+                        "$ref": "#/components/schemas/Coupon"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": ["coupons"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Coupon codes of a promotion",
+        "tags": ["pricing"]
+      },
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCoupon"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Coupon"
+                }
+              }
+            },
+            "description": "Created"
+          }
+        },
+        "summary": "Add a coupon code (unique per business, case-insensitive; optional max uses)",
+        "tags": ["pricing"]
+      }
+    },
+    "/v1/pricing/promotions/{id}/publish": {
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Version"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Promotion"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Publish a draft (immutable from here; devices receive it)",
+        "tags": ["pricing"]
+      }
+    },
+    "/v1/pricing/quote": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuoteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Quote"
+                }
+              }
+            },
+            "description": "Priced cart"
+          }
+        },
+        "summary": "Price a cart server-side with the device engine (read-only; coupons checked, uses not counted)",
+        "tags": ["pricing"]
+      }
+    },
+    "/v1/pricing/tax-regions": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "taxRegions": {
+                      "items": {
+                        "$ref": "#/components/schemas/TaxRegion"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": ["taxRegions"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Tax regions with their rules",
+        "tags": ["pricing"]
+      },
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTaxRegion"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaxRegion"
+                }
+              }
+            },
+            "description": "Created"
+          }
+        },
+        "summary": "Create a tax region (inclusive or exclusive, per-line or per-document rounding) with its rules",
+        "tags": ["pricing"]
+      }
+    },
+    "/v1/pricing/tax-regions/{id}": {
+      "put": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateTaxRegion"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaxRegion"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Replace a region's settings and rule set (optimistic lock on version)",
+        "tags": ["pricing"]
       }
     },
     "/v1/search/variants": {

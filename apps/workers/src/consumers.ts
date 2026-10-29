@@ -1,5 +1,6 @@
 import { uuidv7 } from "@wise-biz/ids";
 import { createImportConsumer } from "@wise-biz/module-catalog";
+import { createPricingFactsConsumer } from "@wise-biz/module-pricing";
 import { createSearchProjectionConsumer } from "@wise-biz/module-search";
 import { createInviteEmailConsumer } from "@wise-biz/module-tenancy";
 
@@ -29,6 +30,7 @@ export function createConsumers(deps: ConsumerDeps): readonly ConsumerDefinition
   return [
     createInviteEmailConsumer(deps),
     createSearchProjectionConsumer(),
+    createPricingFactsConsumer(),
     createImportConsumer(
       {
         pool: deps.imports.pool,

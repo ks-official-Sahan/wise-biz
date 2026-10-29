@@ -1,4 +1,14 @@
 {
-  "modules": ["infra", "audit", "identity", "tenancy", "devices", "catalog", "search", "_template"],
+  "modules": [
+    "infra",
+    "audit",
+    "identity",
+    "tenancy",
+    "devices",
+    "catalog",
+    "pricing",
+    "search",
+    "_template"
+  ],
   "global": ["identity"]
 }
