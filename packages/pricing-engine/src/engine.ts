@@ -90,6 +90,39 @@ interface State {
   locked: boolean;
 }
 
+const int = (v: number, min: number, max = Number.MAX_SAFE_INTEGER) =>
+  Number.isSafeInteger(v) && v >= min && v <= max;
+
+/** Rejects effect and fee values the arithmetic cannot take (NaN, fractions, negatives) before any pricing runs. */
+function validate(input: PricingInput): void {
+  const bad = (what: string) => {
+    throw new PricingError("BAD_INPUT", what);
+  };
+  for (const p of input.promotions ?? []) {
+    const e = p.effect;
+    const ok =
+      e.kind === "percent"
+        ? int(e.bps, 0, UNIT)
+        : e.kind === "amount"
+          ? int(e.amountMinor, 0)
+          : e.kind === "fixed-price"
+            ? int(e.unitPriceMinor, 0)
+            : e.kind === "bxgy"
+              ? int(e.buy, 1) && int(e.get, 1) && int(e.getBps, 0, UNIT)
+              : int(e.priceMinor, 0) &&
+                e.components.length > 0 &&
+                e.components.every((c) => int(c.qty, 1)) &&
+                new Set(e.components.map((c) => c.variantId)).size === e.components.length;
+    if (!ok) bad(`promotion ${p.id}: bad ${e.kind} effect`);
+    if (p.minAmountMinor !== undefined && !int(p.minAmountMinor, 0))
+      bad(`promotion ${p.id}: bad minAmountMinor`);
+  }
+  for (const f of input.fees ?? []) {
+    if (!int(f.value, 0, f.kind === "percent" ? UNIT : Number.MAX_SAFE_INTEGER))
+      bad(`fee ${f.id}: bad value`);
+  }
+}
+
 const byPriority = (a: Promotion, b: Promotion) =>
   b.priority - a.priority || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
 
@@ -178,6 +211,7 @@ function itemDiscounts(
 
 /** Prices a cart. Pure and deterministic: same input, byte-identical output on every device and the server. */
 export function priceCart(input: PricingInput, cache?: Map<string, LineBase>): PricedCart {
+  validate(input);
   const mode = input.rounding?.mode ?? "half-even";
   const currency = input.priceList.currency;
   const trace: string[] = [];
@@ -238,7 +272,8 @@ export function priceCart(input: PricingInput, cache?: Map<string, LineBase>): P
     if (p.target.kind !== "cart" || (p.effect.kind !== "percent" && p.effect.kind !== "amount"))
       continue;
     if (!p.stackable && cartApplied) continue;
-    const open = state.filter((s) => !s.locked && s.remaining > 0);
+    // Same rule as items: a non-stackable promotion skips lines an earlier promotion touched.
+    const open = state.filter((s) => !s.locked && s.remaining > 0 && (p.stackable || !s.touched));
     const pool = open.reduce((a, s) => a + s.remaining, 0);
     if (pool === 0 || (p.minAmountMinor !== undefined && pool < p.minAmountMinor)) continue;
     const want =
@@ -343,8 +378,10 @@ export function createPricer(): (input: PricingInput) => PricedCart {
   let listId = "";
   let cache = new Map<string, LineBase>();
   return (input) => {
-    if (input.priceList.id !== listId || cache.size > 5000) {
-      listId = input.priceList.id;
+    // Line bases are rounded with the cart's mode, so a mode change is a new snapshot too.
+    const id = `${input.priceList.id}|${input.rounding?.mode ?? "half-even"}`;
+    if (id !== listId || cache.size > 5000) {
+      listId = id;
       cache = new Map();
     }
     return priceCart(input, cache);

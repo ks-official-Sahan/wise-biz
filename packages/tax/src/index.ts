@@ -239,6 +239,12 @@ export function applyTax(
   policy: TaxPolicy,
 ): TaxResult {
   const order = check(policy);
+  for (const l of lines) {
+    if (!Number.isSafeInteger(l.amountMinor))
+      throw new TaxPolicyError(
+        `line amount ${String(l.amountMinor)} must be an integer (minor units)`,
+      );
+  }
   const mode = policy.mode ?? "half-even";
   const input = lines.map((l) => ({
     amount: l.amountMinor,

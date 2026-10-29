@@ -316,5 +316,84 @@ describe("edges", () => {
     const a = pricer(base);
     const b = pricer({ ...base, priceList: { id: "pl2", currency: "USD", prices: { a: 200 } } });
     expect([a.totalMinor, b.totalMinor]).toEqual([100, 200]);
+    // A rounding-mode change invalidates the cached bases too.
+    const third = { ...base, lines: [{ ...base.lines[0], qty: "0.005" } as CartLine] };
+    const up = pricer({ ...third, rounding: { mode: "half-up" } });
+    const even = pricer({ ...third, rounding: { mode: "half-even" } });
+    expect([up.totalMinor, even.totalMinor]).toEqual([1, 0]);
+  });
+
+  it("rejects effect and fee values the arithmetic cannot take", () => {
+    const promo = (effect: Promotion["effect"]): Promotion => ({
+      id: "p",
+      name: "P",
+      priority: 1,
+      stackable: true,
+      target: { kind: "items" },
+      effect,
+    });
+    const bad: Promotion["effect"][] = [
+      { kind: "percent", bps: -1 },
+      { kind: "percent", bps: 10_001 },
+      { kind: "amount", amountMinor: 1.5 },
+      { kind: "fixed-price", unitPriceMinor: Number.NaN },
+      { kind: "bxgy", buy: 0, get: 0, getBps: 10_000 },
+      { kind: "bxgy", buy: 2, get: 1, getBps: 20_000 },
+      { kind: "bundle", components: [{ variantId: "a", qty: 0 }], priceMinor: 1 },
+      {
+        kind: "bundle",
+        components: [
+          { variantId: "a", qty: 1 },
+          { variantId: "a", qty: 1 },
+        ],
+        priceMinor: 1,
+      },
+      { kind: "bundle", components: [], priceMinor: 1 },
+    ];
+    for (const e of bad) {
+      expect(() => priceCart({ ...base, promotions: [promo(e)] })).toThrow(/bad .* effect/);
+    }
+    expect(() =>
+      priceCart({
+        ...base,
+        promotions: [{ ...promo({ kind: "percent", bps: 1 }), minAmountMinor: -1 }],
+      }),
+    ).toThrow(/minAmountMinor/);
+    expect(() =>
+      priceCart({
+        ...base,
+        fees: [{ id: "f", name: "F", kind: "amount", value: 0.5, taxCategory: "standard" }],
+      }),
+    ).toThrow(/fee f: bad value/);
+  });
+
+  it("a non-stackable cart promotion skips lines an item promotion touched", () => {
+    const r = priceCart({
+      ...base,
+      lines: [
+        ...base.lines,
+        { id: "y", variantId: "b", categoryIds: [], taxCategory: "s", qty: "1" },
+      ],
+      priceList: { id: "pl", currency: "USD", prices: { a: 100, b: 100 } },
+      promotions: [
+        {
+          id: "i",
+          name: "I",
+          priority: 5,
+          stackable: true,
+          target: { kind: "items", variantIds: ["a"] },
+          effect: { kind: "percent", bps: 1000 },
+        },
+        {
+          id: "c",
+          name: "C",
+          priority: 1,
+          stackable: false,
+          target: { kind: "cart" },
+          effect: { kind: "percent", bps: 5000 },
+        },
+      ],
+    });
+    expect(r.lines.map((l) => l.amountMinor)).toEqual([90, 50]);
   });
 });

@@ -106,6 +106,7 @@ describe("hand-worked", () => {
   it("rejects bad policies", () => {
     expect(() => applyTax("USD", [line(1)], policy([vat(-1)]))).toThrow(TaxPolicyError);
     expect(() => applyTax("USD", [line(1)], policy([vat(100_001)]))).toThrow(TaxPolicyError);
+    expect(() => applyTax("USD", [line(1.5)], policy([vat(100)]))).toThrow(/must be an integer/);
     expect(() => applyTax("USD", [line(1)], policy([vat(1), vat(2)]))).toThrow(TaxPolicyError);
   });
 });
