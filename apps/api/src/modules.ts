@@ -1,6 +1,7 @@
 import { createAuditModule } from "@wise-biz/module-audit";
 import { createCatalogModule } from "@wise-biz/module-catalog";
 import { createDevicesModule } from "@wise-biz/module-devices";
+import { createSearchModule } from "@wise-biz/module-search";
 import { templateModule } from "@wise-biz/module-template";
 import { createTenancyModule } from "@wise-biz/module-tenancy";
 
@@ -31,6 +32,7 @@ export function createModules(
       pin: { pepper: new TextEncoder().encode(devices.pinPepper), isActiveMember },
     }),
     createCatalogModule(),
+    createSearchModule(),
     templateModule,
   ];
 }

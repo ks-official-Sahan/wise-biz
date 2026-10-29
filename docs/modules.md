@@ -25,7 +25,7 @@ Each module: owns a Postgres schema, exposes contracts in `@wise-biz/contracts/<
 | **media** | Wraps media-kit; per-tenant folders, variants for offline cache | media_assets, media_usage | `media.asset.*` | — | P1 |
 | **theming** | Theme tokens, fonts, receipt templates, letterheads, card templates | themes, fonts, receipt_templates, letterheads | `theming.theme.published` | — | P1 |
 | **support** | Tickets, platform announcements | tickets, ticket_messages | `support.*` | — | P2 |
-| **search** | Hybrid search index projection | search_documents (FTS + trigram + vector) | — | `catalog.*`, `customers.*` | P1 |
+| **search** | Hybrid search projection (ADR 0007): `simple` FTS with prefix tsquery + trigram KNN (GiST, word-similarity distance) on a punctuation-free `norm`, fused by reciprocal rank; `GET /v1/search/variants` (catalog:read) | search_documents (FTS + trigram + nullable vector) | — | `catalog.variant.upserted` (consumer `search.catalog-projection` in the workers; `customers.*` later) | P1 |
 | **shortlinks** | URL shortening for receipts, payment links, campaigns (edge) | short_links | — | — | P1 |
 
 ## Dependency rules

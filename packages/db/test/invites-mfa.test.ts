@@ -74,6 +74,7 @@ describe("migrations and lint", () => {
       "tenancy",
       "devices",
       "catalog",
+      "search",
       "template",
     ]);
     expect(globals).toEqual(["identity"]);

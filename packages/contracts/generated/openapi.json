@@ -621,6 +621,33 @@
         "required": ["products", "next"],
         "type": "object"
       },
+      "SearchHit": {
+        "properties": {
+          "barcodes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "productId": {
+            "type": "string"
+          },
+          "score": {
+            "type": "number"
+          },
+          "sku": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "variantId": {
+            "type": "string"
+          }
+        },
+        "required": ["variantId", "productId", "title", "sku", "barcodes", "score"],
+        "type": "object"
+      },
       "SetBarcodes": {
         "additionalProperties": false,
         "properties": {
@@ -2857,6 +2884,55 @@
         },
         "summary": "Rename, move, suspend, reactivate, revoke or blacklist a terminal",
         "tags": ["devices"]
+      }
+    },
+    "/v1/search/variants": {
+      "get": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "required": true,
+            "schema": {
+              "maxLength": 100,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "maximum": 50,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "hits": {
+                      "items": {
+                        "$ref": "#/components/schemas/SearchHit"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": ["hits"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Best matches first"
+          }
+        },
+        "summary": "Hybrid search (full text + typo-tolerant trigram, reciprocal rank fusion) over sellable variants",
+        "tags": ["search"]
       }
     },
     "/v1/template/items": {

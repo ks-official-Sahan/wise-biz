@@ -1,4 +1,4 @@
 {
-  "modules": ["infra", "audit", "identity", "tenancy", "devices", "catalog", "_template"],
+  "modules": ["infra", "audit", "identity", "tenancy", "devices", "catalog", "search", "_template"],
   "global": ["identity"]
 }

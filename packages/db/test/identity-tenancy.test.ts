@@ -75,6 +75,7 @@ describe("registry + migrations", () => {
       "tenancy",
       "devices",
       "catalog",
+      "search",
       "template",
     ]);
     expect(globals).toEqual(["identity"]);

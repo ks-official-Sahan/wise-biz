@@ -1,3 +1,4 @@
+import { createSearchProjectionConsumer } from "@wise-biz/module-search";
 import { createInviteEmailConsumer } from "@wise-biz/module-tenancy";
 
 import type { ConsumerDefinition } from "@wise-biz/events";
@@ -16,5 +17,5 @@ export interface ConsumerDeps {
  */
 export function createConsumers(deps: ConsumerDeps): readonly ConsumerDefinition[] {
   // Structural match: the module's consumer is a plain object with the ConsumerDefinition shape.
-  return [createInviteEmailConsumer(deps)];
+  return [createInviteEmailConsumer(deps), createSearchProjectionConsumer()];
 }

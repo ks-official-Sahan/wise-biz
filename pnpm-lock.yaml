@@ -259,6 +259,9 @@ importers:
       '@wise-biz/module-kit':
         specifier: workspace:*
         version: link:../../packages/module-kit
+      '@wise-biz/module-search':
+        specifier: workspace:*
+        version: link:../../modules/search
       '@wise-biz/module-template':
         specifier: workspace:*
         version: link:../../modules/_template
@@ -451,6 +454,9 @@ importers:
       '@wise-biz/module-audit':
         specifier: workspace:*
         version: link:../../modules/audit
+      '@wise-biz/module-search':
+        specifier: workspace:*
+        version: link:../../modules/search
       '@wise-biz/module-tenancy':
         specifier: workspace:*
         version: link:../../modules/tenancy
@@ -846,6 +852,9 @@ importers:
       '@wise-biz/config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@wise-biz/module-catalog':
+        specifier: workspace:*
+        version: link:../catalog
       '@wise-biz/testing':
         specifier: workspace:*
         version: link:../../packages/testing

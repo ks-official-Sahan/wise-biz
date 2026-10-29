@@ -34,6 +34,7 @@
     "@wise-biz/module-devices": "workspace:*",
     "@wise-biz/module-identity": "workspace:*",
     "@wise-biz/module-kit": "workspace:*",
+    "@wise-biz/module-search": "workspace:*",
     "@wise-biz/module-template": "workspace:*",
     "@wise-biz/module-tenancy": "workspace:*",
     "@wise-biz/policy": "workspace:*",

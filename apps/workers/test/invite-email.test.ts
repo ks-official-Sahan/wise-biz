@@ -41,8 +41,11 @@ describe("invite email consumer (workers wiring)", () => {
     expect(mailer.sent).toHaveLength(1);
     const link = new URL(/http:\/\/\S+/.exec(mailer.sent[0]?.text ?? "")?.[0] ?? "");
     expect(link.origin + link.pathname).toBe(`${CONSOLE}/invite/accept`);
-    expect(link.searchParams.get("t")).toBe(tenantId);
-    const token = link.searchParams.get("k") ?? "";
+    // Params ride in the fragment (never sent to servers or logs).
+    expect(link.search).toBe("");
+    const params = new URLSearchParams(link.hash.slice(1));
+    expect(params.get("t")).toBe(tenantId);
+    const token = params.get("k") ?? "";
     expect(inviteTokenMatches(SECRET, tenantId, inviteId, token)).toBe(true);
     expect(token).toBe(inviteToken(SECRET, tenantId, inviteId));
   });
