@@ -36,6 +36,8 @@ export const VariantUpsertedV1 = defineEvent(
     taxCategory: z.string(),
     tracksBatches: z.boolean(),
     categoryPath: names,
+    /** Category ids root..leaf (promotions target categories by id; pricing keeps them per variant). */
+    categoryIds: names,
     tags: names,
     archived: z.boolean(),
   }),

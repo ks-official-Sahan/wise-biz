@@ -382,7 +382,7 @@ describe("list", () => {
       // The move re-emitted the product's variants with the new category path (search stays fresh).
       const scope = tenantId;
       const r = await admin.query<{
-        payload: { data: { productId: string; categoryPath: string[] } };
+        payload: { data: { productId: string; categoryPath: string[]; categoryIds: string[] } };
       }>(
         "select payload from infra.outbox where tenant_id = $1 and type = 'catalog.variant.upserted' order by id desc limit 1",
         [scope],
@@ -390,6 +390,7 @@ describe("list", () => {
       expect(r.rows[0]?.payload.data).toMatchObject({
         productId: p.id,
         categoryPath: ["Drinks", "Soda"],
+        categoryIds: [drinks.id, soda.id],
       });
 
       const tag = await json<{ id: string }>(

@@ -27,6 +27,7 @@ interface Snapshot {
   name: string;
   categoryId: string | null;
   categoryPath: string[];
+  categoryIds: string[];
   tags: string[];
   archived: boolean;
   variants: (VariantRow & { barcodes: string[] })[];
@@ -48,6 +49,7 @@ async function snapshots(
     category_id: string | null;
     archived: boolean;
     category_path: string[];
+    category_ids: string[];
     tags: string[];
   }>(
     `select p.id, p.name, p.category_id, p.archived_at is not null as archived,
@@ -55,6 +57,8 @@ async function snapshots(
                  from catalog.categories leaf
                  join catalog.categories c on c.tenant_id = leaf.tenant_id and c.id = any(leaf.path)
                  where leaf.tenant_id = p.tenant_id and leaf.id = p.category_id), '{}') as category_path,
+       coalesce((select leaf.path::text[] from catalog.categories leaf
+                 where leaf.tenant_id = p.tenant_id and leaf.id = p.category_id), '{}') as category_ids,
        coalesce((select array_agg(t.name order by lower(t.name))
                  from catalog.product_tags pt join catalog.tags t on t.tenant_id = pt.tenant_id and t.id = pt.tag_id
                  where pt.tenant_id = p.tenant_id and pt.product_id = p.id), '{}') as tags
@@ -80,6 +84,7 @@ async function snapshots(
     name: row.name,
     categoryId: row.category_id,
     categoryPath: row.category_path,
+    categoryIds: row.category_ids,
     tags: row.tags,
     archived: row.archived,
     variants: byProduct.get(row.id) ?? [],
@@ -130,6 +135,7 @@ const variantEvents = (
         taxCategory: v.tax_category,
         tracksBatches: v.tracks_batches,
         categoryPath: s.categoryPath,
+        categoryIds: s.categoryIds,
         tags: s.tags,
         archived: v.archived || s.archived,
       }),
