@@ -38,6 +38,7 @@
     "@wise-biz/module-template": "workspace:*",
     "@wise-biz/module-tenancy": "workspace:*",
     "@wise-biz/policy": "workspace:*",
+    "@wise-biz/storage": "workspace:*",
     "hono": "4.13.13",
     "pg": "8.23.1",
     "pino": "10.4.0",

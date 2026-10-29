@@ -235,6 +235,27 @@
         "required": ["branchId", "name"],
         "type": "object"
       },
+      "CreateImport": {
+        "additionalProperties": false,
+        "properties": {
+          "fileName": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "sizeBytes": {
+            "maximum": 20971520,
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": ["fileName", "sizeBytes", "sha256"],
+        "type": "object"
+      },
       "CreateProduct": {
         "additionalProperties": false,
         "properties": {
@@ -494,6 +515,93 @@
           }
         },
         "required": ["status", "serverTime"],
+        "type": "object"
+      },
+      "Import": {
+        "properties": {
+          "createdAt": {
+            "type": "string"
+          },
+          "errorRows": {
+            "type": "number"
+          },
+          "errors": {
+            "items": {
+              "properties": {
+                "column": {
+                  "type": "string"
+                },
+                "error": {
+                  "type": "string"
+                },
+                "row": {
+                  "type": "number"
+                }
+              },
+              "required": ["row", "column", "error"],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "failure": {
+            "type": ["string", "null"]
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "finishedAt": {
+            "type": ["string", "null"]
+          },
+          "id": {
+            "type": "string"
+          },
+          "okRows": {
+            "type": "number"
+          },
+          "reportUrl": {
+            "type": ["string", "null"]
+          },
+          "status": {
+            "enum": ["awaiting_upload", "queued", "running", "done", "failed"],
+            "type": "string"
+          },
+          "totalRows": {
+            "type": "number"
+          },
+          "upload": {
+            "properties": {
+              "headers": {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              "method": {
+                "enum": ["PUT"],
+                "type": "string"
+              },
+              "url": {
+                "type": "string"
+              }
+            },
+            "required": ["method", "url", "headers"],
+            "type": ["object", "null"]
+          }
+        },
+        "required": [
+          "id",
+          "fileName",
+          "status",
+          "totalRows",
+          "okRows",
+          "errorRows",
+          "errors",
+          "failure",
+          "reportUrl",
+          "upload",
+          "createdAt",
+          "finishedAt"
+        ],
         "type": "object"
       },
       "OperatorSession": {
@@ -2171,6 +2279,102 @@
           }
         },
         "summary": "Rename or move a category (its subtree moves with it)",
+        "tags": ["catalog"]
+      }
+    },
+    "/v1/catalog/imports": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateImport"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Import"
+                }
+              }
+            },
+            "description": "This file was imported before"
+          },
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Import"
+                }
+              }
+            },
+            "description": "Created; upload the file, then POST /start"
+          }
+        },
+        "summary": "Start a CSV import: returns a presigned PUT for the file (the same file hash returns the same import)",
+        "tags": ["catalog"]
+      }
+    },
+    "/v1/catalog/imports/{id}": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Import"
+                }
+              }
+            },
+            "description": "Import"
+          }
+        },
+        "summary": "Import progress, first errors and the downloadable report",
+        "tags": ["catalog"]
+      }
+    },
+    "/v1/catalog/imports/{id}/start": {
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Import"
+                }
+              }
+            },
+            "description": "Queued"
+          }
+        },
+        "summary": "Queue (or resume) the import after the upload; the workers process it in batches of 500",
         "tags": ["catalog"]
       }
     },

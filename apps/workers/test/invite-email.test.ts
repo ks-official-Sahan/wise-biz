@@ -1,6 +1,7 @@
 import { uuidv7 } from "@wise-biz/ids";
 import { createCaptureMailer } from "@wise-biz/mailer";
 import { TenantMemberInvitedV1, inviteToken, inviteTokenMatches } from "@wise-biz/module-tenancy";
+import { createMemoryStore } from "@wise-biz/storage";
 import { describe, expect, it } from "vitest";
 
 import { createConsumers } from "../src/consumers.ts";
@@ -12,7 +13,12 @@ const CONSOLE = "http://localhost:3001";
 describe("invite email consumer (workers wiring)", () => {
   it("is subscribed to tenancy.member.invited and mails a link whose token verifies", async () => {
     const mailer = createCaptureMailer();
-    const [consumer] = createConsumers({ mailer, consoleUrl: CONSOLE, inviteSecret: SECRET });
+    const [consumer] = createConsumers({
+      mailer,
+      consoleUrl: CONSOLE,
+      inviteSecret: SECRET,
+      imports: { pool: {} as never, store: createMemoryStore(), onError: () => undefined },
+    });
     expect(consumer?.name).toBe("tenancy.invite-email");
     expect(consumer?.events).toEqual(["tenancy.member.invited@v1"]);
 

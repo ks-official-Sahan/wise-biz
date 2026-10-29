@@ -6,6 +6,7 @@ import { DomainError, toProblem } from "@wise-biz/errors";
 import { uuidv7 } from "@wise-biz/ids";
 import { policyMiddleware } from "@wise-biz/module-kit";
 import { createCatalog, matrixFromRows } from "@wise-biz/policy";
+import { createMemoryStore } from "@wise-biz/storage";
 import { testDatabase } from "@wise-biz/testing/containers";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -25,7 +26,7 @@ let tenantId = T;
 let role = "owner";
 let device: "active" | "suspended" | null = null;
 
-const catalogModule = createCatalogModule();
+const catalogModule = createCatalogModule({ store: createMemoryStore() });
 const matrix = matrixFromRows(createCatalog(catalogModule.permissions), [
   { role: "owner", permission: "catalog:read" },
   { role: "owner", permission: "catalog:write" },

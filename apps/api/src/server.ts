@@ -13,11 +13,13 @@ import {
   mailEnv,
   observabilityEnv,
   redisEnv,
+  storageEnv,
   webauthnEnv,
 } from "@wise-biz/env";
 import { createMailer } from "@wise-biz/mailer";
 import { SESSION_COOKIE_NAME, createIdentity } from "@wise-biz/module-identity";
 import { createTenancyPorts } from "@wise-biz/module-tenancy";
+import { storeFromEnv } from "@wise-biz/storage";
 import { createClient } from "redis";
 
 import { createApp } from "./app.ts";
@@ -43,6 +45,7 @@ export const API_ENV = {
   ...mailEnv,
   ...inviteEnv,
   ...pinEnv,
+  ...storageEnv,
   ...consoleEnv,
   ...webauthnEnv,
 };
@@ -149,6 +152,7 @@ export async function startServer(
         identity,
         { inviteSecret: env.INVITE_SECRET },
         { nonces: deviceNonces(kernelRedis), pinPepper: env.PIN_PEPPER },
+        storeFromEnv(env),
       ),
       pool,
       redis,

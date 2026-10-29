@@ -271,6 +271,9 @@ importers:
       '@wise-biz/policy':
         specifier: workspace:*
         version: link:../../packages/policy
+      '@wise-biz/storage':
+        specifier: workspace:*
+        version: link:../../packages/storage
       hono:
         specifier: 4.13.13
         version: 4.13.13
@@ -454,12 +457,18 @@ importers:
       '@wise-biz/module-audit':
         specifier: workspace:*
         version: link:../../modules/audit
+      '@wise-biz/module-catalog':
+        specifier: workspace:*
+        version: link:../../modules/catalog
       '@wise-biz/module-search':
         specifier: workspace:*
         version: link:../../modules/search
       '@wise-biz/module-tenancy':
         specifier: workspace:*
         version: link:../../modules/tenancy
+      '@wise-biz/storage':
+        specifier: workspace:*
+        version: link:../../packages/storage
       pg:
         specifier: 8.23.1
         version: 8.23.1
@@ -631,6 +640,12 @@ importers:
       '@wise-biz/policy':
         specifier: workspace:*
         version: link:../../packages/policy
+      '@wise-biz/storage':
+        specifier: workspace:*
+        version: link:../../packages/storage
+      csv-parse:
+        specifier: 7.0.3
+        version: 7.0.3
       hono:
         specifier: 4.13.13
         version: 4.13.13
@@ -1350,6 +1365,31 @@ importers:
       fast-check:
         specifier: 4.10.2
         version: 4.10.2
+      typescript:
+        specifier: 6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: 5.0.5
+        version: 5.0.5(@edge-runtime/vm@5.0.0)(@opentelemetry/api@1.9.1)(@types/node@24.19.2)(@vitest/coverage-v8@5.0.5)(jsdom@30.1.3(@noble/hashes@2.4.0))(vite@8.3.4(@types/node@24.19.2)(jiti@2.7.0)(terser@5.51.2)(yaml@2.9.1))
+
+  packages/storage:
+    dependencies:
+      '@sahan-sac/media-kit':
+        specifier: 0.4.1
+        version: 0.4.1
+    devDependencies:
+      '@types/node':
+        specifier: 24.19.2
+        version: 24.19.2
+      '@wise-biz/config':
+        specifier: workspace:*
+        version: link:../config
+      '@wise-biz/testing':
+        specifier: workspace:*
+        version: link:../testing
+      eslint:
+        specifier: 10.13.0
+        version: 10.13.0(jiti@2.7.0)(supports-color@7.2.0)
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -3433,6 +3473,10 @@ packages:
       resend:
         optional: true
 
+  '@sahan-sac/media-kit@0.4.1':
+    resolution: {integrity: sha512-p+79Uj3SxcpshAHYdmMnGVu/6X2JEFolLguP48zU1NykDBAix8OtPgd99N9RDKIPpWYuhjkd3Yc0evn6vPMPkQ==}
+    engines: {node: ^20.19.0 || >=22.12.0}
+
   '@simple-libs/child-process-utils@2.0.0':
     resolution: {integrity: sha512-dvNoRKLijXnD0XoJAz94pbNuB5GQgDr55UhpSPhffDkTT0Cmcqh9jSCOtwfT2d4H6MI9E7c4SgtMuJXZ6F3c6A==}
     engines: {node: '>=22'}
@@ -4419,6 +4463,9 @@ packages:
 
   csstype@3.2.3:
     resolution: {integrity: sha512-z1HGKcYy2xA8AGQfwrn0PAy+PB7X/GSj3UVJW9qKyn43xWa+gl5nXmU4qqLMRzWVLFC8KusUX8T/0kCiOYpAIQ==}
+
+  csv-parse@7.0.3:
+    resolution: {integrity: sha512-YFd3QM/yo17vH91L1IOZuvl09zM0zEEtdfTcOCKWcMdM++MNaQSyp09slXyFCLaPXvHstQFx/xC8myiFHSMUvw==}
 
   data-urls@8.0.0:
     resolution: {integrity: sha512-JQUCCK+/CAGbGGx618PlFZMXH81Jtj7t73CHv9dd/zVWvxgGT2zLFRjnKb+Ng46GIwcy+f7f88qd4duqllK+WQ==}
@@ -6382,6 +6429,9 @@ packages:
   serve-static@1.16.3:
     resolution: {integrity: sha512-x0RTqQel6g5SY7Lg6ZreMmsOzncHFU7nhnRWkKgWuMTu5NN0DR5oruckMqRvacAN9d5w6ARnRBXl9xhDCgfMeA==}
     engines: {node: '>= 0.8.0'}
+
+  server-only@0.0.1:
+    resolution: {integrity: sha512-qepMx2JxAa5jjfzxG79yPPq+8BuFToHd1hm7kI+Z4zAq1ftQiP7HcxMhDDItrbtwVeLg/cY2JnKnrcFkmiswNA==}
 
   set-cookie-parser@3.2.1:
     resolution: {integrity: sha512-Npd1Pt+4zb3BrSZDPd2qFwRpS6b1EUEasRrO8xS0zMJi0fApXXK5YuzP0minyJnxwnFHoVoJwA55q0A0cu63gQ==}
@@ -9246,6 +9296,11 @@ snapshots:
       nodemailer: 10.1.7
       resend: 6.28.1
 
+  '@sahan-sac/media-kit@0.4.1':
+    dependencies:
+      server-only: 0.0.1
+      zod: 4.6.7
+
   '@simple-libs/child-process-utils@2.0.0':
     dependencies:
       '@simple-libs/stream-utils': 2.0.0
@@ -10253,6 +10308,8 @@ snapshots:
   css-what@6.2.2: {}
 
   csstype@3.2.3: {}
+
+  csv-parse@7.0.3: {}
 
   data-urls@8.0.0(@noble/hashes@2.4.0):
     dependencies:
@@ -12253,6 +12310,8 @@ snapshots:
       send: 0.19.2(supports-color@7.2.0)
     transitivePeerDependencies:
       - supports-color
+
+  server-only@0.0.1: {}
 
   set-cookie-parser@3.2.1: {}
 

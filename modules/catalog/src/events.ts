@@ -60,9 +60,17 @@ export const BarcodeChangedV1 = defineEvent(
   }),
 );
 
+/** Starts (or resumes) an import job in the workers (ADR 0012). */
+export const ImportRequestedV1 = defineEvent(
+  "catalog.import.requested",
+  1,
+  z.object({ importId: z.string() }),
+);
+
 export const CATALOG_EVENTS = [
   ProductUpsertedV1,
   VariantUpsertedV1,
   VariantArchivedV1,
   BarcodeChangedV1,
+  ImportRequestedV1,
 ] as const;

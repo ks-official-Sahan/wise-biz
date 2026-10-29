@@ -4,11 +4,13 @@ import { createDevicesModule } from "@wise-biz/module-devices";
 import { createSearchModule } from "@wise-biz/module-search";
 import { templateModule } from "@wise-biz/module-template";
 import { createTenancyModule } from "@wise-biz/module-tenancy";
+import { createMemoryStore } from "@wise-biz/storage";
 
 import type { NonceStore } from "@wise-biz/http-signatures";
 import type { BranchExists, IsActiveMember } from "@wise-biz/module-devices";
 import type { WbModule } from "@wise-biz/module-kit";
 import type { ActiveTenantSetter, TenancyModuleOptions } from "@wise-biz/module-tenancy";
+import type { ObjectStore } from "@wise-biz/storage";
 
 /**
  * Mounted modules, in registry order (modules/registry.json; identity is global and mounted by the kernel at
@@ -22,6 +24,8 @@ export function createModules(
     nonces: unwiredNonces,
     pinPepper: "docs-only-pepper-never-used-for-real-pins",
   },
+  /** Object storage (imports, media). The docs/test default keeps objects in memory. */
+  store: ObjectStore = createMemoryStore(),
 ): readonly WbModule[] {
   return [
     createAuditModule(),
@@ -31,7 +35,7 @@ export function createModules(
       nonces: devices.nonces,
       pin: { pepper: new TextEncoder().encode(devices.pinPepper), isActiveMember },
     }),
-    createCatalogModule(),
+    createCatalogModule({ store }),
     createSearchModule(),
     templateModule,
   ];
