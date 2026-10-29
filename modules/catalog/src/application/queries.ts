@@ -54,6 +54,8 @@ interface MediaRow {
   asset_key: string;
   position: number;
   alt: string | null;
+  content_type: string;
+  sizes: string[];
 }
 
 const PRODUCT_COLUMNS = `p.id, p.name, p.description, p.category_id, p.version, p.archived_at is not null as archived,
@@ -135,8 +137,9 @@ async function attach(
   }
   if (include.has("media")) {
     const mr = await tx.query<MediaRow>(
-      `select id, product_id, variant_id, asset_key, position, alt from catalog.product_media
-       where tenant_id = $1 and product_id = any($2::uuid[]) order by product_id, position, id`,
+      `select id, product_id, variant_id, asset_key, position, alt, content_type, sizes from catalog.product_media
+       where tenant_id = $1 and product_id = any($2::uuid[]) and uploaded_at is not null
+       order by product_id, position, id`,
       [tenantId, ids],
     );
     const byProduct = group(mr.rows, "product_id");
@@ -147,6 +150,8 @@ async function attach(
         assetKey: m.asset_key,
         position: m.position,
         alt: m.alt,
+        contentType: m.content_type,
+        sizes: m.sizes,
       }));
     }
   }

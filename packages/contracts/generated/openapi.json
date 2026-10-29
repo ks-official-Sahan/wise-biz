@@ -296,6 +296,50 @@
         "required": ["name", "variants"],
         "type": "object"
       },
+      "CreateProductMedia": {
+        "additionalProperties": false,
+        "properties": {
+          "alt": {
+            "maxLength": 200,
+            "type": "string"
+          },
+          "contentType": {
+            "enum": ["image/webp", "image/jpeg", "image/png"],
+            "type": "string"
+          },
+          "sizes": {
+            "properties": {
+              "128": {
+                "maximum": 8388608,
+                "minimum": 1,
+                "type": "integer"
+              },
+              "512": {
+                "maximum": 8388608,
+                "minimum": 1,
+                "type": "integer"
+              },
+              "1024": {
+                "maximum": 8388608,
+                "minimum": 1,
+                "type": "integer"
+              },
+              "original": {
+                "maximum": 8388608,
+                "minimum": 1,
+                "type": "integer"
+              }
+            },
+            "type": "object"
+          },
+          "variantId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          }
+        },
+        "required": ["contentType", "sizes"],
+        "type": "object"
+      },
       "CreateTag": {
         "additionalProperties": false,
         "properties": {
@@ -701,17 +745,63 @@
           "assetKey": {
             "type": "string"
           },
+          "contentType": {
+            "type": "string"
+          },
           "id": {
             "type": "string"
           },
           "position": {
             "type": "number"
           },
+          "sizes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
           "variantId": {
             "type": ["string", "null"]
           }
         },
-        "required": ["id", "variantId", "assetKey", "position", "alt"],
+        "required": ["id", "variantId", "assetKey", "position", "alt", "contentType", "sizes"],
+        "type": "object"
+      },
+      "ProductMediaUploads": {
+        "properties": {
+          "assetKey": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "uploads": {
+            "items": {
+              "properties": {
+                "headers": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                "method": {
+                  "enum": ["PUT"],
+                  "type": "string"
+                },
+                "size": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                }
+              },
+              "required": ["size", "method", "url", "headers"],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": ["id", "assetKey", "uploads"],
         "type": "object"
       },
       "ProductPage": {
@@ -2378,6 +2468,82 @@
         "tags": ["catalog"]
       }
     },
+    "/v1/catalog/media/{id}": {
+      "delete": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "removed": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": ["id", "removed"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Removed"
+          }
+        },
+        "summary": "Remove an image from its product (objects are swept by storage lifecycle rules)",
+        "tags": ["catalog"]
+      }
+    },
+    "/v1/catalog/media/{id}/confirm": {
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "confirmed": {
+                      "type": "boolean"
+                    },
+                    "id": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["id", "confirmed"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Confirmed"
+          }
+        },
+        "summary": "Make an uploaded image visible (include=media lists only confirmed images)",
+        "tags": ["catalog"]
+      }
+    },
     "/v1/catalog/products": {
       "get": {
         "parameters": [
@@ -2566,6 +2732,45 @@
           }
         },
         "summary": "Edit, archive or restore a product (optimistic lock on version)",
+        "tags": ["catalog"]
+      }
+    },
+    "/v1/catalog/products/{id}/media": {
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateProductMedia"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductMediaUploads"
+                }
+              }
+            },
+            "description": "Upload URLs"
+          }
+        },
+        "summary": "Add an image: returns one presigned PUT per size; confirm after uploading",
         "tags": ["catalog"]
       }
     },

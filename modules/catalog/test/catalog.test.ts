@@ -317,7 +317,7 @@ describe("list", () => {
       const pid = p0.products[0]?.id ?? "";
       await withTenantTx(pool, { tenantId: scope, requestId: "t" }, (tx) =>
         tx.query(
-          "insert into catalog.product_media (tenant_id, product_id, asset_key) values ($1, $2, 'tenants/x/p.webp')",
+          "insert into catalog.product_media (tenant_id, product_id, asset_key, uploaded_at) values ($1, $2, 'tenants/x/p', now())",
           [scope, pid],
         ),
       );
@@ -432,5 +432,69 @@ describe("list", () => {
       await send("GET", "/v1/catalog/units"),
     );
     expect(list.conversions[0]?.factor).toBe("12.000000");
+  });
+});
+
+describe("media", () => {
+  it("presigns one PUT per size; only confirmed images are listed; delete removes", async () => {
+    const p = await product();
+    const created = await send("POST", `/v1/catalog/products/${p.id}/media`, {
+      contentType: "image/webp",
+      sizes: { original: 90_000, "128": 4_000, "512": 30_000 },
+      alt: "Front",
+    });
+    expect(created.status).toBe(201);
+    const m = await json<{
+      id: string;
+      assetKey: string;
+      uploads: { size: string; headers: Record<string, string> }[];
+    }>(created);
+    expect(m.assetKey).toBe(`tenants/${T}/media/${m.id}`);
+    expect(m.uploads.map((u) => u.size)).toEqual(["original", "128", "512"]);
+    expect(m.uploads[1]?.headers).toEqual({
+      "content-type": "image/webp",
+      "content-length": "4000",
+    });
+
+    const media = async () =>
+      (
+        await json<{ media?: unknown[] }>(
+          await send("GET", `/v1/catalog/products/${p.id}?include=media`),
+        )
+      ).media;
+    expect(await media()).toEqual([]);
+    expect((await send("POST", `/v1/catalog/media/${m.id}/confirm`, {})).status).toBe(200);
+    expect(await media()).toMatchObject([
+      { id: m.id, sizes: ["original", "128", "512"], alt: "Front" },
+    ]);
+    expect((await send("DELETE", `/v1/catalog/media/${m.id}`, {})).status).toBe(200);
+    expect(await media()).toEqual([]);
+
+    expect(
+      (
+        await send("POST", `/v1/catalog/products/${p.id}/media`, {
+          contentType: "image/gif",
+          sizes: { original: 1 },
+        })
+      ).status,
+    ).toBe(422);
+    expect(
+      (
+        await send("POST", `/v1/catalog/products/${p.id}/media`, {
+          contentType: "image/png",
+          sizes: { "128": 1 },
+        })
+      ).status,
+    ).toBe(422);
+    expect(
+      (
+        await send("POST", `/v1/catalog/products/${p.id}/media`, {
+          contentType: "image/png",
+          variantId: uuidv7(),
+          sizes: { original: 1 },
+        })
+      ).status,
+    ).toBe(404);
+    expect((await send("POST", `/v1/catalog/media/${uuidv7()}/confirm`, {})).status).toBe(404);
   });
 });

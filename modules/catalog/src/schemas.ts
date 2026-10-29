@@ -131,6 +131,9 @@ export const MediaSchema = z
     assetKey: z.string(),
     position: z.number(),
     alt: z.string().nullable(),
+    contentType: z.string(),
+    /** Objects are "<assetKey>/<size>.<ext>" for each size ("original", "128", "512", "1024"). */
+    sizes: z.array(z.string()),
   })
   .openapi("ProductMedia");
 export const VariantSchema = z
