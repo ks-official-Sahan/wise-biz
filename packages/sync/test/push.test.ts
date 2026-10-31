@@ -4,8 +4,9 @@ import { createPushLoop, TransportError } from "../src/push.ts";
 
 import { createDevice, saleBody } from "./support/fake-server.ts";
 
+import type { Timers } from "../src/backoff.ts";
 import type { WireCommand } from "../src/chain.ts";
-import type { LoopEvent, PushResponse, Timers, Transport } from "../src/push.ts";
+import type { LoopEvent, PushResponse, Transport } from "../src/push.ts";
 import type { Device } from "./support/fake-server.ts";
 
 const open: Device[] = [];
@@ -309,7 +310,7 @@ describe("push loop", () => {
     const run = l.trigger();
     await new Promise((r) => setTimeout(r, 30));
     expect(l.state()).toBe("backoff");
-    const again = l.trigger(); // network is back
+    const again = l.networkUp(); // network is back
     await Promise.all([run, again]);
     expect(await d.outbox.unsyncedCount()).toBe(0);
     expect(yields).toBeGreaterThanOrEqual(1);

@@ -4,7 +4,8 @@ import { createPushLoop, TransportError } from "../src/push.ts";
 
 import { createDevice, saleBody } from "./support/fake-server.ts";
 
-import type { PushResponse, Timers, Transport } from "../src/push.ts";
+import type { Timers } from "../src/backoff.ts";
+import type { PushResponse, Transport } from "../src/push.ts";
 
 /** mulberry32: a seeded PRNG so every failing run can be replayed from its number. */
 function prng(seed: number) {

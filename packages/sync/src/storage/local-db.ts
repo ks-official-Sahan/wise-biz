@@ -30,11 +30,13 @@ const MAX_CACHED_STATEMENTS = 128;
 export function createLocalDb(adapter: StorageAdapter): LocalDb {
   let tail: Promise<unknown> = Promise.resolve();
   let closed = false;
+  let poisoned: Error | undefined;
 
   const enqueue = <T>(job: () => Promise<T>): Promise<T> => {
     if (closed) return Promise.reject(new StorageClosedError());
     const result = tail.then(() => {
       if (closed) throw new StorageClosedError();
+      if (poisoned !== undefined) throw poisoned;
       return job();
     });
     // The chain continues whether this job failed or not; the caller still sees the failure.
@@ -88,8 +90,15 @@ export function createLocalDb(adapter: StorageAdapter): LocalDb {
         } catch (err) {
           try {
             await adapter.rollback();
-          } catch {
-            // the original failure is the one to report; a failed rollback leaves the connection to be closed
+          } catch (rollbackErr) {
+            // The connection may still be inside the transaction: nothing can safely run on it. Refuse all further
+            // work (the host reopens the database); the original failure is the one thrown to this caller.
+            poisoned = new Error(
+              "The local database connection is unusable after a failed rollback",
+              {
+                cause: rollbackErr,
+              },
+            );
           }
           throw err;
         }

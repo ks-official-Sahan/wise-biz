@@ -76,6 +76,9 @@ export function changesOf(payload: unknown): { tenantId: string; rows: ChangeRow
         return [upsert("catalog", "product", need(d, "productId"), d)];
       case "catalog.variant.upserted":
         return [upsert("catalog", "variant", need(d, "variantId"), d)];
+      case "catalog.barcode.changed":
+        // The full code set of one variant: a terminal replaces that variant's codes in its barcode map.
+        return [upsert("catalog", "barcodes", need(d, "variantId"), d)];
       case "catalog.variant.archived":
         return [remove("catalog", "variant", need(d, "variantId"))];
       case "pricing.price_list.upserted":
@@ -183,6 +186,7 @@ const EVENTS = [
   "catalog.product.upserted@v1",
   "catalog.variant.upserted@v1",
   "catalog.variant.archived@v1",
+  "catalog.barcode.changed@v1",
   "pricing.price_list.upserted@v1",
   "pricing.price.changed@v1",
   "pricing.fx_rate.recorded@v1",

@@ -1,3 +1,6 @@
+import { backoffDelay, createSleeper, defaultTimers } from "./backoff.ts";
+
+import type { OnClientMetric, Timers } from "./backoff.ts";
 import type { WireCommand } from "./chain.ts";
 import type { Ack, Outbox } from "./outbox.ts";
 
@@ -55,15 +58,11 @@ export type LoopEvent =
   | { type: "rewound"; fromSeq: number; commands: number }
   | { type: "idle" };
 
-export interface Timers {
-  set: (fn: () => void, ms: number) => unknown;
-  clear: (handle: unknown) => void;
-}
-
 export interface LoopOptions {
   outbox: Outbox;
   transport: Transport;
   onEvent?: (e: LoopEvent) => void;
+  onMetric?: OnClientMetric;
   /** Commands per request; the server accepts at most 100. */
   batchLimit?: number;
   /** Request body budget; the server accepts 256 KB. */
@@ -77,6 +76,7 @@ export interface LoopOptions {
   yieldToUi?: () => Promise<void>;
 }
 
+const MAX_GAP_REWINDS = 3;
 const BLOCKING = new Set([
   "CHAIN_BROKEN",
   "BAD_SIGNATURE",
@@ -84,12 +84,6 @@ const BLOCKING = new Set([
   "DEVICE_REVOKED",
   "DEVICE_INACTIVE",
 ]);
-const defaultTimers: Timers = {
-  set: (fn, ms) => setTimeout(fn, ms),
-  clear: (h) => {
-    clearTimeout(h as ReturnType<typeof setTimeout>);
-  },
-};
 
 /**
  * Pushes the outbox to the server, oldest first, one request in flight, never reordering. Everything the server can
@@ -110,44 +104,42 @@ export function createPushLoop(opts: LoopOptions) {
   let state: LoopState = "idle";
   // A function, not a bare comparison: state changes across awaits and from other calls, which control-flow narrowing cannot see.
   const is = (x: LoopState): boolean => state === x;
-  let wake: (() => void) | undefined;
-  let timer: unknown;
+  const sleeper = createSleeper(timers);
   // Mutated by trigger() while drain() awaits: a property, so the compiler does not assume it stays false.
   const flags = { again: false };
   const wantsAgain = (): boolean => flags.again;
   let current: Promise<void> | undefined;
   let attempt = 0;
   let batch = limit;
+  let gapStreak = 0;
 
-  const sleep = (ms: number) =>
-    new Promise<void>((resolve) => {
-      wake = resolve;
-      timer = timers.set(resolve, ms);
-    }).finally(() => {
-      wake = undefined;
-      if (timer !== undefined) timers.clear(timer);
-      timer = undefined;
-    });
-
-  const backoff = (e: TransportError | undefined): number => {
-    const ceiling = Math.min(cap, base * 2 ** attempt);
-    const jittered = Math.floor(random() * ceiling);
-    return Math.max(jittered, e?.retryAfterMs ?? 0);
-  };
+  const backoff = (e: TransportError | undefined): number =>
+    backoffDelay({ attempt, baseMs: base, capMs: cap, random, retryAfterMs: e?.retryAfterMs });
 
   /** One request. Returns true when there may be more to send right away. */
   async function pushOnce(): Promise<boolean> {
     const pending = await outbox.pending(batch, maxBytes);
     if (pending.length === 0) return false;
     let res: PushResponse;
+    const started = performance.now();
     try {
       res = await transport.push(pending.map((p) => p.command));
     } catch (err) {
       return handleFailure(err, pending);
     }
+    opts.onMetric?.("push_batch_ms", performance.now() - started, {
+      commands: String(pending.length),
+    });
+    if (res.acks.length === 0 && res.stopped === null) {
+      // A 200 that acknowledges nothing would spin us: treat it as a failed attempt.
+      return handleFailure(new TransportError("empty answer", { status: 502 }), pending);
+    }
     attempt = 0;
     batch = limit;
-    const { acked, rejected } = await outbox.recordAcks(res.acks);
+    const { acked, rejected } = await outbox.recordAcks(
+      res.acks,
+      pending.map((p) => p.seq),
+    );
     if (res.stopped !== null) {
       const s = res.stopped;
       if (s.code === "SEQUENCE_GAP") return handleGap(s.expectedSeq);
@@ -155,12 +147,15 @@ export function createPushLoop(opts: LoopOptions) {
       emit({ type: "blocked", reason: "quarantined", code: s.code });
       return false;
     }
+    gapStreak = 0;
     emit({ type: "pushed", acked, rejected, remaining: await outbox.unsyncedCount() });
     return true;
   }
 
   async function handleGap(expected: number | undefined): Promise<boolean> {
-    if (expected === undefined || !(await outbox.hasSeq(expected))) {
+    // A server that keeps answering the same gap after we resent what it lacks is not healing: stop, do not spin.
+    gapStreak++;
+    if (gapStreak > MAX_GAP_REWINDS || expected === undefined || !(await outbox.hasSeq(expected))) {
       state = "blocked";
       emit({ type: "blocked", reason: "diverged", code: "SEQUENCE_GAP" });
       return false;
@@ -180,6 +175,8 @@ export function createPushLoop(opts: LoopOptions) {
     err: unknown,
     pending: readonly { seq: number }[],
   ): Promise<boolean> {
+    // stop() (sign-out) wins over any retry: never overwrite "stopped" or send again.
+    if (is("stopped")) return false;
     const e = err instanceof TransportError ? err : undefined;
     const code = e?.code;
     const status = e?.status ?? 0;
@@ -214,7 +211,7 @@ export function createPushLoop(opts: LoopOptions) {
     attempt++;
     state = "backoff";
     emit({ type: "backoff", attempt, delayMs, code });
-    await sleep(delayMs);
+    await sleeper.sleep(delayMs);
     return is("backoff");
   }
 
@@ -225,7 +222,7 @@ export function createPushLoop(opts: LoopOptions) {
       state = "running";
       let more = true;
       while (more && is("running")) {
-        more = await pushOnce();
+        more = await pushOnce().catch((err: unknown) => handleFailure(err, []));
         if (more && is("running")) await opts.yieldToUi?.();
         if (is("backoff")) state = "running";
       }
@@ -243,14 +240,21 @@ export function createPushLoop(opts: LoopOptions) {
       if (is("stopped")) return Promise.resolve();
       if (current !== undefined) {
         flags.again = true;
-        // A trigger during a backoff means "network is back": try now instead of waiting the delay out.
-        wake?.();
         return current;
       }
       current = drain().finally(() => {
         current = undefined;
       });
       return current;
+    },
+    /** The network came back: skip the rest of a backoff wait and push now. (A local write must not do this.) */
+    networkUp(): Promise<void> {
+      sleeper.wake();
+      return this.trigger();
+    },
+    /** Allows a loop that was stopped (sign-out) to run again (sign-in). */
+    start(): void {
+      if (is("stopped")) state = "idle";
     },
     /** After a fresh sign-in (auth) or an owner's re-enrolment (blocked): push again. */
     resume(): Promise<void> {
@@ -260,7 +264,7 @@ export function createPushLoop(opts: LoopOptions) {
     },
     async stop(): Promise<void> {
       state = "stopped";
-      wake?.();
+      sleeper.wake();
       await current;
     },
   };

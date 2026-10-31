@@ -6,6 +6,7 @@ import { countQueries, createPool, instrumentPool, migrate, withTenantTx } from 
 import { DomainError, toProblem } from "@wise-biz/errors";
 import { uuidv7 } from "@wise-biz/ids";
 import { createMemoryStore } from "@wise-biz/storage";
+import { parseSnapshot } from "@wise-biz/sync";
 import { testDatabase } from "@wise-biz/testing/containers";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -83,6 +84,22 @@ async function consume(payload: unknown, tenantId = T, client?: pg.PoolClient) {
     if (client === undefined) own.release();
   }
 }
+
+/**
+ * The feed shows a row only below the cluster-wide oldest running transaction (ADR 0015), and test files run in
+ * parallel against one Postgres: wait until this tenant's rows are visible so assertions do not depend on timing.
+ */
+async function settled(tenantId: string): Promise<void> {
+  for (let i = 0; i < 400; i++) {
+    const r = await admin.query<{ n: string }>(
+      "select count(*) n from sync.sync_changes where tenant_id = $1 and txid >= pg_snapshot_xmin(pg_current_snapshot())",
+      [tenantId],
+    );
+    if (r.rows[0]?.n === "0") return;
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  throw new Error("feed rows did not become visible");
+}
 const read = <R>(fn: Parameters<typeof withTenantTx<R>>[2], tenantId = T) =>
   withTenantTx(pool, { tenantId, requestId: "req-12345678" }, fn);
 const pull = (
@@ -105,6 +122,19 @@ const variant = (id: string, name = "Tea", archived = false) =>
 describe("changesOf", () => {
   it("maps each producer event to its change rows", () => {
     const v = uuidv7();
+    expect(
+      changesOf(
+        event("catalog.barcode.changed", {
+          productId: uuidv7(),
+          variantId: v,
+          codes: ["123"],
+          added: ["123"],
+          removed: [],
+        }),
+      ).rows,
+    ).toMatchObject([
+      { dataset: "catalog", entity: "barcodes", entityId: v, op: "upsert", scopeKey: "all" },
+    ]);
     expect(changesOf(variant(v)).rows).toMatchObject([
       { dataset: "catalog", entity: "variant", entityId: v, op: "upsert", scopeKey: "all" },
     ]);
@@ -262,6 +292,7 @@ describe("bootstrap", () => {
       event("pricing.promotion.published", { promotionId: gone, version: 1, name: "x" }),
     );
     await consume(event("pricing.promotion.archived", { promotionId: gone, version: 2 }));
+    await settled(T);
     const now = new Date();
     const boot = await read((tx) => bootstrap(tx, T, BRANCH, ports, "promotions", now));
     expect(boot.entityCount).toBe(2);
@@ -280,6 +311,14 @@ describe("bootstrap", () => {
       .split("\n")
       .map((l) => JSON.parse(l) as Record<string, unknown>);
     expect(lines[0]).toMatchObject({ dataset: "promotions", scope: "all", cursor: boot.cursor });
+    // The device client reads exactly this format.
+    const parsed = parseSnapshot(
+      gunzipSync(
+        Buffer.from(await new Response(await store.get(key ?? "")).arrayBuffer()),
+      ).toString(),
+    );
+    expect(parsed.cursor).toBe(boot.cursor);
+    expect(parsed.rows).toHaveLength(lines.length - 1);
     const states = Object.fromEntries(
       lines.slice(1).map((l) => [l.id as string, (l.payload as { name: string }).name]),
     );
@@ -292,6 +331,7 @@ describe("bootstrap", () => {
     // A change after the snapshot arrives through pull from the snapshot's cursor, and only that one.
     const c = uuidv7();
     await consume(event("pricing.promotion.published", { promotionId: c, version: 1, name: "c" }));
+    await settled(T);
     const next = await pull("promotions", boot.cursor ?? undefined);
     expect(next.changes.map((x) => x.entityId)).toEqual([c]);
     // Stale: rebuilt, now including c.

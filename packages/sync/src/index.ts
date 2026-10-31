@@ -33,8 +33,36 @@ export type {
   LoopState,
   PushLoop,
   PushResponse,
-  Timers,
   Transport,
 } from "./push.ts";
+export { backoffDelay, createSleeper, defaultTimers } from "./backoff.ts";
+export type { ClientMetric, OnClientMetric, Timers } from "./backoff.ts";
 export { EXPORT_VERSION, ExportError, exportOutbox, openExport } from "./export.ts";
 export type { ExportDeps, ExportFile } from "./export.ts";
+export { applyChanges, applySnapshot, createPullLoop, parseSnapshot } from "./pull.ts";
+export type {
+  BootstrapInfo,
+  ChangesPage,
+  Dataset,
+  Gunzip,
+  PullChange,
+  PullEvent,
+  PullLoop,
+  PullOptions,
+  PullTransport,
+  VariantPayload,
+} from "./pull.ts";
+export { createIndexes, ftsQuery } from "./indexes.ts";
+export type { Indexes, VariantHit } from "./indexes.ts";
+export { createHintStream, createSseParser, fetchOpenStream, StreamHttpError } from "./hints.ts";
+export type {
+  Hint,
+  HintState,
+  HintStream,
+  HintStreamOptions,
+  OpenStream,
+  SseEvent,
+  StreamTicket,
+} from "./hints.ts";
+export { createSyncClient } from "./client.ts";
+export type { SyncClient, SyncClientDeps, SyncHealth } from "./client.ts";

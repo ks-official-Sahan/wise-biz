@@ -10,7 +10,7 @@ Goal: a registered terminal can sell for days without internet, with zero lost s
 | Web | expo-sqlite web (wa-sqlite on OPFS) | Needs COOP/COEP headers (`Cross-Origin-Opener-Policy: same-origin`, `Cross-Origin-Embedder-Policy: credentialless`). `withExclusiveTransactionAsync` is not available on web → use `withTransactionAsync` and a single writer queue. Web terminals are **secondary** (no hardware drawer, limited printing). |
 | Electron | better-sqlite3 in main process, exposed via IPC | Key from OS keychain via `safeStorage` |
 
-One writer per DB: all writes go through `@wise-biz/sync`'s serialized write queue. Reads are free.
+One writer per DB: all writes go through `@wise-biz/sync`'s serialized write queue. Reads are free. The client package (storage port, schema v1, outbox, push and pull loops, hint stream, indexes) and its guarantees are described in ADR 0016; the local schema is `packages/sync/src/schema/migrations.ts`.
 
 ## What lives on the device
 

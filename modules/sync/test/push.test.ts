@@ -142,7 +142,7 @@ function command(
   const hash = commandHash(
     over.type ?? "cash_movement",
     seq,
-    body as RawCommand["body"],
+    body,
     new Uint8Array(Buffer.from(prev, "base64")),
   );
   const signature = sign(hash, over.key ?? d.secretKey);

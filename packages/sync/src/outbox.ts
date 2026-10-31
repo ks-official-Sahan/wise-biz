@@ -186,11 +186,17 @@ export function createOutbox(deps: OutboxDeps) {
     },
 
     /** Records the server's answers. Idempotent: only commands still pending change. */
-    async recordAcks(acks: readonly Ack[]): Promise<{ acked: number; rejected: number }> {
+    async recordAcks(
+      acks: readonly Ack[],
+      /** The sequence numbers just sent: an answer about any other command is ignored. */
+      sent?: readonly number[],
+    ): Promise<{ acked: number; rejected: number }> {
       let acked = 0;
       let rejected = 0;
+      const allowed = sent === undefined ? undefined : new Set(sent);
       await db.transaction(async (tx) => {
         for (const a of acks) {
+          if (allowed !== undefined && !allowed.has(a.seq)) continue;
           const status: CommandStatus = a.status === "rejected" ? "rejected" : "acked";
           const r = await tx.run(
             "UPDATE device_outbox SET status = ?, ack = ? WHERE seq = ? AND status = 'pending'",
