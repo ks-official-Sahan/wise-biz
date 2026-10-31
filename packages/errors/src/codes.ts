@@ -25,6 +25,10 @@ export const ERROR_CODES = Object.freeze({
     slug: "idempotency/in-progress",
   },
   STOCK_INSUFFICIENT: { status: 409, title: "Insufficient stock", slug: "stock/insufficient" },
+  /** A sync batch skips device sequence numbers: the device resends from `details.expectedSeq`. */
+  SEQUENCE_GAP: { status: 409, title: "Sequence gap", slug: "sync/sequence-gap" },
+  /** A command breaks the device's signed hash chain: the device is quarantined (tamper or corruption). */
+  CHAIN_BROKEN: { status: 409, title: "Chain broken", slug: "sync/chain-broken" },
   /** A terminal's totals disagree with the server's for the same pricing inputs, beyond tolerance (ADR 0014). */
   PRICE_MISMATCH: { status: 409, title: "Price mismatch", slug: "pricing/mismatch" },
   ENTITLEMENT_REQUIRED: {

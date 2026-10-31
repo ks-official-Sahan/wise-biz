@@ -3,6 +3,7 @@ import { createImportConsumer } from "@wise-biz/module-catalog";
 import { createInventoryFactsConsumer, createLowStockConsumer } from "@wise-biz/module-inventory";
 import { createPricingFactsConsumer } from "@wise-biz/module-pricing";
 import { createSearchProjectionConsumer } from "@wise-biz/module-search";
+import { createSyncChangesConsumer } from "@wise-biz/module-sync";
 import { createInviteEmailConsumer } from "@wise-biz/module-tenancy";
 
 import type { ConsumerDefinition } from "@wise-biz/events";
@@ -33,6 +34,7 @@ export function createConsumers(deps: ConsumerDeps): readonly ConsumerDefinition
     createSearchProjectionConsumer(),
     createPricingFactsConsumer(),
     createInventoryFactsConsumer(),
+    createSyncChangesConsumer(),
     createLowStockConsumer({ pool: deps.imports.pool, ids: { uuidv7 }, now: () => new Date() }),
     createImportConsumer(
       {

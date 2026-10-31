@@ -5,9 +5,12 @@ import { batchSalePrices, createInventoryModule } from "@wise-biz/module-invento
 import { createPricingModule } from "@wise-biz/module-pricing";
 import { createSalesModule } from "@wise-biz/module-sales";
 import { createSearchModule } from "@wise-biz/module-search";
+import { createSyncModule } from "@wise-biz/module-sync";
 import { templateModule } from "@wise-biz/module-template";
 import { createTenancyModule } from "@wise-biz/module-tenancy";
 import { createMemoryStore } from "@wise-biz/storage";
+
+import { createSyncPorts } from "./sync-ports.ts";
 
 import type { NonceStore } from "@wise-biz/http-signatures";
 import type { BranchExists, IsActiveMember } from "@wise-biz/module-devices";
@@ -45,6 +48,8 @@ export function createModules(
     createInventoryModule({ locationExists }),
     // Commands arrive through sync (P1-06), which applies them with salesPorts (sales-ports.ts).
     createSalesModule(),
+    // Terminals push signed command batches here; each command goes to its owning module through syncPorts.
+    createSyncModule(createSyncPorts(store)),
     createSearchModule(),
     templateModule,
   ];

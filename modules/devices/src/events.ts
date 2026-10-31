@@ -17,4 +17,15 @@ export const DeviceStatusChangedV1 = defineEvent(
   z.object({ ...device, from: z.string(), status: z.string() }),
 );
 
-export const DEVICE_EVENTS = [DeviceEnrolledV1, DeviceStatusChangedV1] as const;
+/** Sync found a forged signature or a broken hash chain: the device was suspended (owner alert hook). */
+export const DeviceQuarantinedV1 = defineEvent(
+  "devices.device.quarantined",
+  1,
+  z.object({ ...device, reason: z.enum(["bad_signature", "chain_broken"]), seq: z.number().int() }),
+);
+
+export const DEVICE_EVENTS = [
+  DeviceEnrolledV1,
+  DeviceStatusChangedV1,
+  DeviceQuarantinedV1,
+] as const;

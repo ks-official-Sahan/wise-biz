@@ -2899,6 +2899,174 @@
         "required": ["items", "nextCursor"],
         "type": "object"
       },
+      "SyncBootstrap": {
+        "properties": {
+          "builtAt": {
+            "type": "string"
+          },
+          "bytes": {
+            "type": "integer"
+          },
+          "cursor": {
+            "type": ["string", "null"]
+          },
+          "dataset": {
+            "enum": ["catalog", "prices", "tax", "promotions", "stock_branch"],
+            "type": "string"
+          },
+          "entityCount": {
+            "type": "integer"
+          },
+          "expiresInSeconds": {
+            "type": "integer"
+          },
+          "url": {
+            "type": ["string", "null"]
+          }
+        },
+        "required": [
+          "dataset",
+          "cursor",
+          "url",
+          "expiresInSeconds",
+          "entityCount",
+          "bytes",
+          "builtAt"
+        ],
+        "type": "object"
+      },
+      "SyncChanges": {
+        "properties": {
+          "changes": {
+            "items": {
+              "properties": {
+                "changedAt": {
+                  "type": "string"
+                },
+                "entity": {
+                  "type": "string"
+                },
+                "entityId": {
+                  "type": "string"
+                },
+                "op": {
+                  "enum": ["upsert", "delete"],
+                  "type": "string"
+                },
+                "payload": {},
+                "version": {
+                  "type": "integer"
+                }
+              },
+              "required": ["entity", "entityId", "op", "version", "changedAt"],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "dataset": {
+            "enum": ["catalog", "prices", "tax", "promotions", "stock_branch"],
+            "type": "string"
+          },
+          "hasMore": {
+            "type": "boolean"
+          },
+          "nextCursor": {
+            "type": ["string", "null"]
+          }
+        },
+        "required": ["dataset", "changes", "nextCursor", "hasMore"],
+        "type": "object"
+      },
+      "SyncPushRequest": {
+        "properties": {
+          "commands": {
+            "items": {
+              "properties": {
+                "body": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": {
+                  "maxLength": 40,
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": ["type", "body"],
+              "type": "object"
+            },
+            "maxItems": 100,
+            "minItems": 1,
+            "type": "array"
+          }
+        },
+        "required": ["commands"],
+        "type": "object"
+      },
+      "SyncPushResponse": {
+        "properties": {
+          "acks": {
+            "items": {
+              "properties": {
+                "error": {
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "details": {},
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "type": "object"
+                },
+                "id": {
+                  "type": ["string", "null"]
+                },
+                "result": {},
+                "seq": {
+                  "type": "integer"
+                },
+                "status": {
+                  "enum": ["applied", "replayed", "rejected"],
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string"
+                }
+              },
+              "required": ["seq", "id", "type", "status"],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "lastSeq": {
+            "type": "integer"
+          },
+          "stopped": {
+            "properties": {
+              "code": {
+                "enum": ["SEQUENCE_GAP", "CHAIN_BROKEN", "BAD_SIGNATURE", "UNKNOWN_DEVICE"],
+                "type": "string"
+              },
+              "expectedSeq": {
+                "type": "integer"
+              },
+              "quarantined": {
+                "type": "boolean"
+              },
+              "seq": {
+                "type": "integer"
+              }
+            },
+            "required": ["seq", "code", "quarantined"],
+            "type": ["object", "null"]
+          }
+        },
+        "required": ["acks", "stopped", "lastSeq"],
+        "type": "object"
+      },
       "Tag": {
         "properties": {
           "id": {
@@ -7391,6 +7559,117 @@
         },
         "summary": "Hybrid search (full text + typo-tolerant trigram, reciprocal rank fusion) over sellable variants",
         "tags": ["search"]
+      }
+    },
+    "/v1/sync/bootstrap": {
+      "get": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "dataset",
+            "required": true,
+            "schema": {
+              "enum": ["catalog", "prices", "tax", "promotions", "stock_branch"],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncBootstrap"
+                }
+              }
+            },
+            "description": "Snapshot"
+          }
+        },
+        "summary": "Terminal: a signed URL of the gzip NDJSON snapshot of a dataset, and the cursor to continue from",
+        "tags": ["sync"]
+      }
+    },
+    "/v1/sync/changes": {
+      "get": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "dataset",
+            "required": true,
+            "schema": {
+              "enum": ["catalog", "prices", "tax", "promotions", "stock_branch"],
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "maxLength": 512,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_-]+$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 500,
+              "maximum": 1000,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncChanges"
+                }
+              }
+            },
+            "description": "A page of changes"
+          },
+          "304": {
+            "description": "Nothing changed since the ETag"
+          }
+        },
+        "summary": "Terminal: changes of one dataset after a cursor (keyset, no gaps or repeats). ETag; 304 when nothing changed",
+        "tags": ["sync"]
+      }
+    },
+    "/v1/sync/commands": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SyncPushRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncPushResponse"
+                }
+              }
+            },
+            "description": "Acks for every applied, replayed or rejected command, and where the batch stopped"
+          }
+        },
+        "summary": "Terminal: push signed, hash-chained commands (<= 100 / 256 KB). Applied in device_seq order, one transaction each",
+        "tags": ["sync"]
       }
     },
     "/v1/template/items": {

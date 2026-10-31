@@ -9,7 +9,12 @@ import {
   newEnrollmentCode,
   normaliseCode,
 } from "../domain/device.ts";
-import { DEVICES_TOPIC, DeviceEnrolledV1, DeviceStatusChangedV1 } from "../events.ts";
+import {
+  DEVICES_TOPIC,
+  DeviceEnrolledV1,
+  DeviceQuarantinedV1,
+  DeviceStatusChangedV1,
+} from "../events.ts";
 
 import type { DeviceStatus } from "../domain/device.ts";
 import type { DeviceDto, EnrollInput, HeartbeatInput, UpdateDeviceInput } from "../schemas.ts";
@@ -385,4 +390,76 @@ export async function recordHeartbeat(
       input.connection ?? null,
     ],
   );
+}
+
+export interface QuarantineInput {
+  readonly tenantId: string;
+  readonly deviceId: string;
+  readonly reason: "bad_signature" | "chain_broken";
+  /** The device sequence number of the offending command. */
+  readonly seq: number;
+  readonly requestId: string;
+  readonly now: Date;
+  readonly ids: { uuidv7(): string };
+}
+
+/**
+ * Sync found tampering: an active device is suspended at once (the next signed request gets 401 DEVICE_INACTIVE), with
+ * an audit row and the quarantine event (the owner alert hangs off it). Idempotent: a device that is no longer active
+ * is left as it is. Runs in the caller's tenant transaction; actor is the system.
+ */
+export async function quarantineDevice(tx: TxHandle, input: QuarantineInput): Promise<void> {
+  const r = await tx.query<{ branch_id: string }>(
+    `update devices.devices set status = 'suspended', status_changed_at = $3
+     where tenant_id = $1 and id = $2 and status = 'active' returning branch_id`,
+    [input.tenantId, input.deviceId, input.now],
+  );
+  const row = r.rows[0];
+  if (row === undefined) return;
+  await appendAudit(tx, [
+    {
+      actorType: "system",
+      actorId: "sync",
+      action: "devices.device.quarantined",
+      entity: "devices.device",
+      entityId: input.deviceId,
+      before: { status: "active" },
+      after: { status: "suspended", reason: input.reason, seq: input.seq },
+      reason: input.reason,
+      requestId: input.requestId,
+    },
+  ]);
+  const data = { deviceId: input.deviceId, branchId: row.branch_id };
+  await appendOutbox(tx, [
+    event(
+      DeviceQuarantinedV1,
+      input,
+      input.tenantId,
+      input.deviceId,
+      { type: "device", id: input.deviceId },
+      { ...data, reason: input.reason, seq: input.seq },
+    ),
+    event(
+      DeviceStatusChangedV1,
+      input,
+      input.tenantId,
+      input.deviceId,
+      { type: "device", id: input.deviceId },
+      { ...data, from: "active", status: "suspended" },
+    ),
+  ]);
+}
+
+/** The key of an ACTIVE terminal (32 raw bytes): a suspended or revoked one verifies nothing, mid-batch included. */
+export async function devicePublicKey(
+  tx: TxHandle,
+  tenantId: string,
+  deviceId: string,
+): Promise<Uint8Array | undefined> {
+  const r = await tx.query<{ public_key: Buffer }>(
+    "select public_key from devices.devices where tenant_id = $1 and id = $2 and status = 'active'",
+    [tenantId, deviceId],
+  );
+  const key = r.rows[0]?.public_key;
+  return key === undefined ? undefined : new Uint8Array(key);
 }

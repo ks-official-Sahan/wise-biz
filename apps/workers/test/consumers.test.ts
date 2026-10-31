@@ -17,6 +17,10 @@ describe("consumer set", () => {
       ["search.catalog-projection", ["catalog.variant.upserted@v1"]],
       ["pricing.variant-facts", ["catalog.variant.upserted@v1"]],
       ["inventory.variant-facts", ["catalog.variant.upserted@v1"]],
+      [
+        "sync.changes",
+        expect.arrayContaining(["pricing.price.changed@v1", "inventory.movement.recorded@v1"]),
+      ],
       ["inventory.low-stock", ["inventory.movement.recorded@v1"]],
       ["catalog.import-runner", ["catalog.import.requested@v1"]],
     ]);

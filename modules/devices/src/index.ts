@@ -11,7 +11,9 @@ import type { WbModule } from "@wise-biz/module-kit";
 
 export { deviceAuth, ENROLL_PATH } from "./device-auth.ts";
 export type { DeviceAuthDeps } from "./device-auth.ts";
-export type { BranchExists } from "./application/devices.ts";
+export { devicePublicKey, quarantineDevice } from "./application/devices.ts";
+export type { BranchExists, QuarantineInput } from "./application/devices.ts";
+export { DeviceQuarantinedV1 } from "./events.ts";
 export type { IsActiveMember, PinDeps } from "./application/pins.ts";
 export type { DevicesHttpOptions } from "./http.ts";
 

@@ -34,7 +34,7 @@ device_outbox(seq integer primary key, id uuid, type text, payload json, hash bl
 ```
 
 1. Completing a sale runs **one local transaction**: insert sale + lines + tenders + local stock movements + outbox row. Then the UI confirms. No network.
-2. Each command carries: `id` (UUIDv7, also the idempotency key), `device_id`, `device_seq` (monotonic), `hlc` (hybrid logical clock), `prev_hash`, `hash = sha256(canonical(payload) ‖ prev_hash)`, `signature = Ed25519(device_key, hash)`.
+2. Each command carries: `id` (UUIDv7, also the idempotency key), `device_id`, `device_seq` (monotonic), `hlc` (hybrid logical clock), `prev_hash`, `hash = sha256(canonical({ type, seq, body without meta }) ‖ prev_hash)` (ADR 0015), `signature = Ed25519(device_key, hash)`.
 3. Sync worker pushes in `seq` order in batches (≤ 100 commands or 256 KB), with exponential backoff + jitter.
 4. Server per command: verify device active → verify signature → verify chain continuity (`prev_hash` matches last accepted for this device) → check idempotency (`unique(tenant_id, terminal_id, device_seq)`) → apply in a transaction → ack with server ids (`invoice_no`).
 5. Gaps in `device_seq` → server answers `409 SEQUENCE_GAP` with expected seq; device resends from there. Chain break → device quarantined, owner alerted (tamper or corruption).
