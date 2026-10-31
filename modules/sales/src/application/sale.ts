@@ -238,7 +238,18 @@ export async function completeSale(
       "The sale currency differs from the shift currency.",
     );
 
+  // A hand-set price needs the operator's price_override permission (a supervisor's override is a separate document
+  // the device records first; sale commands carry no override reference, so the operator's own grant decides).
+  const overridden = cmd.lines.some((l) => l.priceSource === "override");
+  const priceFlags =
+    overridden &&
+    (await operatorFlags(tx, ports.tenancy, t, cmd.operatorId, "sales:price_override")).includes(
+      "operator_unauthorized",
+    )
+      ? ["price_override_unauthorized"]
+      : [];
   const flags = new Set([
+    ...priceFlags,
     ...(await operatorFlags(tx, ports.tenancy, t, cmd.operatorId, "sales:sell", cmd.policyVersion)),
     ...(await priceCheck(tx, ports, o.priceTolerance, t, cmd)),
   ]);

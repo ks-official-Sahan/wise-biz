@@ -57,6 +57,7 @@ CREATE TABLE sales.shifts (
     AND blind_count IS NOT NULL AND z_report IS NOT NULL))
 );
 CREATE INDEX shifts_tenant_branch_idx ON sales.shifts (tenant_id, branch_id, business_date DESC, id DESC);
+CREATE INDEX shifts_tenant_date_idx ON sales.shifts (tenant_id, business_date DESC, id DESC);
 CREATE INDEX shifts_tenant_terminal_idx ON sales.shifts (tenant_id, terminal_id, opened_at DESC);
 -- One open shift per terminal.
 CREATE UNIQUE INDEX shifts_one_open_key ON sales.shifts (tenant_id, terminal_id) WHERE status = 'open';
@@ -106,6 +107,8 @@ CREATE TABLE sales.sales (
   CONSTRAINT sales_shift_fk FOREIGN KEY (tenant_id, shift_id) REFERENCES sales.shifts (tenant_id, id)
 );
 CREATE INDEX sales_tenant_branch_date_idx ON sales.sales (tenant_id, branch_id, business_date DESC, id DESC);
+-- Sales list across branches (and for a scoped member's any-of-branches filter).
+CREATE INDEX sales_tenant_date_idx ON sales.sales (tenant_id, business_date DESC, id DESC);
 CREATE INDEX sales_tenant_shift_idx ON sales.sales (tenant_id, shift_id);
 CREATE INDEX sales_tenant_customer_idx ON sales.sales (tenant_id, customer_id, completed_at DESC)
   WHERE customer_id IS NOT NULL;
@@ -195,7 +198,8 @@ CREATE TABLE sales.voids (
   CONSTRAINT voids_override_fk FOREIGN KEY (tenant_id, override_id) REFERENCES sales.overrides (tenant_id, id)
 );
 CREATE INDEX voids_tenant_shift_idx ON sales.voids (tenant_id, shift_id);
-CREATE INDEX voids_tenant_override_idx ON sales.voids (tenant_id, override_id) WHERE override_id IS NOT NULL;
+-- An override is used once.
+CREATE UNIQUE INDEX voids_override_key ON sales.voids (tenant_id, override_id) WHERE override_id IS NOT NULL;
 
 CREATE TABLE sales.returns (
   id uuid NOT NULL,
@@ -224,7 +228,7 @@ CREATE TABLE sales.returns (
 CREATE INDEX returns_tenant_sale_idx ON sales.returns (tenant_id, sale_id) WHERE sale_id IS NOT NULL;
 CREATE INDEX returns_tenant_shift_idx ON sales.returns (tenant_id, shift_id);
 CREATE INDEX returns_tenant_branch_date_idx ON sales.returns (tenant_id, branch_id, business_date DESC, id DESC);
-CREATE INDEX returns_tenant_override_idx ON sales.returns (tenant_id, override_id) WHERE override_id IS NOT NULL;
+CREATE UNIQUE INDEX returns_override_key ON sales.returns (tenant_id, override_id) WHERE override_id IS NOT NULL;
 
 CREATE TABLE sales.return_lines (
   tenant_id uuid NOT NULL,

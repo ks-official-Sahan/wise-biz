@@ -2253,6 +2253,319 @@
         "required": ["locationId", "currency", "lines"],
         "type": "object"
       },
+      "Sale": {
+        "properties": {
+          "branchId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "businessDate": {
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "type": "string"
+          },
+          "cashRoundingMinor": {
+            "type": "integer"
+          },
+          "completedAt": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "customerId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": ["string", "null"]
+          },
+          "discountMinor": {
+            "type": "integer"
+          },
+          "feeMinor": {
+            "type": "integer"
+          },
+          "flags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "id": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "invoiceNo": {
+            "type": ["string", "null"]
+          },
+          "lines": {
+            "items": {
+              "properties": {
+                "batchId": {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                  "type": ["string", "null"]
+                },
+                "discountMinor": {
+                  "type": "integer"
+                },
+                "line": {
+                  "type": "integer"
+                },
+                "locationId": {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "priceSource": {
+                  "enum": ["override", "batch", "list"],
+                  "type": "string"
+                },
+                "qty": {
+                  "type": "string"
+                },
+                "sku": {
+                  "type": "string"
+                },
+                "taxMinor": {
+                  "type": "integer"
+                },
+                "totalMinor": {
+                  "type": "integer"
+                },
+                "unitCostMinor": {
+                  "type": ["integer", "null"]
+                },
+                "unitPriceMinor": {
+                  "type": "integer"
+                },
+                "variantId": {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "line",
+                "variantId",
+                "name",
+                "sku",
+                "locationId",
+                "batchId",
+                "qty",
+                "unitPriceMinor",
+                "priceSource",
+                "discountMinor",
+                "taxMinor",
+                "totalMinor",
+                "unitCostMinor"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "operatorId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "payableMinor": {
+            "type": "integer"
+          },
+          "returns": {
+            "items": {
+              "properties": {
+                "flags": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "id": {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                  "type": "string"
+                },
+                "lines": {
+                  "items": {
+                    "properties": {
+                      "disposition": {
+                        "enum": ["restock", "writeoff"],
+                        "type": "string"
+                      },
+                      "line": {
+                        "type": "integer"
+                      },
+                      "qty": {
+                        "type": "string"
+                      },
+                      "refundMinor": {
+                        "type": "integer"
+                      },
+                      "saleLine": {
+                        "type": ["integer", "null"]
+                      }
+                    },
+                    "required": ["line", "saleLine", "qty", "refundMinor", "disposition"],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "occurredAt": {
+                  "type": "string"
+                },
+                "reason": {
+                  "type": "string"
+                },
+                "returnNo": {
+                  "type": "integer"
+                },
+                "totalMinor": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "id",
+                "returnNo",
+                "totalMinor",
+                "reason",
+                "flags",
+                "occurredAt",
+                "lines"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "saleNo": {
+            "type": "integer"
+          },
+          "shiftId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "status": {
+            "enum": ["completed", "voided"],
+            "type": "string"
+          },
+          "subtotalMinor": {
+            "type": "integer"
+          },
+          "taxMinor": {
+            "type": "integer"
+          },
+          "tenders": {
+            "items": {
+              "properties": {
+                "amountMinor": {
+                  "type": "integer"
+                },
+                "card": {
+                  "properties": {
+                    "authCode": {
+                      "type": ["string", "null"]
+                    },
+                    "brand": {
+                      "type": ["string", "null"]
+                    },
+                    "last4": {
+                      "type": ["string", "null"]
+                    },
+                    "provider": {
+                      "type": ["string", "null"]
+                    },
+                    "providerRef": {
+                      "type": ["string", "null"]
+                    }
+                  },
+                  "required": ["provider", "providerRef", "authCode", "last4", "brand"],
+                  "type": ["object", "null"]
+                },
+                "changeMinor": {
+                  "type": ["integer", "null"]
+                },
+                "id": {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string"
+                },
+                "receivedMinor": {
+                  "type": ["integer", "null"]
+                }
+              },
+              "required": ["id", "kind", "amountMinor", "receivedMinor", "changeMinor", "card"],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "terminalId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "totalMinor": {
+            "type": "integer"
+          },
+          "void": {
+            "properties": {
+              "id": {
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                "type": "string"
+              },
+              "occurredAt": {
+                "type": "string"
+              },
+              "operatorId": {
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                "type": "string"
+              },
+              "overrideId": {
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                "type": ["string", "null"]
+              },
+              "reason": {
+                "type": "string"
+              }
+            },
+            "required": ["id", "reason", "operatorId", "overrideId", "occurredAt"],
+            "type": ["object", "null"]
+          }
+        },
+        "required": [
+          "id",
+          "branchId",
+          "terminalId",
+          "shiftId",
+          "operatorId",
+          "customerId",
+          "saleNo",
+          "invoiceNo",
+          "status",
+          "currency",
+          "subtotalMinor",
+          "discountMinor",
+          "feeMinor",
+          "taxMinor",
+          "totalMinor",
+          "cashRoundingMinor",
+          "payableMinor",
+          "businessDate",
+          "flags",
+          "completedAt"
+        ],
+        "type": "object"
+      },
+      "SalePage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/Sale"
+            },
+            "type": "array"
+          },
+          "nextCursor": {
+            "type": ["string", "null"]
+          }
+        },
+        "required": ["items", "nextCursor"],
+        "type": "object"
+      },
       "SearchHit": {
         "properties": {
           "barcodes": {
@@ -2367,6 +2680,223 @@
           }
         },
         "required": ["locationId", "items"],
+        "type": "object"
+      },
+      "Shift": {
+        "properties": {
+          "blindCount": {
+            "type": ["boolean", "null"]
+          },
+          "branchId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "businessDate": {
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "type": "string"
+          },
+          "closedAt": {
+            "type": ["string", "null"]
+          },
+          "closedBy": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": ["string", "null"]
+          },
+          "countedCashMinor": {
+            "type": ["integer", "null"]
+          },
+          "currency": {
+            "type": "string"
+          },
+          "expectedCashMinor": {
+            "type": ["integer", "null"]
+          },
+          "flags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "id": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "openedAt": {
+            "type": "string"
+          },
+          "openedBy": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "openingFloatMinor": {
+            "type": "integer"
+          },
+          "overShortMinor": {
+            "type": ["integer", "null"]
+          },
+          "status": {
+            "enum": ["open", "closed"],
+            "type": "string"
+          },
+          "terminalId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "zReport": {
+            "properties": {
+              "cash": {
+                "properties": {
+                  "countedMinor": {
+                    "type": "integer"
+                  },
+                  "dropsMinor": {
+                    "type": "integer"
+                  },
+                  "expectedMinor": {
+                    "type": "integer"
+                  },
+                  "floatAddMinor": {
+                    "type": "integer"
+                  },
+                  "openingFloatMinor": {
+                    "type": "integer"
+                  },
+                  "overShortMinor": {
+                    "type": "integer"
+                  },
+                  "payInMinor": {
+                    "type": "integer"
+                  },
+                  "payOutMinor": {
+                    "type": "integer"
+                  },
+                  "refundsMinor": {
+                    "type": "integer"
+                  },
+                  "salesMinor": {
+                    "type": "integer"
+                  },
+                  "voidedMinor": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "openingFloatMinor",
+                  "salesMinor",
+                  "refundsMinor",
+                  "voidedMinor",
+                  "payInMinor",
+                  "payOutMinor",
+                  "floatAddMinor",
+                  "dropsMinor",
+                  "expectedMinor",
+                  "countedMinor",
+                  "overShortMinor"
+                ],
+                "type": "object"
+              },
+              "drawerOpens": {
+                "type": "integer"
+              },
+              "returns": {
+                "properties": {
+                  "count": {
+                    "type": "integer"
+                  },
+                  "totalMinor": {
+                    "type": "integer"
+                  }
+                },
+                "required": ["count", "totalMinor"],
+                "type": "object"
+              },
+              "sales": {
+                "properties": {
+                  "count": {
+                    "type": "integer"
+                  },
+                  "discountMinor": {
+                    "type": "integer"
+                  },
+                  "payableMinor": {
+                    "type": "integer"
+                  },
+                  "taxMinor": {
+                    "type": "integer"
+                  }
+                },
+                "required": ["count", "payableMinor", "taxMinor", "discountMinor"],
+                "type": "object"
+              },
+              "tenders": {
+                "items": {
+                  "properties": {
+                    "kind": {
+                      "type": "string"
+                    },
+                    "refundsMinor": {
+                      "type": "integer"
+                    },
+                    "salesMinor": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": ["kind", "salesMinor", "refundsMinor"],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "voids": {
+                "properties": {
+                  "count": {
+                    "type": "integer"
+                  },
+                  "payableMinor": {
+                    "type": "integer"
+                  }
+                },
+                "required": ["count", "payableMinor"],
+                "type": "object"
+              }
+            },
+            "required": ["sales", "voids", "returns", "tenders", "cash", "drawerOpens"],
+            "type": ["object", "null"]
+          }
+        },
+        "required": [
+          "id",
+          "branchId",
+          "terminalId",
+          "openedBy",
+          "closedBy",
+          "businessDate",
+          "currency",
+          "status",
+          "openingFloatMinor",
+          "expectedCashMinor",
+          "countedCashMinor",
+          "overShortMinor",
+          "blindCount",
+          "flags",
+          "openedAt",
+          "closedAt",
+          "zReport"
+        ],
+        "type": "object"
+      },
+      "ShiftPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/Shift"
+            },
+            "type": "array"
+          },
+          "nextCursor": {
+            "type": ["string", "null"]
+          }
+        },
+        "required": ["items", "nextCursor"],
         "type": "object"
       },
       "Tag": {
@@ -6395,6 +6925,423 @@
         },
         "summary": "Replace a region's settings and rule set (optimistic lock on version)",
         "tags": ["pricing"]
+      }
+    },
+    "/v1/sales/sales": {
+      "get": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "branchId",
+            "required": false,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "shiftId",
+            "required": false,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "customerId",
+            "required": false,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "enum": ["completed", "voided"],
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "flagged",
+            "required": false,
+            "schema": {
+              "enum": ["true", "false"],
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "flag",
+            "required": false,
+            "schema": {
+              "pattern": "^[a-z_]{1,40}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "include",
+            "required": false,
+            "schema": {
+              "pattern": "^[a-z,]{0,60}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "after",
+            "required": false,
+            "schema": {
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}\\|[0-9a-f-]{36}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalePage"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Sales, newest first (keyset). Filters: branch, shift, customer, status, business dates, flagged. include=lines,tenders,returns,void adds each with one query for the page",
+        "tags": ["sales"]
+      }
+    },
+    "/v1/sales/sales/{id}": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "include",
+            "required": false,
+            "schema": {
+              "pattern": "^[a-z,]{0,60}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Sale"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "One sale; lines, tenders, returns and void come with ?include=",
+        "tags": ["sales"]
+      }
+    },
+    "/v1/sales/shifts": {
+      "get": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "branchId",
+            "required": false,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "terminalId",
+            "required": false,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "enum": ["open", "closed"],
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "after",
+            "required": false,
+            "schema": {
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}\\|[0-9a-f-]{36}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShiftPage"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Shifts, newest first (keyset)",
+        "tags": ["sales"]
+      }
+    },
+    "/v1/sales/shifts/{id}": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Shift"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "One shift with its Z-report (frozen at close, null while open)",
+        "tags": ["sales"]
+      }
+    },
+    "/v1/sales/shifts/{id}/z-report": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "cash": {
+                      "properties": {
+                        "countedMinor": {
+                          "type": "integer"
+                        },
+                        "dropsMinor": {
+                          "type": "integer"
+                        },
+                        "expectedMinor": {
+                          "type": "integer"
+                        },
+                        "floatAddMinor": {
+                          "type": "integer"
+                        },
+                        "openingFloatMinor": {
+                          "type": "integer"
+                        },
+                        "overShortMinor": {
+                          "type": "integer"
+                        },
+                        "payInMinor": {
+                          "type": "integer"
+                        },
+                        "payOutMinor": {
+                          "type": "integer"
+                        },
+                        "refundsMinor": {
+                          "type": "integer"
+                        },
+                        "salesMinor": {
+                          "type": "integer"
+                        },
+                        "voidedMinor": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "openingFloatMinor",
+                        "salesMinor",
+                        "refundsMinor",
+                        "voidedMinor",
+                        "payInMinor",
+                        "payOutMinor",
+                        "floatAddMinor",
+                        "dropsMinor",
+                        "expectedMinor",
+                        "countedMinor",
+                        "overShortMinor"
+                      ],
+                      "type": "object"
+                    },
+                    "drawerOpens": {
+                      "type": "integer"
+                    },
+                    "returns": {
+                      "properties": {
+                        "count": {
+                          "type": "integer"
+                        },
+                        "totalMinor": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": ["count", "totalMinor"],
+                      "type": "object"
+                    },
+                    "sales": {
+                      "properties": {
+                        "count": {
+                          "type": "integer"
+                        },
+                        "discountMinor": {
+                          "type": "integer"
+                        },
+                        "payableMinor": {
+                          "type": "integer"
+                        },
+                        "taxMinor": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": ["count", "payableMinor", "taxMinor", "discountMinor"],
+                      "type": "object"
+                    },
+                    "tenders": {
+                      "items": {
+                        "properties": {
+                          "kind": {
+                            "type": "string"
+                          },
+                          "refundsMinor": {
+                            "type": "integer"
+                          },
+                          "salesMinor": {
+                            "type": "integer"
+                          }
+                        },
+                        "required": ["kind", "salesMinor", "refundsMinor"],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "voids": {
+                      "properties": {
+                        "count": {
+                          "type": "integer"
+                        },
+                        "payableMinor": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": ["count", "payableMinor"],
+                      "type": "object"
+                    }
+                  },
+                  "required": ["sales", "voids", "returns", "tenders", "cash", "drawerOpens"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "The Z-report of a closed shift (404 while it is open)",
+        "tags": ["sales"]
       }
     },
     "/v1/search/variants": {

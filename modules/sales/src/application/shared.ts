@@ -29,6 +29,8 @@ const UNIQUE: Readonly<Record<string, string>> = {
   returns_terminal_no_key: "This terminal already used this return number.",
   shifts_one_open_key: "This terminal already has an open shift.",
   voids_sale_key: "This sale is already voided.",
+  voids_override_key: "This override was already used.",
+  returns_override_key: "This override was already used.",
 };
 
 /** Unique violations become 409 (the transaction is aborted either way). */
@@ -99,6 +101,85 @@ export async function assertReplay(
   if (r.rows[0]?.same !== true) {
     throw new DomainError("CONFLICT", "A different document already uses this id.");
   }
+}
+
+/** Locks the document id; true when this exact document was already recorded (the caller replays its answer). */
+export async function seen(
+  tx: TxHandle,
+  t: TerminalContext,
+  docType: DocType,
+  docId: string,
+  meta: CommandMeta,
+): Promise<boolean> {
+  await lockDocument(tx, t.tenantId, docId);
+  const r = await tx.query(
+    "select 1 from sales.device_documents where tenant_id = $1 and doc_type = $2 and doc_id = $3",
+    [t.tenantId, docType, docId],
+  );
+  if (r.rowCount !== 1) return false;
+  await assertReplay(tx, t, docType, docId, meta);
+  return true;
+}
+
+export interface ShiftRow {
+  readonly id: string;
+  readonly status: "open" | "closed";
+  readonly currency: string;
+  readonly opening_float_minor: string;
+}
+
+/**
+ * The terminal's open shift, locked: FOR SHARE by documents that add to it, FOR UPDATE by CloseShift, so a close
+ * waits for documents committing beside it and no document joins a closed shift.
+ */
+export async function lockOpenShift(
+  tx: TxHandle,
+  t: TerminalContext,
+  shiftId: string,
+  mode: "share" | "update",
+): Promise<ShiftRow> {
+  const r = await tx.query<ShiftRow & { terminal_id: string }>(
+    `select id, terminal_id, status, currency, opening_float_minor from sales.shifts
+     where tenant_id = $1 and id = $2 for ${mode === "share" ? "share" : "update"}`,
+    [t.tenantId, shiftId],
+  );
+  const row = r.rows[0];
+  if (row?.terminal_id !== t.terminalId)
+    return invalid("shiftId", "Unknown shift for this terminal.");
+  if (row.status !== "open") return invalid("shiftId", "This shift is closed.");
+  return row;
+}
+
+/**
+ * An override a document relies on: it must exist, grant exactly the permission, be requested by the document's
+ * operator, and (when it names one) be for this document. An approver who lacked the permission was flagged on the
+ * override; the document carries `override_unauthorized` for review instead of being refused (offline policy).
+ */
+export async function overrideFlags(
+  tx: TxHandle,
+  t: TerminalContext,
+  overrideId: string,
+  need: { permission: string; operatorId: string; subjectId: string | null },
+): Promise<string[]> {
+  const r = await tx.query<{
+    permission: string;
+    requester_id: string;
+    subject_id: string | null;
+    flags: string[];
+  }>(
+    `select permission, requester_id, subject_id, flags from sales.overrides
+     where tenant_id = $1 and id = $2 and terminal_id = $3`,
+    [t.tenantId, overrideId, t.terminalId],
+  );
+  const o = r.rows[0];
+  if (o === undefined) return invalid("overrideId", "Unknown override.");
+  if (o.permission !== need.permission)
+    invalid("overrideId", `This override does not grant ${need.permission}.`);
+  if (o.requester_id !== need.operatorId)
+    invalid("overrideId", "This override was requested by another operator.");
+  if (o.subject_id !== null && o.subject_id !== need.subjectId)
+    invalid("overrideId", "This override was approved for another document.");
+  return o.flags.includes("approver_unauthorized") ? ["override_unauthorized"] : [];
 }
 
 /** Inventory's port takes the module-kit command context; the operator is the acting user. */
