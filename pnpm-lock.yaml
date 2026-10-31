@@ -1165,6 +1165,9 @@ importers:
       '@wise-biz/storage':
         specifier: workspace:*
         version: link:../../packages/storage
+      '@wise-biz/sync':
+        specifier: workspace:*
+        version: link:../../packages/sync
       hono:
         specifier: 4.13.13
         version: 4.13.13
@@ -1744,9 +1747,18 @@ importers:
 
   packages/sync:
     dependencies:
+      '@noble/ciphers':
+        specifier: 2.4.0
+        version: 2.4.0
+      '@noble/hashes':
+        specifier: 2.4.0
+        version: 2.4.0
       '@wise-biz/crypto':
         specifier: workspace:*
         version: link:../crypto
+      '@wise-biz/http-signatures':
+        specifier: workspace:*
+        version: link:../http-signatures
       '@wise-biz/ids':
         specifier: workspace:*
         version: link:../ids

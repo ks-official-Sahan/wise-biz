@@ -15,7 +15,10 @@
     "test": "vitest run --coverage"
   },
   "dependencies": {
+    "@noble/ciphers": "2.4.0",
+    "@noble/hashes": "2.4.0",
     "@wise-biz/crypto": "workspace:*",
+    "@wise-biz/http-signatures": "workspace:*",
     "@wise-biz/ids": "workspace:*"
   },
   "devDependencies": {

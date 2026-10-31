@@ -1,6 +1,7 @@
-import { canonicalize, constantTimeEqual, sha256, utf8, verify } from "@wise-biz/crypto";
+import { constantTimeEqual, verify } from "@wise-biz/crypto";
 import { withTenantTx } from "@wise-biz/db";
 import { DomainError } from "@wise-biz/errors";
+import { commandHash } from "@wise-biz/sync";
 
 import { COMMAND_SCHEMAS, isCommandType } from "./commands.ts";
 
@@ -89,24 +90,8 @@ export interface BatchResult {
 const GENESIS = new Uint8Array(32);
 const b64 = (s: string) => new Uint8Array(Buffer.from(s, "base64"));
 
-/**
- * hash = sha256(canonical({ type, seq, body without meta }) || prev_hash): exactly what the device signs. The command
- * type and sequence number are inside the hash, so a signed command cannot be relabelled or renumbered in transit.
- */
-export function commandHash(
-  type: string,
-  seq: number,
-  body: RawCommand["body"],
-  prevHash: Uint8Array,
-): Uint8Array {
-  const rest: Record<string, unknown> = { ...body };
-  delete rest.meta;
-  const canon = utf8(canonicalize({ type, seq, body: rest }));
-  const data = new Uint8Array(canon.length + prevHash.length);
-  data.set(canon, 0);
-  data.set(prevHash, canon.length);
-  return sha256(data);
-}
+/** The shared definition lives in the device client (`@wise-biz/sync`); both sides must hash identically. */
+export { commandHash };
 
 /**
  * A deterministic refusal of a validly signed command: a business rule (DomainError) or a data/integrity error from
