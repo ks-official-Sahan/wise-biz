@@ -76,6 +76,7 @@ describe("registry + migrations", () => {
       "devices",
       "catalog",
       "pricing",
+      "inventory",
       "search",
       "template",
     ]);

@@ -16,6 +16,7 @@ import {
   workerEnv,
 } from "@wise-biz/env";
 import { createPgBus } from "@wise-biz/events";
+import { uuidv7 } from "@wise-biz/ids";
 import { createMailer } from "@wise-biz/mailer";
 import {
   createAnchorJob,
@@ -23,6 +24,12 @@ import {
   createPartitionJob,
   createPeriodic,
 } from "@wise-biz/module-audit";
+import {
+  ensureInventoryPartitions,
+  exclusive,
+  runDriftCheck,
+  runExpiringBatches,
+} from "@wise-biz/module-inventory";
 import { storeFromEnv } from "@wise-biz/storage";
 
 import { createConsumers } from "./consumers.ts";
@@ -141,7 +148,28 @@ export function startWorker(
       } while (n >= PRUNE_BATCH);
     },
   });
-  const loops = [chainer, anchorJob, partitionJob, pruneJob];
+  // Inventory jobs (ADR 0013): one replica at a time via a session advisory lock; each is idempotent.
+  const inventoryDeps = { pool, ids: { uuidv7 }, now: () => new Date() };
+  const inventoryJob = (name: string, intervalMs: number, run: () => Promise<unknown>) =>
+    createPeriodic({
+      name,
+      intervalMs,
+      logger,
+      onMetric: onAuditMetric,
+      run: async () => {
+        const result = await exclusive(pool, name, run);
+        if (result !== undefined && result !== 0)
+          logger.info({ job: name, result }, "inventory job done");
+      },
+    });
+  const inventoryLoops = [
+    inventoryJob("inventory-partitions", 24 * HOUR_MS, () => ensureInventoryPartitions(pool)),
+    inventoryJob("inventory-expiring", 6 * HOUR_MS, () =>
+      runExpiringBatches(inventoryDeps, env.INVENTORY_EXPIRY_HORIZON_DAYS),
+    ),
+    inventoryJob("inventory-drift", 24 * HOUR_MS, () => runDriftCheck(inventoryDeps)),
+  ];
+  const loops = [chainer, anchorJob, partitionJob, pruneJob, ...inventoryLoops];
   for (const l of loops) l.start();
   metrics.start();
   logger.info({ consumers: consumerSet.map((c) => c.name) }, "worker started");

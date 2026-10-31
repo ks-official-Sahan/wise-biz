@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import { createConsumers } from "../src/consumers.ts";
 
 describe("consumer set", () => {
-  it("runs the invite email, search and pricing projections, and catalog import consumers", () => {
+  it("runs the invite email, search, pricing and inventory projections, and catalog import consumers", () => {
     const consumers = createConsumers({
       mailer: createCaptureMailer(),
       consoleUrl: "http://localhost:3001",
@@ -16,6 +16,8 @@ describe("consumer set", () => {
       ["tenancy.invite-email", ["tenancy.member.invited@v1"]],
       ["search.catalog-projection", ["catalog.variant.upserted@v1"]],
       ["pricing.variant-facts", ["catalog.variant.upserted@v1"]],
+      ["inventory.variant-facts", ["catalog.variant.upserted@v1"]],
+      ["inventory.low-stock", ["inventory.movement.recorded@v1"]],
       ["catalog.import-runner", ["catalog.import.requested@v1"]],
     ]);
   });

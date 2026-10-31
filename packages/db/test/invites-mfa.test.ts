@@ -75,6 +75,7 @@ describe("migrations and lint", () => {
       "devices",
       "catalog",
       "pricing",
+      "inventory",
       "search",
       "template",
     ]);

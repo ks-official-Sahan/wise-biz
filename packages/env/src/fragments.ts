@@ -126,6 +126,8 @@ export const workerEnv = {
   WORKER_LEASE_MS: z.coerce.number().int().min(1000).max(3_600_000).default(300_000),
   WORKER_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(1000).default(10),
   WORKER_HANDLER_TIMEOUT_MS: z.coerce.number().int().min(100).max(600_000).default(30_000),
+  /** inventory.batch.expiring fires when a batch with stock expires within this many days. */
+  INVENTORY_EXPIRY_HORIZON_DAYS: z.coerce.number().int().min(0).max(365).default(7),
 };
 
 export const chainerEnv = {

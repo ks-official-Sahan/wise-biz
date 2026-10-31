@@ -27,6 +27,11 @@ export const DEFAULT_ROLE_GRANTS: Readonly<Record<SystemRole, readonly Permissio
     "catalog:write",
     "pricing:read",
     "pricing:write",
+    "inventory:read",
+    "inventory:receive",
+    "inventory:adjust",
+    "inventory:write",
+    "inventory:sell_expired",
   ],
   supervisor: [
     "tenancy:read",
@@ -35,10 +40,21 @@ export const DEFAULT_ROLE_GRANTS: Readonly<Record<SystemRole, readonly Permissio
     "devices:unlock",
     "catalog:read",
     "pricing:read",
+    "inventory:read",
+    "inventory:receive",
   ],
-  cashier: ["devices:pin", "catalog:read", "pricing:read"],
-  inventory_clerk: ["devices:pin", "catalog:read", "catalog:write", "pricing:read"],
-  accountant: ["tenancy:read", "catalog:read", "pricing:read"],
+  cashier: ["devices:pin", "catalog:read", "pricing:read", "inventory:read"],
+  inventory_clerk: [
+    "devices:pin",
+    "catalog:read",
+    "catalog:write",
+    "pricing:read",
+    "inventory:read",
+    "inventory:receive",
+    "inventory:adjust",
+    "inventory:write",
+  ],
+  accountant: ["tenancy:read", "catalog:read", "pricing:read", "inventory:read"],
 };
 
 export interface NewBusinessInput {
