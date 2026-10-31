@@ -20,11 +20,24 @@ export interface Quote extends PricedCart {
  * one indexed query for the whole cart (prices, variant facts, coupons by `= any`), so cost does not grow per line in
  * round trips. Coupon max uses are enforced here; uses are counted when a sale completes (sales module).
  */
+/**
+ * Inventory owns batches; the composition root injects this read (one indexed query for the cart) so a batch with its
+ * own sale price wins over the price list (data-model.md, Batches and FEFO) without a cross-module table read.
+ */
+export type BatchPrices = (
+  tx: TxHandle,
+  tenantId: string,
+  batchIds: readonly string[],
+) => Promise<
+  ReadonlyMap<string, { readonly variantId: string; readonly salePriceMinor: number | null }>
+>;
+
 export async function quote(
   tx: TxHandle,
   tenantId: string,
   input: z.output<typeof QuoteSchema>,
   now: Date,
+  batchPrices?: BatchPrices,
 ): Promise<Quote> {
   // FOR SHARE: a concurrent price or tax-region write (both lock this row) finishes before or after the whole quote,
   // so one quote never mixes two snapshots.
@@ -68,6 +81,21 @@ export async function quote(
   ];
 
   const fact = new Map(facts.rows.map((f) => [f.variant_id, f]));
+  const batchIds = input.lines.flatMap((l) => (l.batchId === undefined ? [] : [l.batchId]));
+  if (batchIds.length > 0 && batchPrices === undefined) {
+    return invalid("lines", "Batch pricing is not available here.");
+  }
+  const batches =
+    batchIds.length === 0 || batchPrices === undefined
+      ? new Map<string, { variantId: string; salePriceMinor: number | null }>()
+      : await batchPrices(tx, tenantId, batchIds);
+  const batchPrice = (l: (typeof input.lines)[number], i: number) => {
+    if (l.batchId === undefined) return {};
+    const b = batches.get(l.batchId);
+    if (b?.variantId !== l.variantId)
+      return invalid(`lines.${String(i)}.batchId`, "Unknown batch for this variant.");
+    return b.salePriceMinor === null ? {} : { batchPriceMinor: b.salePriceMinor };
+  };
   const lines: CartLine[] = input.lines.map((l, i) => {
     const f = fact.get(l.variantId);
     if (f === undefined || f.archived)
@@ -79,6 +107,7 @@ export async function quote(
       taxCategory: f.tax_category,
       qty: l.qty,
       ...(l.priceOverrideMinor === undefined ? {} : { priceOverrideMinor: l.priceOverrideMinor }),
+      ...batchPrice(l, i),
     };
   });
   const region = regions[0];

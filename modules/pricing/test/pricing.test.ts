@@ -24,7 +24,19 @@ let role = "owner";
 let device: "active" | "suspended" | null = null;
 let now = Date.parse("2026-10-29T10:00:00.000Z");
 
-const pricingModule = createPricingModule();
+/** Inventory's batch read, faked: batch id -> its variant and own sale price. */
+const batches = new Map<string, { variantId: string; salePriceMinor: number | null }>();
+const pricingModule = createPricingModule({
+  batchPrices: (_tx, _tenant, ids) =>
+    Promise.resolve(
+      new Map(
+        ids.flatMap((id) => {
+          const b = batches.get(id);
+          return b === undefined ? [] : [[id, b] as const];
+        }),
+      ),
+    ),
+});
 const matrix = matrixFromRows(createCatalog(pricingModule.permissions), [
   { role: "owner", permission: "pricing:read" },
   { role: "owner", permission: "pricing:write" },
@@ -665,6 +677,37 @@ describe("quote", () => {
       { code: "NOPE", status: "unknown" },
     ]);
     expect(q.discountMinor).toBe(5_000 + 50_000);
+  });
+
+  it("a batch with its own sale price wins over the list; a foreign batch is refused", async () => {
+    const [own, plain, foreign] = [uuidv7(), uuidv7(), uuidv7()];
+    batches.set(own, { variantId: tea, salePriceMinor: 20_000 });
+    batches.set(plain, { variantId: cake, salePriceMinor: null });
+    batches.set(foreign, { variantId: cake, salePriceMinor: 1 });
+    const q = await ok<Quote>(
+      await send(
+        "POST",
+        "/quote",
+        cart({
+          lines: [
+            { id: "1", variantId: tea, qty: "2", batchId: own },
+            { id: "2", variantId: cake, qty: "1", batchId: plain },
+          ],
+        }),
+      ),
+    );
+    expect(q.lines.map((l) => [l.priceSource, l.unitPriceMinor])).toEqual([
+      ["batch", 20_000],
+      ["list", 45_050],
+    ]);
+    for (const batchId of [foreign, uuidv7()]) {
+      const r = await send(
+        "POST",
+        "/quote",
+        cart({ lines: [{ id: "1", variantId: tea, qty: "1", batchId }] }),
+      );
+      expect(r.status).toBe(422);
+    }
   });
 
   it("rejects unknown and archived variants, and a list not in force", async () => {

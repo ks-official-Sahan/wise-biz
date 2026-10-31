@@ -2,6 +2,115 @@
   "components": {
     "parameters": {},
     "schemas": {
+      "Adjust": {
+        "properties": {
+          "id": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "lines": {
+            "items": {
+              "properties": {
+                "batchId": {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                  "type": ["string", "null"]
+                },
+                "qty": {
+                  "pattern": "^-?\\d{1,14}(\\.\\d{1,4})?$",
+                  "type": "string"
+                },
+                "variantId": {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                  "type": "string"
+                }
+              },
+              "required": ["variantId", "qty"],
+              "type": "object"
+            },
+            "maxItems": 500,
+            "minItems": 1,
+            "type": "array"
+          },
+          "locationId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "note": {
+            "maxLength": 500,
+            "minLength": 1,
+            "type": "string"
+          },
+          "reason": {
+            "enum": [
+              "damage",
+              "theft",
+              "loss",
+              "found",
+              "count_correction",
+              "expiry",
+              "writeoff",
+              "sample",
+              "other"
+            ],
+            "type": "string"
+          }
+        },
+        "required": ["locationId", "reason", "lines"],
+        "type": "object"
+      },
+      "Adjustment": {
+        "properties": {
+          "balances": {
+            "items": {
+              "properties": {
+                "batchId": {
+                  "type": ["string", "null"]
+                },
+                "locationId": {
+                  "type": "string"
+                },
+                "qty": {
+                  "type": "string"
+                },
+                "reserved": {
+                  "type": "string"
+                },
+                "variantId": {
+                  "type": "string"
+                }
+              },
+              "required": ["locationId", "variantId", "batchId", "qty", "reserved"],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "id": {
+            "type": "string"
+          },
+          "locationId": {
+            "type": "string"
+          },
+          "reason": {
+            "enum": [
+              "damage",
+              "theft",
+              "loss",
+              "found",
+              "count_correction",
+              "expiry",
+              "writeoff",
+              "sample",
+              "other"
+            ],
+            "type": "string"
+          },
+          "valueMinor": {
+            "type": "integer"
+          }
+        },
+        "required": ["id", "locationId", "reason", "valueMinor", "balances"],
+        "type": "object"
+      },
       "AuditEntry": {
         "properties": {
           "action": {
@@ -109,6 +218,51 @@
         "required": ["entries", "nextCursor"],
         "type": "object"
       },
+      "BalancePage": {
+        "properties": {
+          "items": {
+            "items": {
+              "properties": {
+                "available": {
+                  "type": "string"
+                },
+                "batchId": {
+                  "type": ["string", "null"]
+                },
+                "expiresOn": {
+                  "type": ["string", "null"]
+                },
+                "locationId": {
+                  "type": "string"
+                },
+                "lotCode": {
+                  "type": ["string", "null"]
+                },
+                "qty": {
+                  "type": "string"
+                },
+                "reserved": {
+                  "type": "string"
+                },
+                "salePriceMinor": {
+                  "type": ["integer", "null"]
+                },
+                "variantId": {
+                  "type": "string"
+                }
+              },
+              "required": ["locationId", "variantId", "batchId", "qty", "reserved", "available"],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "nextCursor": {
+            "type": ["string", "null"]
+          }
+        },
+        "required": ["items", "nextCursor"],
+        "type": "object"
+      },
       "Barcode": {
         "properties": {
           "code": {
@@ -176,6 +330,45 @@
           }
         },
         "required": ["code", "format", "variant", "product"],
+        "type": "object"
+      },
+      "Batch": {
+        "properties": {
+          "currency": {
+            "type": "string"
+          },
+          "expiresOn": {
+            "type": ["string", "null"]
+          },
+          "id": {
+            "type": "string"
+          },
+          "lotCode": {
+            "type": ["string", "null"]
+          },
+          "receivedAt": {
+            "type": ["string", "null"]
+          },
+          "salePriceMinor": {
+            "type": ["integer", "null"]
+          },
+          "unitCostMinor": {
+            "type": "integer"
+          },
+          "variantId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "variantId",
+          "lotCode",
+          "expiresOn",
+          "currency",
+          "unitCostMinor",
+          "salePriceMinor",
+          "receivedAt"
+        ],
         "type": "object"
       },
       "Category": {
@@ -1125,6 +1318,61 @@
         ],
         "type": "object"
       },
+      "MovementPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "properties": {
+                "batchId": {
+                  "type": ["string", "null"]
+                },
+                "id": {
+                  "type": "string"
+                },
+                "locationId": {
+                  "type": "string"
+                },
+                "occurredAt": {
+                  "type": "string"
+                },
+                "qty": {
+                  "type": "string"
+                },
+                "reason": {
+                  "type": "string"
+                },
+                "sourceId": {
+                  "type": "string"
+                },
+                "sourceType": {
+                  "type": "string"
+                },
+                "unitCostMinor": {
+                  "type": ["integer", "null"]
+                }
+              },
+              "required": [
+                "id",
+                "locationId",
+                "batchId",
+                "qty",
+                "reason",
+                "sourceType",
+                "sourceId",
+                "unitCostMinor",
+                "occurredAt"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "nextCursor": {
+            "type": ["string", "null"]
+          }
+        },
+        "required": ["items", "nextCursor"],
+        "type": "object"
+      },
       "OperatorSession": {
         "properties": {
           "expiresAt": {
@@ -1830,6 +2078,10 @@
           "lines": {
             "items": {
               "properties": {
+                "batchId": {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                  "type": "string"
+                },
                 "id": {
                   "maxLength": 64,
                   "minLength": 1,
@@ -1861,6 +2113,144 @@
           }
         },
         "required": ["priceListId", "lines"],
+        "type": "object"
+      },
+      "Receipt": {
+        "properties": {
+          "balances": {
+            "items": {
+              "properties": {
+                "batchId": {
+                  "type": ["string", "null"]
+                },
+                "locationId": {
+                  "type": "string"
+                },
+                "qty": {
+                  "type": "string"
+                },
+                "reserved": {
+                  "type": "string"
+                },
+                "variantId": {
+                  "type": "string"
+                }
+              },
+              "required": ["locationId", "variantId", "batchId", "qty", "reserved"],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "lines": {
+            "items": {
+              "properties": {
+                "batchId": {
+                  "type": ["string", "null"]
+                },
+                "line": {
+                  "type": "integer"
+                },
+                "qty": {
+                  "type": "string"
+                },
+                "unitCostMinor": {
+                  "type": "integer"
+                },
+                "variantId": {
+                  "type": "string"
+                }
+              },
+              "required": ["line", "variantId", "batchId", "qty", "unitCostMinor"],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "locationId": {
+            "type": "string"
+          },
+          "receivedAt": {
+            "type": "string"
+          }
+        },
+        "required": ["id", "locationId", "currency", "receivedAt", "lines", "balances"],
+        "type": "object"
+      },
+      "Receive": {
+        "properties": {
+          "currency": {
+            "type": "string"
+          },
+          "id": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "lines": {
+            "items": {
+              "properties": {
+                "expiresOn": {
+                  "format": "date",
+                  "type": "string"
+                },
+                "lotCode": {
+                  "maxLength": 64,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "qty": {
+                  "pattern": "^\\d{1,14}(\\.\\d{1,4})?$",
+                  "type": "string"
+                },
+                "salePriceMinor": {
+                  "maximum": 9007199254740991,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "unitCostMinor": {
+                  "maximum": 9007199254740991,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "variantId": {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                  "type": "string"
+                }
+              },
+              "required": ["variantId", "qty", "unitCostMinor"],
+              "type": "object"
+            },
+            "maxItems": 500,
+            "minItems": 1,
+            "type": "array"
+          },
+          "locationId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "purchaseOrderId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "receivedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "reference": {
+            "maxLength": 64,
+            "minLength": 1,
+            "type": "string"
+          },
+          "supplierId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          }
+        },
+        "required": ["locationId", "currency", "lines"],
         "type": "object"
       },
       "SearchHit": {
@@ -1944,6 +2334,39 @@
           }
         },
         "required": ["version", "prices"],
+        "type": "object"
+      },
+      "SetThresholds": {
+        "properties": {
+          "items": {
+            "items": {
+              "properties": {
+                "maxQty": {
+                  "pattern": "^\\d{1,14}(\\.\\d{1,4})?$",
+                  "type": ["string", "null"]
+                },
+                "minQty": {
+                  "pattern": "^\\d{1,14}(\\.\\d{1,4})?$",
+                  "type": ["string", "null"]
+                },
+                "variantId": {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                  "type": "string"
+                }
+              },
+              "required": ["variantId", "minQty"],
+              "type": "object"
+            },
+            "maxItems": 1000,
+            "minItems": 1,
+            "type": "array"
+          },
+          "locationId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          }
+        },
+        "required": ["locationId", "items"],
         "type": "object"
       },
       "Tag": {
@@ -2828,6 +3251,27 @@
         "required": ["tenantId", "name", "branchId", "locationId"],
         "type": "object"
       },
+      "Threshold": {
+        "properties": {
+          "locationId": {
+            "type": "string"
+          },
+          "lowSince": {
+            "type": ["string", "null"]
+          },
+          "maxQty": {
+            "type": ["string", "null"]
+          },
+          "minQty": {
+            "type": "string"
+          },
+          "variantId": {
+            "type": "string"
+          }
+        },
+        "required": ["locationId", "variantId", "minQty", "maxQty", "lowSince"],
+        "type": "object"
+      },
       "Timestamp": {
         "format": "date-time",
         "type": "string"
@@ -2866,6 +3310,17 @@
           }
         },
         "required": ["id", "fromUnitId", "toUnitId", "factor"],
+        "type": "object"
+      },
+      "UpdateBatch": {
+        "properties": {
+          "salePriceMinor": {
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "type": ["integer", "null"]
+          }
+        },
+        "required": ["salePriceMinor"],
         "type": "object"
       },
       "UpdateCategory": {
@@ -4804,6 +5259,356 @@
         },
         "summary": "Rename, move, suspend, reactivate, revoke or blacklist a terminal",
         "tags": ["devices"]
+      }
+    },
+    "/v1/inventory/adjustments": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Adjust"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Adjustment"
+                }
+              }
+            },
+            "description": "Created"
+          }
+        },
+        "summary": "Adjust stock with a reason; value over the role's limit is 412 with approver roles",
+        "tags": ["inventory"]
+      }
+    },
+    "/v1/inventory/balances": {
+      "get": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "locationId",
+            "required": false,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "variantId",
+            "required": false,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "byBatch",
+            "required": false,
+            "schema": {
+              "enum": ["true", "false"],
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "expiringBefore",
+            "required": false,
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "after",
+            "required": false,
+            "schema": {
+              "pattern": "^[0-9a-f-]{36}\\|[0-9a-f-]{36}(\\|[0-9a-f-]{36})?$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "maximum": 500,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BalancePage"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Stock balances by location or variant (per batch with byBatch or expiringBefore)",
+        "tags": ["inventory"]
+      }
+    },
+    "/v1/inventory/batches": {
+      "get": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "variantId",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "expiringBefore",
+            "required": false,
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "batches": {
+                      "items": {
+                        "$ref": "#/components/schemas/Batch"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": ["batches"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Batches of a variant, earliest expiry first",
+        "tags": ["inventory"]
+      }
+    },
+    "/v1/inventory/batches/{id}": {
+      "patch": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateBatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Batch"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Set or clear a batch's own sale price (wins over the price list)",
+        "tags": ["inventory"]
+      }
+    },
+    "/v1/inventory/movements": {
+      "get": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "variantId",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "locationId",
+            "required": false,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "before",
+            "required": false,
+            "schema": {
+              "pattern": "^[^|]{20,40}\\|[0-9a-f-]{36}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "maximum": 500,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MovementPage"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Ledger of one variant, newest first (keyset pages)",
+        "tags": ["inventory"]
+      }
+    },
+    "/v1/inventory/receipts": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Receive"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Receipt"
+                }
+              }
+            },
+            "description": "Created"
+          }
+        },
+        "summary": "Receive stock (with or without a purchase order); creates batches for batch-tracked variants",
+        "tags": ["inventory"]
+      }
+    },
+    "/v1/inventory/thresholds": {
+      "get": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "locationId",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "thresholds": {
+                      "items": {
+                        "$ref": "#/components/schemas/Threshold"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": ["thresholds"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Low-stock thresholds of a location",
+        "tags": ["inventory"]
+      },
+      "put": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetThresholds"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "locationId": {
+                      "type": "string"
+                    },
+                    "removed": {
+                      "type": "integer"
+                    },
+                    "set": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": ["locationId", "set", "removed"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Set (or remove with minQty null) up to 1000 thresholds of a location",
+        "tags": ["inventory"]
       }
     },
     "/v1/pricing/fees": {

@@ -1,6 +1,7 @@
 import { createAuditModule } from "@wise-biz/module-audit";
 import { createCatalogModule } from "@wise-biz/module-catalog";
 import { createDevicesModule } from "@wise-biz/module-devices";
+import { batchSalePrices, createInventoryModule } from "@wise-biz/module-inventory";
 import { createPricingModule } from "@wise-biz/module-pricing";
 import { createSearchModule } from "@wise-biz/module-search";
 import { templateModule } from "@wise-biz/module-template";
@@ -9,6 +10,7 @@ import { createMemoryStore } from "@wise-biz/storage";
 
 import type { NonceStore } from "@wise-biz/http-signatures";
 import type { BranchExists, IsActiveMember } from "@wise-biz/module-devices";
+import type { LocationExists } from "@wise-biz/module-inventory";
 import type { WbModule } from "@wise-biz/module-kit";
 import type { ActiveTenantSetter, TenancyModuleOptions } from "@wise-biz/module-tenancy";
 import type { ObjectStore } from "@wise-biz/storage";
@@ -37,7 +39,9 @@ export function createModules(
       pin: { pepper: new TextEncoder().encode(devices.pinPepper), isActiveMember },
     }),
     createCatalogModule({ store }),
-    createPricingModule(),
+    // A batch with its own sale price wins over the list in the quote (inventory owns batches).
+    createPricingModule({ batchPrices: batchSalePrices }),
+    createInventoryModule({ locationExists }),
     createSearchModule(),
     templateModule,
   ];
@@ -52,6 +56,15 @@ const branchExists: BranchExists = async (tx, tenantId, branchId) => {
     "select 1 from tenancy.branches where tenant_id = $1 and id = $2 and archived_at is null",
     [tenantId, branchId],
   );
+  return r.rowCount === 1;
+};
+
+/** Stock lives at locations, and tenancy owns them (same bridge as branchExists). */
+const locationExists: LocationExists = async (tx, tenantId, locationId) => {
+  const r = await tx.query("select 1 from tenancy.locations where tenant_id = $1 and id = $2", [
+    tenantId,
+    locationId,
+  ]);
   return r.rowCount === 1;
 };
 

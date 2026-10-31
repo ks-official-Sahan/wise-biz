@@ -315,6 +315,8 @@ export const QuoteSchema = z
           variantId: uuid7,
           qty,
           priceOverrideMinor: minor.optional(),
+          /** The batch this line sells from (FEFO pick); its own sale price wins over the list. */
+          batchId: uuid7.optional(),
         }),
       )
       .max(500),

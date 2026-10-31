@@ -54,6 +54,7 @@ import {
   VersionSchema,
 } from "./schemas.ts";
 
+import type { BatchPrices } from "./application/quote.ts";
 import type { OpenAPIHono } from "@hono/zod-openapi";
 import type { AppEnv, CommandOptions, ModuleDeps } from "@wise-biz/module-kit";
 import type { Context, MiddlewareHandler } from "hono";
@@ -301,7 +302,11 @@ const routes = {
   }),
 };
 
-export function mountRoutes(app: OpenAPIHono<AppEnv>, deps: ModuleDeps): void {
+export function mountRoutes(
+  app: OpenAPIHono<AppEnv>,
+  deps: ModuleDeps,
+  batchPrices?: BatchPrices,
+): void {
   // Every pricing mutation: pricing:write, idempotency required, constraint violations mapped to 409/422.
   const command = <I>(
     c: Context<AppEnv>,
@@ -438,7 +443,7 @@ export function mountRoutes(app: OpenAPIHono<AppEnv>, deps: ModuleDeps): void {
         : { tenantId: device.tenantId, requestId: c.get("requestId") };
     const input = c.req.valid("json");
     const priced = await withTenantTx(deps.pool, scope, (tx) =>
-      quote(tx, scope.tenantId, input, new Date(deps.clock.now())),
+      quote(tx, scope.tenantId, input, new Date(deps.clock.now()), batchPrices),
     );
     return c.json(priced as z.infer<typeof QuoteResponseSchema>, 200);
   });

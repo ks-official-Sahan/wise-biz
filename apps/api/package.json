@@ -33,6 +33,7 @@
     "@wise-biz/module-catalog": "workspace:*",
     "@wise-biz/module-devices": "workspace:*",
     "@wise-biz/module-identity": "workspace:*",
+    "@wise-biz/module-inventory": "workspace:*",
     "@wise-biz/module-kit": "workspace:*",
     "@wise-biz/module-pricing": "workspace:*",
     "@wise-biz/module-search": "workspace:*",
