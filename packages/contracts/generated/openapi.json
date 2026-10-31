@@ -3067,6 +3067,27 @@
         "required": ["acks", "stopped", "lastSeq"],
         "type": "object"
       },
+      "SyncStreamTicket": {
+        "properties": {
+          "channels": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "expiresInSeconds": {
+            "type": "integer"
+          },
+          "token": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": ["token", "url", "expiresInSeconds", "channels"],
+        "type": "object"
+      },
       "Tag": {
         "properties": {
           "id": {
@@ -7669,6 +7690,24 @@
           }
         },
         "summary": "Terminal: push signed, hash-chained commands (<= 100 / 256 KB). Applied in device_seq order, one transaction each",
+        "tags": ["sync"]
+      }
+    },
+    "/v1/sync/stream-ticket": {
+      "post": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncStreamTicket"
+                }
+              }
+            },
+            "description": "Ticket"
+          }
+        },
+        "summary": "Terminal: a short-lived signed ticket for the realtime stream (hints that a dataset moved; pull stays the source of truth)",
         "tags": ["sync"]
       }
     },

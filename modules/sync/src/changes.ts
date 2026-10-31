@@ -1,10 +1,13 @@
 import { z } from "zod";
 
+import { noticesOf } from "./realtime.ts";
+
+import type { Dataset } from "./datasets.ts";
+import type { ChangeNotice } from "./realtime.ts";
 import type { PoolClient } from "pg";
 
-export const DATASETS = ["catalog", "prices", "tax", "promotions", "stock_branch"] as const;
-export type Dataset = (typeof DATASETS)[number];
-export const isDataset = (s: string): s is Dataset => (DATASETS as readonly string[]).includes(s);
+export { DATASETS, isDataset } from "./datasets.ts";
+export type { Dataset } from "./datasets.ts";
 
 export interface ChangeRow {
   readonly dataset: Dataset;
@@ -144,7 +147,16 @@ export interface SyncChangesConsumer {
 /** One statement for all the rows of an event (a price change can carry hundreds). */
 export async function applyChanges(client: PoolClient, payload: unknown): Promise<number> {
   const { tenantId, rows } = changesOf(payload);
-  if (rows.length === 0) return 0;
+  await insertRows(client, tenantId, rows);
+  return rows.length;
+}
+
+async function insertRows(
+  client: PoolClient,
+  tenantId: string,
+  rows: readonly ChangeRow[],
+): Promise<void> {
+  if (rows.length === 0) return;
   await client.query(
     `insert into sync.sync_changes (tenant_id, dataset, scope_key, entity, entity_id, op, version, payload)
      select $1, r.dataset, r.scope_key, r.entity, r.entity_id, r.op, r.version, r.payload
@@ -165,7 +177,6 @@ export async function applyChanges(client: PoolClient, payload: unknown): Promis
       ),
     ],
   );
-  return rows.length;
 }
 
 const EVENTS = [
@@ -182,14 +193,30 @@ const EVENTS = [
   "inventory.movement.recorded@v1",
 ] as const;
 
-/** Structural twin of @wise-biz/events ConsumerDefinition (the workers pass it to the bus by shape). */
-export function createSyncChangesConsumer(): SyncChangesConsumer {
+/**
+ * Structural twin of @wise-biz/events ConsumerDefinition (the workers pass it to the bus by shape). `notify` hints
+ * the realtime service that a dataset moved. It runs inside the handler's transaction, so a hint can beat the commit:
+ * terminals treat it as "pull now" and keep a slow poll as the fallback (offline-sync.md). A failing notify never
+ * fails the handler.
+ */
+export function createSyncChangesConsumer(
+  notify?: (notice: ChangeNotice) => void,
+): SyncChangesConsumer {
   return {
     name: SYNC_CHANGES_CONSUMER,
     events: EVENTS,
     maxAttempts: 5,
     handle: async (event, ctx) => {
-      await applyChanges(ctx.client, event.payload);
+      const { tenantId, rows } = changesOf(event.payload);
+      await insertRows(ctx.client, tenantId, rows);
+      if (notify === undefined) return;
+      for (const n of noticesOf(tenantId, rows)) {
+        try {
+          notify(n);
+        } catch {
+          // best effort: the poll fallback covers a lost hint
+        }
+      }
     },
   };
 }

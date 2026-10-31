@@ -16,6 +16,7 @@ import {
   createSyncChangesConsumer,
   createSyncModule,
   pullChanges,
+  verifyTicket,
 } from "../src/index.ts";
 
 import type { PullPorts } from "../src/index.ts";
@@ -368,5 +369,72 @@ describe("GET /v1/sync/changes and /bootstrap", () => {
     const res = await app.request("/v1/sync/bootstrap?dataset=catalog");
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({ dataset: "catalog", entityCount: 2 });
+  });
+});
+
+describe("realtime hints", () => {
+  const SECRET = "s".repeat(32);
+
+  it("the consumer announces each touched channel once, and a failing notify never fails the handler", async () => {
+    const notices: { channel: string; dataset: string }[] = [];
+    const client = await worker.connect();
+    try {
+      await client.query("select set_config('app.tenant_id', $1, false)", [T]);
+      const consumer = createSyncChangesConsumer((n) => notices.push(n));
+      await consumer.handle({ payload: variant(uuidv7()) }, { client });
+      await consumer.handle({ payload: variant(uuidv7()) }, { client });
+      const boom = createSyncChangesConsumer(() => {
+        throw new Error("redis down");
+      });
+      await expect(
+        boom.handle({ payload: variant(uuidv7()) }, { client }),
+      ).resolves.toBeUndefined();
+      // An event with no rows announces nothing.
+      await consumer.handle({ payload: event("inventory.unrelated", {}) }, { client });
+    } finally {
+      client.release();
+    }
+    expect(notices.map((n) => n.channel)).toEqual(["all:catalog", "all:catalog"]);
+  });
+
+  it("POST /v1/sync/stream-ticket lists the branch's channels and verifies with the shared secret", async () => {
+    const app = new OpenAPIHono<AppEnv>();
+    app.use("*", async (c, next) => {
+      c.set("requestId", "req-12345678");
+      c.set("device", { deviceId: uuidv7(), tenantId: T, branchId: BRANCH, status: "active" });
+      await next();
+    });
+    createSyncModule(
+      {
+        handlers: {} as never,
+        deviceKey: () => Promise.resolve(undefined),
+        quarantine: () => Promise.resolve(),
+        ...ports,
+      },
+      {},
+      { secret: SECRET, url: "https://rt.example.test", ttlSeconds: 60 },
+    ).routes(app, { pool, clock: { now: () => 1_000_000 }, ids: { uuidv7 } });
+    const res = await app.request("/v1/sync/stream-ticket", { method: "POST" });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      token: string;
+      url: string;
+      expiresInSeconds: number;
+      channels: string[];
+    };
+    expect(body).toMatchObject({ url: "https://rt.example.test", expiresInSeconds: 60 });
+    expect(body.channels).toEqual([
+      "all:catalog",
+      "all:prices",
+      "all:tax",
+      "all:promotions",
+      `l:${LOC}:stock_branch`,
+    ]);
+    expect(verifyTicket(SECRET, body.token, 1_000_000)).toMatchObject({
+      tid: T,
+      ch: body.channels,
+      exp: 1060,
+    });
+    expect(verifyTicket(SECRET, body.token, 1_060_000)).toBeUndefined();
   });
 });

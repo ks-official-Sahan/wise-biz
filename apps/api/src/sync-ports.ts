@@ -12,14 +12,15 @@ import {
 
 import { salesPorts } from "./sales-ports.ts";
 
-import type { SyncPorts } from "@wise-biz/module-sync";
+import type { OnSyncMetric, SyncPorts } from "@wise-biz/module-sync";
 import type { ObjectStore } from "@wise-biz/storage";
 
 /**
  * Sync verifies a terminal's signed commands and hands each to the module that owns it. Wired here so sync never
  * imports sales or devices: the handlers, the device key lookup and the quarantine are the only seams.
  */
-export const createSyncPorts = (store: ObjectStore): SyncPorts => ({
+export const createSyncPorts = (store: ObjectStore, onMetric?: OnSyncMetric): SyncPorts => ({
+  ...(onMetric === undefined ? {} : { onMetric }),
   handlers: {
     complete_sale: (tx, t, cmd) => completeSale(tx, salesPorts, t, cmd),
     complete_return: (tx, t, cmd) => completeReturn(tx, salesPorts, t, cmd),

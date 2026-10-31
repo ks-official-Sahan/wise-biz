@@ -19,7 +19,22 @@ export interface QuarantineInput {
 }
 
 /** What push needs from the rest of the system, wired at the composition root. */
+export type SyncMetricName =
+  /** Wall time of one command's transaction, labels: type, status (applied | replayed | rejected | stopped). */
+  | "sync_apply_ms"
+  /** Commands acknowledged by one batch (a size histogram: how far behind terminals run). */
+  | "sync_batch_commands"
+  /** A batch that stopped early, labels: code. */
+  | "sync_stopped";
+export type OnSyncMetric = (
+  name: SyncMetricName,
+  value: number,
+  labels: Record<string, string>,
+) => void;
+
 export interface PushPorts {
+  /** Optional metrics sink; a throwing sink never fails a batch. */
+  readonly onMetric?: OnSyncMetric;
   readonly handlers: CommandHandlers;
   /** The terminal's Ed25519 public key (raw 32 bytes). */
   deviceKey(tx: TxHandle, tenantId: string, deviceId: string): Promise<Uint8Array | undefined>;
@@ -328,13 +343,30 @@ export async function applyBatch(
   const sorted = [...commands].sort((a, b) => a.body.meta.deviceSeq - b.body.meta.deviceSeq);
   const acks: Ack[] = [];
   let lastSeq = -1;
+  const emit = (name: SyncMetricName, value: number, labels: Record<string, string>): void => {
+    try {
+      deps.onMetric?.(name, value, labels);
+    } catch {
+      // metrics are best effort
+    }
+  };
   for (const cmd of sorted) {
+    const started = performance.now();
     const out = await withTenantTx(deps.pool, { tenantId: device.tenantId, requestId }, (tx) =>
       applyOne(tx, deps, device, requestId, cmd),
     );
     lastSeq = out.lastSeq;
-    if (out.kind === "stop") return { acks, stopped: out.stop, lastSeq };
+    emit("sync_apply_ms", performance.now() - started, {
+      type: cmd.type,
+      status: out.kind === "stop" ? "stopped" : out.ack.status,
+    });
+    if (out.kind === "stop") {
+      emit("sync_stopped", 1, { code: out.stop.code });
+      emit("sync_batch_commands", acks.length, {});
+      return { acks, stopped: out.stop, lastSeq };
+    }
     acks.push(out.ack);
   }
+  emit("sync_batch_commands", acks.length, {});
   return { acks, stopped: null, lastSeq };
 }

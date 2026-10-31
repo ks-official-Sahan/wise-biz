@@ -32,7 +32,8 @@
     "@wise-biz/module-tenancy": "workspace:*",
     "@wise-biz/storage": "workspace:*",
     "pg": "8.23.1",
-    "pino": "10.4.0"
+    "pino": "10.4.0",
+    "redis": "6.3.0"
   },
   "devDependencies": {
     "@types/node": "24.19.2",

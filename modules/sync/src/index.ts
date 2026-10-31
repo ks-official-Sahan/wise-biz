@@ -5,6 +5,7 @@ import { definePermissions } from "@wise-biz/policy";
 
 import { mountRoutes } from "./http.ts";
 
+import type { RealtimeOptions } from "./http.ts";
 import type { PullOptions, PullPorts } from "./pull.ts";
 import type { PushPorts } from "./push.ts";
 import type { WbModule } from "@wise-biz/module-kit";
@@ -16,13 +17,26 @@ export type {
   Ack,
   BatchResult,
   DeviceRef,
+  OnSyncMetric,
   PushDeps,
   PushPorts,
   QuarantineInput,
   RawCommand,
   Stop,
+  SyncMetricName,
 } from "./push.ts";
 export { PushRequestSchema, PushResponseSchema } from "./http.ts";
+export type { RealtimeOptions } from "./http.ts";
+export {
+  channelFor,
+  channelsForBranch,
+  MAX_TICKET_CHANNELS,
+  noticesOf,
+  redisChannel,
+  signTicket,
+  verifyTicket,
+} from "./realtime.ts";
+export type { ChangeNotice, TicketClaims } from "./realtime.ts";
 export {
   applyChanges,
   changesOf,
@@ -36,7 +50,12 @@ export type { Bootstrap, Change, PullOptions, PullPorts } from "./pull.ts";
 export type SyncPorts = PushPorts & PullPorts;
 
 /** Terminals push signed command batches, pull deltas from the change feed and bootstrap from snapshots. */
-export function createSyncModule(ports: PushPorts & PullPorts, pull: PullOptions = {}): WbModule {
+export function createSyncModule(
+  ports: PushPorts & PullPorts,
+  pull: PullOptions = {},
+  /** Mounts POST /v1/sync/stream-ticket when the realtime service is configured. */
+  realtime?: RealtimeOptions,
+): WbModule {
   return defineModule({
     name: "sync",
     migrationsDir: join(import.meta.dirname, "..", "migrations"),
@@ -44,7 +63,7 @@ export function createSyncModule(ports: PushPorts & PullPorts, pull: PullOptions
     permissions: definePermissions("sync", []),
     events: [],
     routes: (app, deps) => {
-      mountRoutes(app, deps, ports, pull);
+      mountRoutes(app, deps, ports, pull, realtime);
     },
   });
 }

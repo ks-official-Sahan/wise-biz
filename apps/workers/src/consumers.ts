@@ -8,9 +8,12 @@ import { createInviteEmailConsumer } from "@wise-biz/module-tenancy";
 
 import type { ConsumerDefinition } from "@wise-biz/events";
 import type { ImportJobDeps } from "@wise-biz/module-catalog";
+import type { ChangeNotice } from "@wise-biz/module-sync";
 import type { MailSender } from "@wise-biz/module-tenancy";
 
 export interface ConsumerDeps {
+  /** Realtime hint sink (Redis pub/sub in production); omit to run without hints (terminals poll). */
+  readonly notify?: (notice: ChangeNotice) => void;
   /** Real mailer in production (@wise-biz/mailer), a capture mailer in tests. */
   readonly mailer: MailSender;
   readonly consoleUrl: string;
@@ -34,7 +37,7 @@ export function createConsumers(deps: ConsumerDeps): readonly ConsumerDefinition
     createSearchProjectionConsumer(),
     createPricingFactsConsumer(),
     createInventoryFactsConsumer(),
-    createSyncChangesConsumer(),
+    createSyncChangesConsumer(deps.notify),
     createLowStockConsumer({ pool: deps.imports.pool, ids: { uuidv7 }, now: () => new Date() }),
     createImportConsumer(
       {

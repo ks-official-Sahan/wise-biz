@@ -45,7 +45,7 @@ Commands, not row diffs: the server re-runs business rules (prices honored as sn
 
 - Server keeps a per-tenant change feed (`sync_changes(tenant_id, scope, entity, entity_id, op, version, changed_at)`), filled by outbox consumers.
 - Device sends `cursor` per dataset; server returns up to N changes + next cursor. Keyset pagination, no offsets.
-- Realtime nudge: WebSocket/SSE message "dataset X advanced" → device pulls. Push is a hint; pull is the truth.
+- Realtime nudge: SSE message "dataset X advanced" → device pulls. Push is a hint; pull is the truth. A terminal gets a ticket from `POST /v1/sync/stream-ticket`, opens `GET {url}/v1/stream` with `Authorization: Bearer {ticket}`, pulls once on `event: ready`, then on each `event: hint` (`{"hints":[{"channel","dataset"}]}`, at most 4 a second). Keep a 30–60 s poll as the fallback: a hint can precede the commit or be lost. On `event: reconnect`, a close or a 503, fetch a new ticket and reconnect with backoff (ADR 0015).
 - First boot: bulk snapshot (gzip NDJSON from object storage, signed URL), then deltas.
 
 ## Conflict policy

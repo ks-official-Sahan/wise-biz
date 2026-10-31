@@ -39,7 +39,7 @@ pnpm db:psql              # psql as wb_app (RLS applies; NOBYPASSRLS)
 - `proxy_cache` micro-cache for public GETs (storefront JSON, catalog images) 1–5 s, `proxy_cache_lock on`, `stale-while-revalidate`.
 - Never cache authenticated responses (`Cache-Control: private, no-store` from API).
 - Rate limit zones as a second line after the edge.
-- WebSocket upgrade for `apps/realtime`.
+- `apps/realtime` (SSE, `GET /v1/stream`): `proxy_buffering off`, `proxy_read_timeout 1h`, `proxy_http_version 1.1`, no `gzip` on `text/event-stream`; the service sends `: ping` every 25 s and closes streams after 5 min (clients reconnect with a new ticket). Scale by adding instances (no database, no sticky sessions); alert on `/ready` 503.
 
 ## Cloudflare
 

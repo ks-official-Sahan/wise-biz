@@ -17,6 +17,7 @@ export {
   kafkaEnv,
   mailEnv,
   observabilityEnv,
+  realtimeEnv,
   redisEnv,
   storageEnv,
   webauthnEnv,

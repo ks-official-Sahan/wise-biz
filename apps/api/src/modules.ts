@@ -16,6 +16,7 @@ import type { NonceStore } from "@wise-biz/http-signatures";
 import type { BranchExists, IsActiveMember } from "@wise-biz/module-devices";
 import type { LocationExists } from "@wise-biz/module-inventory";
 import type { WbModule } from "@wise-biz/module-kit";
+import type { OnSyncMetric, RealtimeOptions } from "@wise-biz/module-sync";
 import type { ActiveTenantSetter, TenancyModuleOptions } from "@wise-biz/module-tenancy";
 import type { ObjectStore } from "@wise-biz/storage";
 
@@ -33,6 +34,10 @@ export function createModules(
   },
   /** Object storage (imports, media). The docs/test default keeps objects in memory. */
   store: ObjectStore = createMemoryStore(),
+  /** Realtime stream tickets (apps/realtime); omitted when the service is not configured. */
+  realtime?: RealtimeOptions,
+  /** Sync push metrics sink (apply latency, batch size, rejections). */
+  syncMetric?: OnSyncMetric,
 ): readonly WbModule[] {
   return [
     createAuditModule(),
@@ -49,7 +54,7 @@ export function createModules(
     // Commands arrive through sync (P1-06), which applies them with salesPorts (sales-ports.ts).
     createSalesModule(),
     // Terminals push signed command batches here; each command goes to its owning module through syncPorts.
-    createSyncModule(createSyncPorts(store)),
+    createSyncModule(createSyncPorts(store, syncMetric), {}, realtime),
     createSearchModule(),
     templateModule,
   ];
@@ -90,6 +95,11 @@ const unwiredNonces: NonceStore = {
 };
 
 /** Route/permission shapes only (OpenAPI generation, tests): the session port is not wired and must never be called. */
-export const docModules: readonly WbModule[] = createModules({
-  setActiveTenant: () => Promise.reject(new Error("docModules: session port is not wired")),
-});
+export const docModules: readonly WbModule[] = createModules(
+  { setActiveTenant: () => Promise.reject(new Error("docModules: session port is not wired")) },
+  {},
+  undefined,
+  undefined,
+  // So the OpenAPI document lists the stream-ticket route; the secret never signs a real ticket.
+  { secret: "docs-only-secret-never-used-for-real-tickets", url: "https://realtime.example.test" },
+);

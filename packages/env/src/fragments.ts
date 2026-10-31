@@ -130,6 +130,20 @@ export const workerEnv = {
   INVENTORY_EXPIRY_HORIZON_DAYS: z.coerce.number().int().min(0).max(365).default(7),
 };
 
+/**
+ * Realtime hints (apps/realtime). The ticket secret is shared by the API (mints) and the realtime service (verifies);
+ * both are optional so a deployment without realtime still boots (terminals then rely on their poll). Never log it.
+ */
+export const realtimeEnv = {
+  REALTIME_TICKET_SECRET: z.string().min(32).optional(),
+  /** Public base URL terminals use to open the stream. */
+  REALTIME_URL: z.url().optional(),
+  /** 0 binds an ephemeral port (tests). */
+  REALTIME_PORT: z.coerce.number().int().min(0).max(65535).default(3002),
+  /** Open streams per instance; the next connection gets 503 so a load balancer can spread. */
+  REALTIME_MAX_CONNECTIONS: z.coerce.number().int().min(1).max(1_000_000).default(20_000),
+};
+
 export const chainerEnv = {
   DATABASE_CHAINER_URL: pgUrl,
   AUDIT_CHAIN_INTERVAL_MS: z.coerce.number().int().min(100).max(300_000).default(2000),

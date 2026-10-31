@@ -13,6 +13,7 @@ import {
   inviteEnv,
   mailEnv,
   observabilityEnv,
+  redisEnv,
   workerEnv,
 } from "@wise-biz/env";
 import { createPgBus } from "@wise-biz/events";
@@ -35,6 +36,7 @@ import { storeFromEnv } from "@wise-biz/storage";
 import { createConsumers } from "./consumers.ts";
 import { createLogger } from "./logger.ts";
 import { OLDEST_UNCHAINED_SQL, createMetrics } from "./metrics.ts";
+import { createRealtimePublisher } from "./realtime.ts";
 import { createRelay } from "./relay.ts";
 import { settleSteps } from "./shutdown.ts";
 
@@ -43,7 +45,13 @@ import type { ConsumerDefinition, OnMetric } from "@wise-biz/events";
 import type { AuditOnMetric } from "@wise-biz/module-audit";
 import type { Logger } from "pino";
 
-export const WORKER_ENV = { ...observabilityEnv, ...workerEnv, ...chainerEnv };
+/** REDIS_URL is optional here: without it the workers skip realtime hints and terminals fall back to their poll. */
+export const WORKER_ENV = {
+  ...observabilityEnv,
+  ...workerEnv,
+  ...chainerEnv,
+  REDIS_URL: redisEnv.REDIS_URL.optional(),
+};
 /** Only the default consumer set needs these (invite email); an explicit consumer list does not require them. */
 export const CONSUMER_ENV = { ...mailEnv, ...inviteEnv, ...consoleEnv, ...storageEnv };
 const POOL_MAX = 10;
@@ -77,9 +85,11 @@ export function startWorker(
     onError: poolError("worker"),
   });
   if (env.NODE_ENV !== "production") instrumentPool(pool);
+  const realtime = createRealtimePublisher(env.REDIS_URL, logger);
   const consumerSet =
     consumers ??
     createConsumers({
+      notify: realtime.notify,
       mailer: createMailer(consumerEnv ?? defineEnv(CONSUMER_ENV, source)),
       consoleUrl: consumerEnv?.CONSOLE_URL ?? "",
       inviteSecret: consumerEnv?.INVITE_SECRET ?? "",
@@ -187,6 +197,7 @@ export function startWorker(
         )),
         ...(await settleSteps([{ name: "metrics", run: () => metrics.stop() }], logger)),
         ...(await settleSteps([{ name: "bus", run: () => bus.stop() }], logger)),
+        ...(await settleSteps([{ name: "realtime", run: () => realtime.stop() }], logger)),
         ...(await settleSteps(
           [
             { name: "pool", run: () => pool.end() },

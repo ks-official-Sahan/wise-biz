@@ -10,6 +10,7 @@ import {
   identityDbEnv,
   inviteEnv,
   pinEnv,
+  realtimeEnv,
   mailEnv,
   observabilityEnv,
   redisEnv,
@@ -28,6 +29,7 @@ import { nodeRedisKernel, sessionResolver } from "./kernel/auth/index.ts";
 import { deviceNonces } from "./kernel/device/nonces.ts";
 import { createLogger } from "./logger.ts";
 import { createModules } from "./modules.ts";
+import { createSyncMetrics } from "./sync-metrics.ts";
 
 import type { CacheOnMetric } from "./idempotency-cache.ts";
 import type { EnvSource } from "@wise-biz/env";
@@ -45,6 +47,7 @@ export const API_ENV = {
   ...mailEnv,
   ...inviteEnv,
   ...pinEnv,
+  ...realtimeEnv,
   ...storageEnv,
   ...consoleEnv,
   ...webauthnEnv,
@@ -96,7 +99,11 @@ export async function startServer(
     logger.error({ err }, "redis error");
   });
 
+  const syncMetrics = createSyncMetrics(logger);
+  syncMetrics.start();
+
   const teardown = async (): Promise<void> => {
+    syncMetrics.stop();
     try {
       await pool.end();
     } catch {
@@ -153,6 +160,10 @@ export async function startServer(
         { inviteSecret: env.INVITE_SECRET },
         { nonces: deviceNonces(kernelRedis), pinPepper: env.PIN_PEPPER },
         storeFromEnv(env),
+        env.REALTIME_TICKET_SECRET !== undefined && env.REALTIME_URL !== undefined
+          ? { secret: env.REALTIME_TICKET_SECRET, url: env.REALTIME_URL }
+          : undefined,
+        syncMetrics.onMetric,
       ),
       pool,
       redis,

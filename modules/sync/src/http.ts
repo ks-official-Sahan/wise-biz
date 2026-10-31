@@ -6,6 +6,7 @@ import { requireTerminal } from "@wise-biz/module-kit";
 import { DATASETS } from "./changes.ts";
 import { bootstrap, decodeCursor, pullChanges } from "./pull.ts";
 import { applyBatch } from "./push.ts";
+import { channelsForBranch, signTicket } from "./realtime.ts";
 
 import type { PullOptions, PullPorts } from "./pull.ts";
 import type { PushPorts } from "./push.ts";
@@ -111,6 +112,33 @@ const ChangesResponse = z
     hasMore: z.boolean(),
   })
   .openapi("SyncChanges");
+export interface RealtimeOptions {
+  /** HMAC key shared with apps/realtime. Never log it. */
+  readonly secret: string;
+  /** Public base URL of the realtime service, returned to the terminal. */
+  readonly url: string;
+  readonly ttlSeconds?: number;
+}
+const TICKET_TTL_SECONDS = 120;
+const TicketResponse = z
+  .object({
+    token: z.string(),
+    /** Connect with GET {url}/v1/stream?ticket={token} (SSE). The ticket is single-purpose and short-lived. */
+    url: z.string(),
+    expiresInSeconds: z.number().int(),
+    channels: z.array(z.string()),
+  })
+  .openapi("SyncStreamTicket");
+const ticketRoute = createRoute({
+  method: "post",
+  path: "/v1/sync/stream-ticket",
+  tags: ["sync"],
+  summary:
+    "Terminal: a short-lived signed ticket for the realtime stream (hints that a dataset moved; pull stays the source of truth)",
+  responses: {
+    200: { description: "Ticket", content: { "application/json": { schema: TicketResponse } } },
+  },
+});
 const BootstrapQuery = z.object({ dataset: DatasetSchema });
 const BootstrapResponse = z
   .object({
@@ -160,6 +188,7 @@ export function mountRoutes(
   deps: ModuleDeps,
   ports: PushPorts & PullPorts,
   pull: PullOptions = {},
+  realtime?: RealtimeOptions,
 ): void {
   app.openapi(changesRoute, async (c) => {
     const device = requireTerminal(c);
@@ -204,6 +233,33 @@ export function mountRoutes(
     return c.json(result, 200);
   });
   mountPush(app, deps, ports);
+  if (realtime !== undefined) mountTicket(app, deps, ports, realtime);
+}
+
+function mountTicket(
+  app: OpenAPIHono<AppEnv>,
+  deps: ModuleDeps,
+  ports: PullPorts,
+  realtime: RealtimeOptions,
+): void {
+  const ttl = realtime.ttlSeconds ?? TICKET_TTL_SECONDS;
+  app.openapi(ticketRoute, async (c) => {
+    const device = requireTerminal(c);
+    const locations = await withTenantTx(
+      deps.pool,
+      { tenantId: device.tenantId, requestId: c.get("requestId") },
+      (tx) => ports.branchLocations(tx, device.tenantId, device.branchId),
+    );
+    const channels = channelsForBranch(DATASETS, locations);
+    const token = signTicket(realtime.secret, {
+      v: 1,
+      tid: device.tenantId,
+      sub: device.deviceId,
+      ch: channels,
+      exp: Math.floor(deps.clock.now() / 1000) + ttl,
+    });
+    return c.json({ token, url: realtime.url, expiresInSeconds: ttl, channels }, 200);
+  });
 }
 
 function mountPush(app: OpenAPIHono<AppEnv>, deps: ModuleDeps, ports: PushPorts): void {

@@ -64,4 +64,4 @@ Key choice keeps per-branch or per-entity ordering. Increase partitions before h
 
 ## Realtime fan-out
 
-Consumers publish compact notices to Redis pub/sub `rt:{tenantId}:{channel}`; `apps/realtime` forwards to subscribed WS/SSE clients after checking the subscriber's permissions. Dashboards receive increments, not full reloads. Throttle per connection (max 4 msgs/s, coalesce).
+Consumers publish compact notices to Redis pub/sub `rt:{tenantId}:{channel}` (sync: `all:{dataset}`, `l:{locationId}:stock_branch`); `apps/realtime` forwards to subscribed WS/SSE clients after checking the subscriber's permissions. Dashboards receive increments, not full reloads. Throttle per connection (max 4 msgs/s, coalesce).
