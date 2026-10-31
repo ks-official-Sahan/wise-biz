@@ -41,7 +41,10 @@ vi.mock("@wise-biz/db", () => ({
 const T = "01900000-0000-7000-8000-000000000001";
 const U = "01900000-0000-7000-8000-000000000002";
 const IDEM = "idem-12345678";
-const matrix = matrixFromRows(createCatalog(["t:write"]), [{ role: "w", permission: "t:write" }]);
+const matrix = matrixFromRows(createCatalog(["t:write"]), [
+  { role: "w", permission: "t:write" },
+  { role: "lim", permission: "t:write", conditions: { maxAmountMinor: 100 } },
+]);
 const Body = z.object({ name: z.string().min(1) });
 
 let cache: Map<string, string>;
@@ -51,7 +54,11 @@ let handler: ReturnType<typeof vi.fn>;
 
 function build(
   roles: string[],
-  over: { idempotency?: "required" | "optional" | "off"; resource?: boolean } = {},
+  over: {
+    idempotency?: "required" | "optional" | "off";
+    resource?: boolean;
+    precheck?: boolean;
+  } = {},
 ): OpenAPIHono<AppEnv> {
   const app = new OpenAPIHono<AppEnv>();
   app.use("*", async (c, next) => {
@@ -74,6 +81,7 @@ function build(
       input: Body,
       ...(over.idempotency ? { idempotency: over.idempotency } : {}),
       ...(over.resource ? { resource: () => ({ branchId: "nope" }) } : {}),
+      ...(over.precheck ? { precheckResource: { amountMinor: 0 } } : {}),
       handler: handler as never,
     }),
   );
@@ -131,6 +139,16 @@ describe("runCommand", () => {
     expect((await call(app, '{"name":"a"}', null)).status).toBe(422);
     expect((await call(app, '{"name":"a"}', "short")).status).toBe(422);
     expect(m.tx).not.toHaveBeenCalled();
+  });
+
+  it("a conditional grant passes the body-less check only with a precheck resource", async () => {
+    expect((await call(build(["lim"]), '{"name":"a"}')).status).toBe(412);
+    handler.mockResolvedValue({
+      body: { ok: true },
+      audit: [{ action: "t", entity: "t", entityId: "1" }],
+      noEvents: true,
+    });
+    expect((await call(build(["lim"], { precheck: true }), '{"name":"a"}')).status).not.toBe(412);
   });
 
   it("resource check runs after validation", async () => {

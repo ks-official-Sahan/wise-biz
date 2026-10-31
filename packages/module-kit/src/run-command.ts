@@ -62,6 +62,12 @@ export interface CommandOptions<I> {
   /** Default "required". "optional": honoured when the header is present. "off": never. */
   idempotency?: "required" | "optional" | "off";
   resource?: (input: I) => AuthorizeResource;
+  /**
+   * Resource for the body-less step-1 check, for grants whose conditions need data the body or the database gives
+   * later (e.g. `{ amountMinor: 0 }`: a role limited by maxAmountMinor still passes). The real check then runs via
+   * `resource` or inside the handler.
+   */
+  precheckResource?: AuthorizeResource;
   handler: (tx: TxHandle, input: I, ctx: CommandContext) => Promise<CommandResult>;
 }
 
@@ -170,7 +176,7 @@ export async function runCommand<I>(
     if (opts.permission === undefined) {
       throw new DomainError("INTERNAL", "command needs a permission or bootstrapTenantId");
     }
-    authorize(c, opts.permission);
+    authorize(c, opts.permission, opts.precheckResource);
     tenant = requireTenant(c);
   } else {
     const { userId: actor } = requireUser(c);
