@@ -295,11 +295,9 @@ function mountPush(app: OpenAPIHono<AppEnv>, deps: ModuleDeps, ports: PushPorts)
     // A batch that processed nothing and stopped is a refusal, not a partial success.
     if (result.acks.length === 0 && result.stopped !== null) {
       const s = result.stopped;
-      if (s.code === "SEQUENCE_GAP") {
-        throw new DomainError("SEQUENCE_GAP", "Resend from the expected sequence number.", {
-          details: { expectedSeq: s.expectedSeq },
-        });
-      }
+      // A gap is answered as data, not an error: problem responses never carry `details`, and the terminal needs
+      // `expectedSeq` to resend from the right place.
+      if (s.code === "SEQUENCE_GAP") return c.json(result, 200);
       if (s.code === "UNKNOWN_DEVICE") throw new DomainError("DEVICE_REVOKED", "Unknown device.");
       throw new DomainError(
         "CHAIN_BROKEN",

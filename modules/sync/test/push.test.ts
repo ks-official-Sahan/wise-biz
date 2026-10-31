@@ -441,7 +441,7 @@ describe("POST /v1/sync/commands", () => {
       body: JSON.stringify({ commands }),
     });
 
-  it("acks a batch, and answers a batch that processed nothing with 409 SEQUENCE_GAP", async () => {
+  it("acks a batch, and answers a gap with the sequence it expects", async () => {
     const res = await post([command(current), command(current)]);
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
@@ -453,8 +453,11 @@ describe("POST /v1/sync/commands", () => {
     expect(body).toMatchObject({ stopped: null, lastSeq: 1 });
     command(current); // seq 2 never sent
     const gap = await post([command(current)]);
-    expect(gap.status).toBe(409);
-    expect(await gap.json()).toMatchObject({ code: "SEQUENCE_GAP", details: { expectedSeq: 2 } });
+    expect(gap.status).toBe(200);
+    expect(await gap.json()).toMatchObject({
+      acks: [],
+      stopped: { code: "SEQUENCE_GAP", expectedSeq: 2, quarantined: false },
+    });
   });
 
   it("refuses a duplicate seq, an empty or oversized batch, a suspended or unsigned device", async () => {
