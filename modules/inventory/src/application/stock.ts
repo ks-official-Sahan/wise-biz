@@ -419,7 +419,15 @@ export async function batchSalePrices(
   tenantId: string,
   batchIds: readonly string[],
 ): Promise<
-  Map<string, { variantId: string; salePriceMinor: number | null; expiresOn: string | null }>
+  Map<
+    string,
+    {
+      variantId: string;
+      salePriceMinor: number | null;
+      expiresOn: string | null;
+      unitCostMinor: number;
+    }
+  >
 > {
   if (batchIds.length === 0) return new Map();
   const r = await tx.query<{
@@ -427,8 +435,9 @@ export async function batchSalePrices(
     variant_id: string;
     sale_price_minor: string | null;
     expires_on: string | null;
+    unit_cost_minor: string;
   }>(
-    `select id, variant_id, sale_price_minor, expires_on::text from inventory.batches
+    `select id, variant_id, sale_price_minor, expires_on::text, unit_cost_minor from inventory.batches
      where tenant_id = $1 and id = any($2::uuid[])`,
     [tenantId, [...new Set(batchIds)]],
   );
@@ -439,6 +448,7 @@ export async function batchSalePrices(
         variantId: x.variant_id,
         salePriceMinor: x.sale_price_minor === null ? null : Number(x.sale_price_minor),
         expiresOn: x.expires_on,
+        unitCostMinor: Number(x.unit_cost_minor),
       },
     ]),
   );

@@ -28,9 +28,10 @@ module.exports = {
   forbidden: [
     {
       name: "no-cross-module-internals",
-      comment: "A module may import another module only through its contracts.ts.",
+      comment:
+        "A module may import another module only through its contracts.ts. Tests may wire real neighbours (devDependencies), production code never.",
       severity: "error",
-      from: { path: "^modules/([^/]+)/" },
+      from: { path: "^modules/([^/]+)/", pathNot: "^modules/[^/]+/test/" },
       to: {
         path: "^modules/[^/]+/",
         pathNot: ["^modules/$1/", "^modules/[^/]+/contracts[.]ts$"],

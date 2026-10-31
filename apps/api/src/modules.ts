@@ -3,6 +3,7 @@ import { createCatalogModule } from "@wise-biz/module-catalog";
 import { createDevicesModule } from "@wise-biz/module-devices";
 import { batchSalePrices, createInventoryModule } from "@wise-biz/module-inventory";
 import { createPricingModule } from "@wise-biz/module-pricing";
+import { createSalesModule } from "@wise-biz/module-sales";
 import { createSearchModule } from "@wise-biz/module-search";
 import { templateModule } from "@wise-biz/module-template";
 import { createTenancyModule } from "@wise-biz/module-tenancy";
@@ -42,6 +43,8 @@ export function createModules(
     // A batch with its own sale price wins over the list in the quote (inventory owns batches).
     createPricingModule({ batchPrices: batchSalePrices }),
     createInventoryModule({ locationExists }),
+    // Commands arrive through sync (P1-06), which applies them with salesPorts (sales-ports.ts).
+    createSalesModule(),
     createSearchModule(),
     templateModule,
   ];

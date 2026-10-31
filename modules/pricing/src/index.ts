@@ -20,6 +20,7 @@ export {
 } from "./events.ts";
 export { createPricingFactsConsumer, PRICING_FACTS_CONSUMER } from "./projection.ts";
 export type { PricingFactsConsumer } from "./projection.ts";
+export { quote } from "./application/quote.ts";
 export type { BatchPrices, Quote } from "./application/quote.ts";
 
 /** Price lists, tax regions, fees, promotions, coupons, FX rates and the server-side quote (same engine as devices). */
