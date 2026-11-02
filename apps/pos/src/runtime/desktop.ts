@@ -1,4 +1,7 @@
+import { HardwareError } from "@wise-biz/hardware";
+
 import type { DeviceIdentity, DeviceVault, Platform } from "../platform/index.ts";
+import type { Printer } from "@wise-biz/hardware";
 import type { Prepared, Row, SqlParams, StorageAdapter } from "@wise-biz/sync";
 
 /**
@@ -17,6 +20,11 @@ export interface DesktopBridge {
     readonly commit: () => Promise<void>;
     readonly rollback: () => Promise<void>;
     readonly close: () => Promise<void>;
+  };
+  readonly hw: {
+    readonly config: () => Promise<{ readonly printer: { readonly kind: string } }>;
+    readonly print: (bytes: Uint8Array) => Promise<void>;
+    readonly kick: () => Promise<void>;
   };
   readonly vault: {
     readonly load: () => Promise<string | undefined>;
@@ -88,4 +96,31 @@ export function createDesktopVault(bridge: DesktopBridge): DeviceVault {
     save: (i) => bridge.vault.save(JSON.stringify(i)),
     clear: () => bridge.vault.clear(),
   };
+}
+
+/** The printer the desktop shell has configured, behind the hardware port. Failures keep the shell's message. */
+export function createDesktopPrinter(bridge: DesktopBridge): Printer {
+  return {
+    write: async (bytes) => {
+      try {
+        await bridge.hw.print(bytes);
+      } catch (e) {
+        const message = e instanceof Error ? e.message : "The printer failed.";
+        throw new HardwareError(
+          /cannot reach|No printer/i.test(message) ? "offline" : "rejected",
+          message,
+        );
+      }
+    },
+    status: () => Promise.resolve("ready"),
+  };
+}
+
+/** Reads the shell's saved hardware settings once; true when a printer is set up. */
+export async function desktopPrinterConfigured(bridge: DesktopBridge): Promise<boolean> {
+  try {
+    return (await bridge.hw.config()).printer.kind !== "none";
+  } catch {
+    return false;
+  }
 }

@@ -16,7 +16,9 @@
     "e2e": "pnpm build && playwright test"
   },
   "dependencies": {
-    "better-sqlite3": "13.0.3"
+    "@wise-biz/hardware": "workspace:*",
+    "better-sqlite3": "13.0.3",
+    "serialport": "13.0.0"
   },
   "devDependencies": {
     "@playwright/test": "1.64.1",

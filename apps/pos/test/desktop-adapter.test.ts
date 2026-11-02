@@ -1,8 +1,15 @@
+import { HardwareError, DRAWER_KICK_BYTES } from "@wise-biz/hardware";
 import { openLocalDb } from "@wise-biz/sync";
 import Database from "better-sqlite3";
 import { describe, expect, it } from "vitest";
 
-import { createDesktopVault, openDesktopSqlite } from "../src/runtime/desktop.ts";
+import { receiptJob } from "../src/features/tender/model/drawer.ts";
+import {
+  createDesktopPrinter,
+  createDesktopVault,
+  desktopPrinterConfigured,
+  openDesktopSqlite,
+} from "../src/runtime/desktop.ts";
 
 import type { DesktopBridge } from "../src/runtime/desktop.ts";
 import type { Row } from "@wise-biz/sync";
@@ -52,6 +59,11 @@ function fakeBridge(): DesktopBridge & { vaultValue: string | undefined } {
         return Promise.resolve();
       },
     },
+    hw: {
+      config: () => Promise.resolve({ printer: { kind: "none" } }),
+      print: () => Promise.resolve(),
+      kick: () => Promise.resolve(),
+    },
     vault: {
       load: () => Promise.resolve(vaultValue),
       save: (v) => {
@@ -94,5 +106,58 @@ describe("desktop storage adapter", () => {
     expect(await vault.load()).toBeUndefined();
     await vault.clear();
     expect(await vault.load()).toBeUndefined();
+  });
+});
+
+describe("desktop printer and drawer", () => {
+  it("wraps the shell's printer and maps its failures to hardware errors", async () => {
+    const bridge = fakeBridge();
+    const sent: Uint8Array[] = [];
+    let fail: string | undefined;
+    const b = {
+      ...bridge,
+      hw: {
+        ...bridge.hw,
+        print: (bytes: Uint8Array) => {
+          if (fail !== undefined) return Promise.reject(new Error(fail));
+          sent.push(bytes);
+          return Promise.resolve();
+        },
+      },
+    };
+    const printer = createDesktopPrinter(b);
+    await printer.write(Uint8Array.of(1));
+    expect(sent).toHaveLength(1);
+    fail = "cannot reach printer at 10.0.0.9";
+    await expect(printer.write(Uint8Array.of(1))).rejects.toMatchObject({ kind: "offline" });
+    fail = "printer refused the job";
+    const e = await printer.write(Uint8Array.of(1)).catch((x: unknown) => x);
+    expect(e).toBeInstanceOf(HardwareError);
+    expect(e).toMatchObject({ kind: "rejected" });
+    expect(await printer.status()).toBe("ready");
+    expect(await desktopPrinterConfigured(bridge)).toBe(false);
+    expect(
+      await desktopPrinterConfigured({
+        ...bridge,
+        hw: { ...bridge.hw, config: () => Promise.resolve({ printer: { kind: "network" } }) },
+      }),
+    ).toBe(true);
+    expect(
+      await desktopPrinterConfigured({
+        ...bridge,
+        hw: { ...bridge.hw, config: () => Promise.reject(new Error("x")) },
+      }),
+    ).toBe(false);
+  });
+
+  it("appends the drawer pulse only when cash was taken", () => {
+    const receipt = Uint8Array.of(7, 8);
+    expect(receiptJob(receipt, [{ kind: "card" }])).toBe(receipt);
+    expect([...receiptJob(receipt, [{ kind: "card" }, { kind: "cash" }])]).toEqual([
+      7,
+      8,
+      ...DRAWER_KICK_BYTES,
+    ]);
+    expect(receiptJob(receipt, [])).toBe(receipt);
   });
 });

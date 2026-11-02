@@ -15,7 +15,7 @@ if (process.env.WISE_BIZ_RELEASE === "1" && !apiOrigin.startsWith("https://"))
 
 const common = {
   platform: "node",
-  external: ["electron", "better-sqlite3"],
+  external: ["electron", "better-sqlite3", "serialport"],
   output: { format: "cjs", dir: path.join(root, "dist"), sourcemap: false },
 };
 

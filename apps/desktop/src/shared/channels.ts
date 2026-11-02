@@ -16,6 +16,12 @@ export const CHANNELS = {
   vaultLoad: "wb:vault:load",
   vaultSave: "wb:vault:save",
   vaultClear: "wb:vault:clear",
+  hwConfig: "wb:hw:config",
+  hwSetConfig: "wb:hw:set-config",
+  hwPrint: "wb:hw:print",
+  hwKick: "wb:hw:kick",
+  hwPorts: "wb:hw:ports",
+  hwScale: "wb:hw:scale",
 } as const;
 
 export type Channel = (typeof CHANNELS)[keyof typeof CHANNELS];
@@ -26,6 +32,26 @@ export const ALL_CHANNELS: readonly Channel[] = Object.values(CHANNELS);
 export type SqlValue = string | number | bigint | null | Uint8Array;
 export type SqlParams = readonly SqlValue[];
 export type SqlRow = Record<string, unknown>;
+
+export type PrinterConfig =
+  | { readonly kind: "none" }
+  | { readonly kind: "network"; readonly host: string; readonly port: number }
+  | { readonly kind: "serial"; readonly path: string; readonly baudRate: number };
+export type ScaleConfig =
+  | { readonly kind: "none" }
+  | { readonly kind: "serial"; readonly path: string; readonly baudRate: number };
+export interface HardwareConfig {
+  readonly printer: PrinterConfig;
+  readonly scale: ScaleConfig;
+}
+export interface PortInfo {
+  readonly path: string;
+  readonly manufacturer?: string | undefined;
+}
+export interface ScaleReading {
+  readonly grams: number;
+  readonly stable: boolean;
+}
 
 export type DesktopPlatform = "windows" | "macos" | "linux";
 
@@ -43,6 +69,14 @@ export interface DesktopBridge {
     readonly commit: () => Promise<void>;
     readonly rollback: () => Promise<void>;
     readonly close: () => Promise<void>;
+  };
+  readonly hw: {
+    readonly config: () => Promise<HardwareConfig>;
+    readonly setConfig: (config: HardwareConfig) => Promise<HardwareConfig>;
+    readonly print: (bytes: Uint8Array) => Promise<void>;
+    readonly kick: () => Promise<void>;
+    readonly ports: () => Promise<PortInfo[]>;
+    readonly scale: () => Promise<ScaleReading | undefined>;
   };
   readonly vault: {
     readonly load: () => Promise<string | undefined>;

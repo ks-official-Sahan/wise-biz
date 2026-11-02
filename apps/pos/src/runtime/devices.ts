@@ -4,6 +4,13 @@ import { createMockAdapter } from "@wise-biz/payments-adapters";
 import type { Printer } from "@wise-biz/hardware";
 import type { PaymentAdapter } from "@wise-biz/payments-adapters";
 
+let desktopPrinter: Printer | undefined;
+
+/** Set at startup from the desktop shell's saved settings (undefined when no printer is configured there). */
+export function setDesktopPrinter(p: Printer | undefined): void {
+  desktopPrinter = p;
+}
+
 export interface Devices {
   /** Undefined hides the card button: a terminal with no card reader set up takes cash only. */
   readonly adapter: PaymentAdapter | undefined;
@@ -17,9 +24,17 @@ export interface Devices {
  * and the e2e suite). A release build without the flag never carries a card button that approves everything.
  */
 export function configuredDevices(): Devices {
+  if (desktopPrinter !== undefined)
+    return { adapter: mockAdapterIfEnabled(), printer: desktopPrinter };
   if (process.env.EXPO_PUBLIC_MOCK_PAYMENTS !== "1")
     return { adapter: undefined, printer: undefined };
   const printer = createMemoryPrinter();
   (globalThis as { __wbPrinterJobs?: Uint8Array[] }).__wbPrinterJobs = printer.jobs;
   return { adapter: createMockAdapter({ scenario: { kind: "approve", afterMs: 400 } }), printer };
+}
+
+function mockAdapterIfEnabled(): PaymentAdapter | undefined {
+  return process.env.EXPO_PUBLIC_MOCK_PAYMENTS === "1"
+    ? createMockAdapter({ scenario: { kind: "approve", afterMs: 400 } })
+    : undefined;
 }

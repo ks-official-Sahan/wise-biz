@@ -2,6 +2,7 @@ import { CHANNELS } from "../shared/channels.ts";
 
 import { isTrustedSender } from "./security.ts";
 
+import type { HardwareService } from "./hardware.ts";
 import type { StorageService } from "./storage.ts";
 import type { createVaultStore } from "./vault.ts";
 
@@ -24,9 +25,13 @@ export interface IpcMainLike {
  */
 export function registerIpc(
   ipc: IpcMainLike,
-  deps: { storage: StorageService; vault: ReturnType<typeof createVaultStore> },
+  deps: {
+    storage: StorageService;
+    vault: ReturnType<typeof createVaultStore>;
+    hardware: HardwareService;
+  },
 ): void {
-  const { storage, vault } = deps;
+  const { storage, vault, hardware } = deps;
   const table: Record<string, Handler> = {
     [CHANNELS.dbOpen]: (id) => {
       storage.open(id);
@@ -54,6 +59,12 @@ export function registerIpc(
     [CHANNELS.vaultClear]: () => {
       vault.clear();
     },
+    [CHANNELS.hwConfig]: () => hardware.config(),
+    [CHANNELS.hwSetConfig]: (c) => hardware.setConfig(c),
+    [CHANNELS.hwPrint]: (b) => hardware.print(b),
+    [CHANNELS.hwKick]: () => hardware.kick(),
+    [CHANNELS.hwPorts]: () => hardware.ports(),
+    [CHANNELS.hwScale]: () => hardware.scale(),
   };
   for (const [channel, fn] of Object.entries(table)) {
     ipc.handle(channel, async (event, ...args) => {

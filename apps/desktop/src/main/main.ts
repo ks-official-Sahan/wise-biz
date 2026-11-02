@@ -1,9 +1,11 @@
 import fs from "node:fs";
+import tcp from "node:net";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { BrowserWindow, app, ipcMain, net, protocol, safeStorage, session } from "electron";
 
+import { createHardwareService, parseHardwareConfig } from "./hardware.ts";
 import { registerIpc } from "./ipc.ts";
 import {
   APP_ORIGIN,
@@ -16,6 +18,7 @@ import { createStorageService } from "./storage.ts";
 import { createVaultStore } from "./vault.ts";
 import { createMainWindow } from "./window.ts";
 
+import type { SerialLike } from "./hardware.ts";
 import type { Driver } from "./storage.ts";
 
 // Replaced at build time (scripts/build.mjs). The renderer bundle talks to this API origin and no other.
@@ -44,6 +47,17 @@ function openDriver(file: string): Driver {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const Database = require("better-sqlite3") as new (f: string) => Driver;
   return new Database(file);
+}
+
+async function openSerialPort(path: string, baudRate: number): Promise<SerialLike> {
+  const { SerialPort } = await import("serialport");
+  return new Promise((resolve, reject) => {
+    const port = new SerialPort({ path, baudRate, autoOpen: false });
+    port.open((err) => {
+      if (err) reject(err);
+      else resolve(port as unknown as SerialLike);
+    });
+  });
 }
 
 function atomicWrite(file: string, data: Uint8Array): void {
@@ -140,13 +154,51 @@ if (gotLock)
           },
         },
       });
+      const configFile = path.join(userData, "hardware.json");
+      const hardware = createHardwareService({
+        loadConfig: () => {
+          try {
+            return parseHardwareConfig(JSON.parse(fs.readFileSync(configFile, "utf8")));
+          } catch {
+            return undefined;
+          }
+        },
+        saveConfig: (c) => {
+          atomicWrite(configFile, Buffer.from(JSON.stringify(c)));
+        },
+        connect: (host, port) => {
+          const socket = tcp.connect({ host, port });
+          return {
+            write: (bytes, done) => {
+              socket.write(bytes, done);
+            },
+            destroy: () => {
+              socket.destroy();
+            },
+            end: () => {
+              socket.end();
+            },
+            on: (event, handler) => {
+              socket.on(event, handler);
+            },
+          };
+        },
+        openSerial: openSerialPort,
+        listSerial: async () => {
+          const { SerialPort } = await import("serialport");
+          return (await SerialPort.list()).map((p) => ({
+            path: p.path,
+            manufacturer: p.manufacturer,
+          }));
+        },
+      });
       registerIpc(
         {
           handle: (channel, listener) => {
             ipcMain.handle(channel, listener);
           },
         },
-        { storage, vault },
+        { storage, vault, hardware },
       );
       app.on("before-quit", () => {
         storage.close();

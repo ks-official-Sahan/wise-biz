@@ -14,6 +14,7 @@ import { OperationsSheet } from "../operations/OperationsSheet.tsx";
 import { OverrideSheet } from "../overrides/OverrideSheet.tsx";
 import { unavailableOverridePort } from "../overrides/port.ts";
 import { commitSale, loadLocations } from "../tender/model/commit.ts";
+import { receiptJob } from "../tender/model/drawer.ts";
 import { buildReceiptDoc } from "../tender/model/receipt-doc.ts";
 import { createTenderSession } from "../tender/model/session.ts";
 import { TenderSheet } from "../tender/ui/TenderSheet.tsx";
@@ -239,18 +240,21 @@ export function SellScreen({
               ? undefined
               : (sale, tenders) =>
                   printer.write(
-                    encodeEscPos(
-                      buildReceiptDoc({
-                        sale,
-                        pricing,
-                        cart: lines,
-                        tenders,
-                        store: { name: storeName },
-                        ...(RECEIPT_BASE === undefined ? {} : { receiptBaseUrl: RECEIPT_BASE }),
-                        locale,
-                        note,
-                      }),
-                      { width: 80 },
+                    receiptJob(
+                      encodeEscPos(
+                        buildReceiptDoc({
+                          sale,
+                          pricing,
+                          cart: lines,
+                          tenders,
+                          store: { name: storeName },
+                          ...(RECEIPT_BASE === undefined ? {} : { receiptBaseUrl: RECEIPT_BASE }),
+                          locale,
+                          note,
+                        }),
+                        { width: 80 },
+                      ),
+                      tenders,
                     ),
                   ),
           onChange: (state) => {

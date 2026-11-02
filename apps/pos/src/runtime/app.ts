@@ -4,7 +4,14 @@ import { Platform as RnPlatform } from "react-native";
 import { createPosStore, loadPersisted } from "../state/store.ts";
 
 import { createController } from "./controller.ts";
-import { createDesktopVault, getDesktop, openDesktopSqlite } from "./desktop.ts";
+import {
+  createDesktopPrinter,
+  createDesktopVault,
+  desktopPrinterConfigured,
+  getDesktop,
+  openDesktopSqlite,
+} from "./desktop.ts";
+import { setDesktopPrinter } from "./devices.ts";
 import { reportError, setReportSink } from "./report.ts";
 import { openExpoSqlite } from "./sqlite-adapter.ts";
 import { createKeyValue, createVault, isLowTrustPlatform } from "./vault.ts";
@@ -50,6 +57,8 @@ export function getApp(): Promise<App> {
     const store = createPosStore({ storage, ui });
     // Inside the Electron shell the database and the device key live in the main process (better-sqlite3, safeStorage).
     const desktop = getDesktop();
+    if (desktop !== undefined && (await desktopPrinterConfigured(desktop)))
+      setDesktopPrinter(createDesktopPrinter(desktop));
     const controller = createController({
       store,
       vault: desktop === undefined ? createVault() : createDesktopVault(desktop),

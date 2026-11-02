@@ -28,6 +28,14 @@ const bridge: DesktopBridge = {
     rollback: () => call(CHANNELS.dbRollback),
     close: () => call(CHANNELS.dbClose),
   },
+  hw: {
+    config: () => call(CHANNELS.hwConfig),
+    setConfig: (c) => call(CHANNELS.hwSetConfig, c),
+    print: (b) => call(CHANNELS.hwPrint, b),
+    kick: () => call(CHANNELS.hwKick),
+    ports: () => call(CHANNELS.hwPorts),
+    scale: () => call(CHANNELS.hwScale),
+  },
   vault: {
     load: () => call(CHANNELS.vaultLoad),
     save: (v) => call(CHANNELS.vaultSave, v),

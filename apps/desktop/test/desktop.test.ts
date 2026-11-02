@@ -3,6 +3,7 @@ import path from "node:path";
 import Database from "better-sqlite3";
 import { describe, expect, it } from "vitest";
 
+import { createHardwareService } from "../src/main/hardware.ts";
 import { registerIpc } from "../src/main/ipc.ts";
 import {
   APP_ORIGIN,
@@ -18,6 +19,17 @@ import { ALL_CHANNELS, CHANNELS } from "../src/shared/channels.ts";
 
 import type { Driver } from "../src/main/storage.ts";
 import type { SafeStorage, VaultFiles } from "../src/main/vault.ts";
+
+const hw = () =>
+  createHardwareService({
+    loadConfig: () => undefined,
+    saveConfig: () => undefined,
+    connect: () => {
+      throw new Error("no network in unit tests");
+    },
+    openSerial: () => Promise.reject(new Error("no serial in unit tests")),
+    listSerial: () => Promise.resolve([]),
+  });
 
 const storage = () =>
   createStorageService({
@@ -165,6 +177,7 @@ describe("ipc", () => {
       { handle: (c, l) => void handlers.set(c, l) },
       {
         storage: s,
+        hardware: hw(),
         vault: createVaultStore({
           file: "f",
           safe: {
@@ -234,6 +247,7 @@ describe("hardening", () => {
       },
       {
         storage: storage(),
+        hardware: hw(),
         vault: createVaultStore({
           file: "f",
           safe: {
