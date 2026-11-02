@@ -18,6 +18,13 @@ export function ftsQuery(text: string): string | undefined {
     .join(" ");
 }
 
+/** Letters and digits only, lower-cased: the tokens both search engines work from. */
+function tokensOf(text: string): string[] {
+  return (text.normalize("NFKC").match(/[\p{L}\p{N}]+/gu) ?? [])
+    .slice(0, 8)
+    .map((t) => t.toLowerCase());
+}
+
 interface BarcodePayload {
   readonly variantId: string;
   readonly codes: readonly string[];
@@ -39,6 +46,18 @@ export function createIndexes(db: LocalDb) {
     for (const code of codes) byCode.set(code, variantId);
     if (codes.length === 0) codesOf.delete(variantId);
     else codesOf.set(variantId, codes);
+  }
+
+  let fts: boolean | undefined;
+  /** Web SQLite builds may lack FTS5; the migration then created a plain table and search scans it. */
+  async function hasFts(): Promise<boolean> {
+    fts ??= (
+      (await db.get<{ sql: string }>("SELECT sql FROM sqlite_master WHERE name = 'variant_search'"))
+        ?.sql ?? ""
+    )
+      .toUpperCase()
+      .includes("VIRTUAL");
+    return fts;
   }
 
   return {
@@ -79,6 +98,21 @@ export function createIndexes(db: LocalDb) {
     async search(text: string, limit = 20): Promise<VariantHit[]> {
       const q = ftsQuery(text);
       if (q === undefined) return [];
+      if (!(await hasFts())) {
+        // Same contract without FTS5: every token starts a word of the name or the SKU (the last one is a prefix too).
+        const tokens = tokensOf(text);
+        const clause = tokens
+          .map(() => "(lower(s.name) LIKE ? OR lower(s.name) LIKE ? OR lower(s.sku) LIKE ?)")
+          .join(" AND ");
+        // Tokens are letters and digits only, so they carry no LIKE wildcards.
+        const params = tokens.flatMap((t) => [`${t}%`, `% ${t}%`, `${t}%`]);
+        return db.all<VariantHit>(
+          `SELECT i.variant_id AS variantId, s.name AS name, s.sku AS sku
+           FROM variant_search s JOIN variant_index i ON i.variant_rowid = s.rowid
+           WHERE ${clause} ORDER BY length(s.name), s.name LIMIT ?`,
+          [...params, limit],
+        );
+      }
       return db.all<VariantHit>(
         `SELECT i.variant_id AS variantId, s.name AS name, s.sku AS sku
          FROM variant_search s JOIN variant_index i ON i.variant_rowid = s.rowid

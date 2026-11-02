@@ -1,0 +1,15 @@
+{
+  "expo": {
+    "name": "wise-biz POS",
+    "slug": "wise-biz-pos",
+    "scheme": "wisebizpos",
+    "version": "0.0.0",
+    "orientation": "default",
+    "userInterfaceStyle": "automatic",
+    "plugins": ["expo-router", "expo-secure-store", "expo-sqlite"],
+    "android": { "package": "biz.wise.pos" },
+    "ios": { "bundleIdentifier": "biz.wise.pos" },
+    "web": { "bundler": "metro", "output": "single" },
+    "experiments": { "typedRoutes": false, "tsconfigPaths": false }
+  }
+}

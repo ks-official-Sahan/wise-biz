@@ -115,6 +115,8 @@ export function createSyncClient(deps: SyncClientDeps) {
     : undefined;
 
   return {
+    /** The device database, for host reads (rosters, theme) that are not part of sync itself. */
+    db: deps.db,
     outbox,
     indexes,
     pushLoop,

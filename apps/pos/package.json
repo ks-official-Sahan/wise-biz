@@ -4,28 +4,55 @@
   "private": true,
   "type": "module",
   "wiseBiz": {
-    "runtime": "universal"
-  },
-  "exports": {
-    ".": "./src/platform/index.ts"
+    "runtime": "node"
   },
   "scripts": {
+    "web": "expo start --web",
+    "android": "expo start --android",
+    "export:web": "expo export --platform web",
     "lint": "eslint . --max-warnings 0",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --coverage"
+    "test": "vitest run --coverage",
+    "e2e:build": "node e2e/build.mjs",
+    "e2e": "playwright test"
   },
   "dependencies": {
+    "@expo/metro-runtime": "58.0.15",
+    "@reduxjs/toolkit": "2.13.0",
+    "@tanstack/react-query": "5.105.0",
     "@wise-biz/crypto": "workspace:*",
     "@wise-biz/http-signatures": "workspace:*",
     "@wise-biz/ids": "workspace:*",
-    "@wise-biz/sync": "workspace:*"
+    "@wise-biz/money": "workspace:*",
+    "@wise-biz/sync": "workspace:*",
+    "@wise-biz/theme": "workspace:*",
+    "@wise-biz/ui": "workspace:*",
+    "expo": "58.0.17",
+    "expo-constants": "58.0.13",
+    "expo-crypto": "58.0.7",
+    "expo-font": "58.0.10",
+    "expo-linking": "58.0.14",
+    "expo-router": "58.0.25",
+    "expo-secure-store": "58.0.2",
+    "expo-sqlite": "58.0.13",
+    "expo-status-bar": "58.0.4",
+    "fflate": "0.8.3",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "react-native": "0.88.0",
+    "react-native-safe-area-context": "5.10.1",
+    "react-native-screens": "4.30.0",
+    "react-native-web": "0.21.4",
+    "react-redux": "9.3.1"
   },
   "devDependencies": {
     "@edge-runtime/vm": "5.0.0",
+    "@playwright/test": "1.64.1",
     "@wise-biz/config": "workspace:*",
     "@wise-biz/testing": "workspace:*",
     "eslint": "10.13.0",
     "typescript": "6.0.3",
     "vitest": "5.0.5"
-  }
+  },
+  "main": "expo-router/entry"
 }

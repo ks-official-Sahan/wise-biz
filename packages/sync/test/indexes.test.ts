@@ -127,6 +127,36 @@ describe("indexes", () => {
   });
 });
 
+describe("search without FTS5 (web SQLite builds)", () => {
+  it("falls back to a scan with the same results for names and SKUs", async () => {
+    const inner = betterSqliteAdapter();
+    const noFts = {
+      ...inner,
+      exec: (sql: string) =>
+        /fts5/i.test(sql) ? Promise.reject(new Error("no such module: fts5")) : inner.exec(sql),
+    };
+    const db = await openLocalDb(noFts);
+    dbs.push(db);
+    await db.transaction(async (tx) => {
+      await applyChanges(tx, "catalog", [
+        change("variant", "v1", { variantId: "v1", name: "Green Tea 500g", sku: "GT-500" }),
+        change("variant", "v2", { variantId: "v2", name: "Green Apple Juice", sku: "GJ-1" }),
+        change("variant", "v3", {
+          variantId: "v3",
+          name: "Green Tea Old",
+          sku: "GT-0",
+          archived: true,
+        }),
+      ]);
+    });
+    const idx = createIndexes(db);
+    expect((await idx.search("green t")).map((h) => h.variantId)).toEqual(["v1"]);
+    expect((await idx.search("gre")).map((h) => h.variantId).sort()).toEqual(["v1", "v2"]);
+    expect((await idx.search("gj")).map((h) => h.variantId)).toEqual(["v2"]);
+    expect(await idx.search("zzz")).toEqual([]);
+  });
+});
+
 describe("lookup budgets", () => {
   it(
     "barcode map under 0.1 ms; FTS over 100k variants under 30 ms",

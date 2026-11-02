@@ -79,6 +79,24 @@ export interface OpenOptions {
   now?: () => number;
 }
 
+async function supportsFts5(db: LocalDb): Promise<boolean> {
+  try {
+    await db.exec(
+      "CREATE VIRTUAL TABLE temp._fts_probe USING fts5(x); DROP TABLE temp._fts_probe;",
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Without FTS5 the search table is a plain two-column table (same rowid contract); search then scans it. */
+function withoutFts(stmt: string): string {
+  return stmt.startsWith("CREATE VIRTUAL TABLE variant_search")
+    ? "CREATE TABLE variant_search (name text NOT NULL, sku text NOT NULL)"
+    : stmt;
+}
+
 /**
  * Opens a device database: durability pragmas, then every migration not applied yet. WAL with `synchronous=FULL`: an
  * acknowledged local sale survives power loss (the outbox row is the only copy until the server acks it).
@@ -107,10 +125,11 @@ export async function openLocalDb(
       `The local database is at version ${String(Math.max(...ahead))}, newer than this app (${String(LATEST_VERSION)}): update the app`,
     );
   }
+  const fts = await supportsFts5(db);
   for (const m of MIGRATIONS) {
     if (done.has(m.version)) continue;
     await db.transaction(async (tx) => {
-      for (const stmt of m.sql) await tx.exec(stmt);
+      for (const stmt of m.sql) await tx.exec(fts ? stmt : withoutFts(stmt));
       await tx.run("INSERT INTO _migrations (version, applied_at) VALUES (?, ?)", [
         m.version,
         now(),
