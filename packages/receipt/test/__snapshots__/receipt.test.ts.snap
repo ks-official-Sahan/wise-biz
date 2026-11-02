@@ -1,0 +1,83 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`ESC/POS > matches the 58 mm golden receipt 1`] = `
+"<1b>@<1b>t<00><1b>a<01><1b>E<01>Cafe Wise & Sons
+<1b>E<00>12 Galle Road
+Colombo 03
+VAT 123456789
+Thank you for shopping with us
+<1b>a<00>--------------------------------
+Receipt 000123
+Nov 2, 2026, 10:15 AM
+Served by Amara
+--------------------------------
+Green Tea 500 g            10.00
+  2 x 5.00
+Whole Milk 1 L extra long
+product name that must wrap 5.40
+  3 x 1.80
+Discount                   -0.60
+  for Sam
+--------------------------------
+Subtotal                   15.40
+Discounts                  -0.60
+VAT 10%                     1.48
+Rounding                   -0.03
+<1b>E<01><1d>!<11>TOTAL      16.25
+<1d>!<00><1b>E<00>--------------------------------
+Cash                       20.00
+<1b>E<01>Change                      3.75
+<1b>E<00>Loyalty balance: 120 pts
+--------------------------------
+Gift receipt
+<1b>a<01>No returns without receipt
+
+<1d>(k<04><00>1A2<00><1d>(k<03><00>1C<05><1d>(k<03><00>1E1<1d>(k<1f><00>1P0https://r.example.com/abc123<1d>(k<03><00>1Q0
+https://r.example.com/abc123
+
+
+
+
+<1d>VB<00><1b>p<00><19><fa>"
+`;
+
+exports[`ESC/POS > matches the 80 mm golden receipt 1`] = `
+"<1b>@<1b>t<00><1b>a<01><1b>E<01>Cafe Wise & Sons
+<1b>E<00>12 Galle Road
+Colombo 03
+VAT 123456789
+Thank you for shopping with us
+<1b>a<00>------------------------------------------------
+Receipt 000123
+Nov 2, 2026, 10:15 AM
+Served by Amara
+------------------------------------------------
+Green Tea 500 g                            10.00
+  2 x 5.00
+Whole Milk 1 L extra long product name that
+must wrap                                   5.40
+  3 x 1.80
+Discount                                   -0.60
+  for Sam
+------------------------------------------------
+Subtotal                                   15.40
+Discounts                                  -0.60
+VAT 10%                                     1.48
+Rounding                                   -0.03
+<1b>E<01><1d>!<11>TOTAL              16.25
+<1d>!<00><1b>E<00>------------------------------------------------
+Cash                                       20.00
+<1b>E<01>Change                                      3.75
+<1b>E<00>Loyalty balance: 120 pts
+------------------------------------------------
+Gift receipt
+<1b>a<01>No returns without receipt
+
+<1d>(k<04><00>1A2<00><1d>(k<03><00>1C<05><1d>(k<03><00>1E1<1d>(k<1f><00>1P0https://r.example.com/abc123<1d>(k<03><00>1Q0
+https://r.example.com/abc123
+
+
+
+
+<1d>VB<00><1b>p<00><19><fa>"
+`;
