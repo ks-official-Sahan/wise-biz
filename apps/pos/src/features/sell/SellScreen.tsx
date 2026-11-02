@@ -10,6 +10,7 @@ import { reportError } from "../../runtime/report.ts";
 import { SyncChip } from "../../ui/chrome.tsx";
 import { useController } from "../../ui/context.tsx";
 import { useAppSelector } from "../../ui/hooks.ts";
+import { OperationsSheet } from "../operations/OperationsSheet.tsx";
 import { OverrideSheet } from "../overrides/OverrideSheet.tsx";
 import { unavailableOverridePort } from "../overrides/port.ts";
 import { commitSale, loadLocations } from "../tender/model/commit.ts";
@@ -95,6 +96,7 @@ export function SellScreen({
   const [quick, setQuick] = useState<QuickItem[]>([]);
   const [override, setOverride] = useState<OverrideEdit>();
   const [catalogOpen, setCatalogOpen] = useState(false);
+  const [opsOpen, setOpsOpen] = useState(false);
   const [parkedOpen, setParkedOpen] = useState(false);
   const [parked, setParked] = useState<ParkedSale[]>([]);
   const [parkedAt, setParkedAt] = useState(0);
@@ -173,6 +175,7 @@ export function SellScreen({
     model !== undefined &&
       override === undefined &&
       !catalogOpen &&
+      !opsOpen &&
       !parkedOpen &&
       tender === undefined,
   );
@@ -336,6 +339,14 @@ export function SellScreen({
         )}
         <View style={s.barActions}>
           <Button
+            label="Till"
+            variant="ghost"
+            onPress={() => {
+              setOpsOpen(true);
+            }}
+            testID="till"
+          />
+          <Button
             label="Lock"
             variant="ghost"
             onPress={() => {
@@ -442,6 +453,16 @@ export function SellScreen({
           }}
         />
       )}
+
+      <OperationsSheet
+        visible={opsOpen}
+        onClose={() => {
+          setOpsOpen(false);
+        }}
+        port={port}
+        currency={sell.currency ?? "USD"}
+        locale={locale}
+      />
 
       <OverrideSheet
         visible={override !== undefined}

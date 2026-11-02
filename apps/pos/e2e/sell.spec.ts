@@ -312,3 +312,57 @@ test("split: part cash, rest by card; a decline is not possible with the approvi
   await expect(page.getByText("Paid in full")).toBeVisible({ timeout: 10_000 });
   await page.getByTestId("tender-new-sale").click();
 });
+
+test("shift: open with a float, sell, void inside the window, close with a matching count", async ({
+  page,
+}) => {
+  await signIn(page);
+  await page.getByTestId("till").click();
+  await page.getByTestId("ops-float").fill("50.00");
+  await page.getByTestId("ops-open").click();
+  await expect(page.getByText("Shift open")).toBeVisible();
+  await page.keyboard.press("Escape");
+
+  await scan(page, TEA);
+  await scan(page, RICE);
+  await page.getByTestId("sell-pay").click();
+  await page.getByTestId("tender-suggest-0").click(); // exact 14.30
+  await page.getByTestId("tender-new-sale").click();
+
+  await page.getByTestId("till").click();
+  await page.getByTestId("ops-tabs").getByText("Sales").click();
+  await page.getByTestId("ops-sale-1").click();
+  await page.getByTestId("ops-reason").fill("customer left");
+  await page.getByTestId("ops-void").click();
+  await expect(page.getByText("Voided").first()).toBeVisible();
+
+  await page.getByTestId("ops-tabs").getByText("Shift").click();
+  await page.getByTestId("ops-counted").fill("50.00");
+  await page.getByTestId("ops-close").click();
+  await expect(page.getByTestId("ops-variance")).toContainText("Drawer matches");
+});
+
+test("shift: a short count is reported, and a return without permission asks for a supervisor", async ({
+  page,
+}) => {
+  await signIn(page);
+  await scan(page, TEA);
+  await page.getByTestId("sell-pay").click();
+  await page.getByTestId("tender-suggest-0").click();
+  await page.getByTestId("tender-new-sale").click();
+
+  await page.getByTestId("till").click();
+  await page.getByTestId("ops-tabs").getByText("Sales").click();
+  await page.getByTestId("ops-sale-1").click();
+  await page.getByTestId("ops-plus-0").click();
+  await page.getByTestId("ops-reason").fill("wrong item");
+  await page.getByTestId("ops-return").click();
+  await expect(page.getByTestId("override-sheet")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("override-sheet")).toBeHidden();
+  if (!(await page.getByTestId("ops-tabs").isVisible())) await page.getByTestId("till").click();
+  await page.getByTestId("ops-tabs").getByText("Shift").click();
+  await page.getByTestId("ops-counted").fill("1.00");
+  await page.getByTestId("ops-close").click();
+  await expect(page.getByTestId("ops-variance")).toContainText("Short by");
+});
