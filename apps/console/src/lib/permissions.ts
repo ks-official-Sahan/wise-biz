@@ -42,6 +42,33 @@ export const PERMISSION_GROUPS: readonly { module: string; items: readonly Permi
     ],
   },
   {
+    module: "Sales",
+    items: [
+      { permission: "sales:read", label: "View sales", allows: "See sales, shifts and Z-reports." },
+      {
+        permission: "sales:return",
+        label: "Take returns",
+        allows: "Refund sold items at the till.",
+      },
+      { permission: "sales:void", label: "Void sales", allows: "Void a recent sale at the till." },
+    ],
+  },
+  {
+    module: "Terminals",
+    items: [
+      {
+        permission: "devices:read",
+        label: "View terminals",
+        allows: "See terminals and when they were last online.",
+      },
+      {
+        permission: "devices:manage",
+        label: "Manage terminals",
+        allows: "Add, rename, move, suspend, revoke or blacklist terminals.",
+      },
+    ],
+  },
+  {
     module: "Stock",
     items: [
       {

@@ -1,7 +1,17 @@
 /** Navigation and command registry: one list feeds the sidebar, bottom nav and the command palette. */
 export interface NavItem {
   readonly href:
-    "/" | "/catalog" | "/pricing" | "/stock" | "/people" | "/roles" | "/audit" | "/settings";
+    | "/"
+    | "/catalog"
+    | "/pricing"
+    | "/sales"
+    | "/shifts"
+    | "/devices"
+    | "/stock"
+    | "/people"
+    | "/roles"
+    | "/audit"
+    | "/settings";
   readonly label: string;
   /** Extra words the command palette matches on. */
   readonly keywords: readonly string[];
@@ -16,6 +26,24 @@ export const NAV: readonly NavItem[] = [
     label: "Products",
     keywords: ["catalog", "items", "sku", "barcode", "import", "inventory"],
     primary: true,
+  },
+  {
+    href: "/sales",
+    label: "Sales",
+    keywords: ["receipts", "orders", "transactions", "voids", "returns", "refunds"],
+    primary: true,
+  },
+  {
+    href: "/shifts",
+    label: "Shifts",
+    keywords: ["z-report", "cash", "drawer", "till", "over short", "close"],
+    primary: false,
+  },
+  {
+    href: "/devices",
+    label: "Terminals",
+    keywords: ["devices", "pos", "enroll", "revoke", "suspend", "register"],
+    primary: false,
   },
   {
     href: "/stock",
@@ -33,7 +61,7 @@ export const NAV: readonly NavItem[] = [
     href: "/people",
     label: "People",
     keywords: ["members", "staff", "invite", "team"],
-    primary: true,
+    primary: false,
   },
   { href: "/roles", label: "Roles", keywords: ["permissions", "access"], primary: false },
   {
