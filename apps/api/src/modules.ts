@@ -5,6 +5,7 @@ import { batchSalePrices, createInventoryModule } from "@wise-biz/module-invento
 import { createPricingModule } from "@wise-biz/module-pricing";
 import { createSalesModule } from "@wise-biz/module-sales";
 import { createSearchModule } from "@wise-biz/module-search";
+import { shortlinksModule } from "@wise-biz/module-shortlinks";
 import { createSyncModule } from "@wise-biz/module-sync";
 import { templateModule } from "@wise-biz/module-template";
 import { createTenancyModule } from "@wise-biz/module-tenancy";
@@ -56,6 +57,8 @@ export function createModules(
     // Terminals push signed command batches here; each command goes to its owning module through syncPorts.
     createSyncModule(createSyncPorts(store, syncMetric), {}, realtime),
     createSearchModule(),
+    // Public digital receipts (/r/:code); the sale-to-link consumer runs in apps/workers.
+    shortlinksModule,
     templateModule,
   ];
 }

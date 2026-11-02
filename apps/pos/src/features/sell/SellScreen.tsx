@@ -49,6 +49,8 @@ const useStyles = createStyles((t) => ({
 const browserOnline = (): boolean =>
   (globalThis as { navigator?: { onLine?: boolean } }).navigator?.onLine !== false;
 
+const RECEIPT_BASE = process.env.EXPO_PUBLIC_RECEIPT_BASE_URL as string | undefined;
+
 const EMPTY_TOTALS = (currency: string): SellTotals => ({
   subtotalMinor: 0,
   discountMinor: 0,
@@ -241,6 +243,7 @@ export function SellScreen({
                         cart: lines,
                         tenders,
                         store: { name: storeName },
+                        ...(RECEIPT_BASE === undefined ? {} : { receiptBaseUrl: RECEIPT_BASE }),
                         locale,
                         note,
                       }),

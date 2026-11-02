@@ -1,3 +1,5 @@
+import { receiptCode } from "@wise-biz/receipt";
+
 import type { CommittedSale } from "./commit.ts";
 import type { TenderEntry } from "./tender.ts";
 import type { CartLine } from "../../../state/slices.ts";
@@ -29,7 +31,8 @@ export function buildReceiptDoc(o: {
   readonly locale: string;
   readonly operatorName?: string;
   readonly note?: string | null;
-  readonly shortUrl?: string;
+  /** Base of the public receipt page, e.g. "https://r.example.com/r/"; the sale's code is appended. */
+  readonly receiptBaseUrl?: string;
 }): ReceiptDoc {
   const priced = o.pricing.priced;
   if (priced === undefined) throw new Error("cannot print an unpriced sale");
@@ -75,7 +78,9 @@ export function buildReceiptDoc(o: {
     changeMinor: change,
     ...(o.note === null || o.note === undefined ? {} : { note: o.note }),
     ...(o.store.footer === undefined ? {} : { footer: o.store.footer }),
-    ...(o.shortUrl === undefined ? {} : { qrUrl: o.shortUrl }),
+    ...(o.receiptBaseUrl === undefined
+      ? {}
+      : { qrUrl: `${o.receiptBaseUrl}${receiptCode(o.sale.saleId)}` }),
     openDrawer: o.tenders.some((t) => t.kind === "cash"),
   };
 }

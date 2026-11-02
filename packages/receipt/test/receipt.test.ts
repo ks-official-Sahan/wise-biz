@@ -249,3 +249,17 @@ describe("code page 858", () => {
     expect([...b]).toContain(0xe1);
   });
 });
+
+describe("receipt code", () => {
+  it("is stable, 10 characters, and tolerant of how people type it", async () => {
+    const { receiptCode, normalizeReceiptCode } = await import("../src/index.ts");
+    const a = receiptCode("018f3b0e-1c2d-7abc-8def-0123456789ab");
+    expect(a).toMatch(/^[0-9A-HJKMNP-TV-Z]{10}$/);
+    expect(receiptCode("018f3b0e-1c2d-7abc-8def-0123456789ab")).toBe(a);
+    expect(receiptCode("another-sale")).not.toBe(a);
+    expect(normalizeReceiptCode(` ${a.toLowerCase()} `)).toBe(a);
+    expect(normalizeReceiptCode("OOOOOOOOOO")).toBe("0000000000");
+    expect(normalizeReceiptCode("short")).toBeUndefined();
+    expect(normalizeReceiptCode("UUUUUUUUUU")).toBeUndefined();
+  });
+});

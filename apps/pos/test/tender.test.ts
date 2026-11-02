@@ -426,7 +426,7 @@ describe("receipt of a sale", () => {
       store: { name: "Wise Shop", footer: ["Thanks"] },
       locale: "en-US",
       operatorName: "Amara",
-      shortUrl: "https://r.example.com/x",
+      receiptBaseUrl: "https://r.example.com/r/",
     });
     expect(doc).toMatchObject({
       number: "Receipt 000001",
@@ -435,6 +435,8 @@ describe("receipt of a sale", () => {
       changeMinor: 1500 - (pricing.totals.totalMinor - 500),
     });
     expect(doc.tenders.map((t) => t.label)).toEqual(["Card ****4242", "Cash"]);
+    expect(doc.qrUrl?.startsWith("https://r.example.com/r/")).toBe(true);
+    expect(doc.qrUrl?.length).toBe("https://r.example.com/r/".length + 10);
     expect(doc.taxes[0]).toMatchObject({ name: "VAT 10%" });
     expect(encodeEscPos(doc, { width: 58 }).length).toBeGreaterThan(100);
     expect(() =>
