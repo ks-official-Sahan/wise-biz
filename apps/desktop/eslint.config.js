@@ -2,7 +2,7 @@
 import { node } from "@wise-biz/config/eslint/node";
 
 export default [
-  { ignores: ["renderer/**", "dist/**", "release/**"] },
+  { ignores: ["renderer/**", "dist/**", "release/**", "display/**", "src/customer-display/**"] },
   ...node({ root: import.meta.dirname }),
   {
     // Unit tests and e2e touch the filesystem and Node built-ins freely.

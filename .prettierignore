@@ -11,3 +11,4 @@ docs/
 .claude/
 apps/desktop/renderer
 apps/desktop/release
+apps/desktop/display

@@ -2,7 +2,9 @@ import { CHANNELS } from "../shared/channels.ts";
 
 import { isTrustedSender } from "./security.ts";
 
+import type { DisplayController } from "./display.ts";
 import type { HardwareService } from "./hardware.ts";
+import type { Kiosk } from "./kiosk.ts";
 import type { StorageService } from "./storage.ts";
 import type { createVaultStore } from "./vault.ts";
 
@@ -29,9 +31,11 @@ export function registerIpc(
     storage: StorageService;
     vault: ReturnType<typeof createVaultStore>;
     hardware: HardwareService;
+    display: DisplayController;
+    kiosk: Kiosk;
   },
 ): void {
-  const { storage, vault, hardware } = deps;
+  const { storage, vault, hardware, display, kiosk } = deps;
   const table: Record<string, Handler> = {
     [CHANNELS.dbOpen]: (id) => {
       storage.open(id);
@@ -60,11 +64,33 @@ export function registerIpc(
       vault.clear();
     },
     [CHANNELS.hwConfig]: () => hardware.config(),
-    [CHANNELS.hwSetConfig]: (c) => hardware.setConfig(c),
+    [CHANNELS.hwSetConfig]: (c) => {
+      kiosk.guard();
+      return hardware.setConfig(c);
+    },
     [CHANNELS.hwPrint]: (b) => hardware.print(b),
     [CHANNELS.hwKick]: () => hardware.kick(),
     [CHANNELS.hwPorts]: () => hardware.ports(),
     [CHANNELS.hwScale]: () => hardware.scale(),
+    [CHANNELS.displayShow]: (s) => {
+      display.show(s);
+    },
+    [CHANNELS.displayClear]: () => {
+      display.clear();
+    },
+    [CHANNELS.displayScreens]: () => ({ screens: display.screens(), chosen: display.chosen() }),
+    [CHANNELS.displayChoose]: (id) => {
+      kiosk.guard();
+      display.choose(id);
+    },
+    [CHANNELS.kioskStatus]: () => kiosk.status(),
+    [CHANNELS.kioskSetPin]: (pin, current) => {
+      kiosk.setPin(pin, current);
+    },
+    [CHANNELS.kioskSetEnabled]: (enabled, pin) => {
+      kiosk.setEnabled(enabled, pin);
+    },
+    [CHANNELS.kioskVerify]: (pin) => kiosk.verify(pin),
   };
   for (const [channel, fn] of Object.entries(table)) {
     ipc.handle(channel, async (event, ...args) => {

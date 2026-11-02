@@ -5,11 +5,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ScrollView, View } from "react-native";
 import { useStore } from "react-redux";
 
+import { getDesktop } from "../../runtime/desktop.ts";
 import { configuredDevices } from "../../runtime/devices.ts";
 import { reportError } from "../../runtime/report.ts";
 import { SyncChip } from "../../ui/chrome.tsx";
 import { useController } from "../../ui/context.tsx";
 import { useAppSelector } from "../../ui/hooks.ts";
+import { DevicesSheet } from "../devices/DevicesSheet.tsx";
+import { displayStateFor } from "../devices/model/display-state.ts";
 import { OperationsSheet } from "../operations/OperationsSheet.tsx";
 import { OverrideSheet } from "../overrides/OverrideSheet.tsx";
 import { unavailableOverridePort } from "../overrides/port.ts";
@@ -98,6 +101,8 @@ export function SellScreen({
   const [override, setOverride] = useState<OverrideEdit>();
   const [catalogOpen, setCatalogOpen] = useState(false);
   const [opsOpen, setOpsOpen] = useState(false);
+  const [devicesOpen, setDevicesOpen] = useState(false);
+  const desktop = useMemo(() => getDesktop(), []);
   const [parkedOpen, setParkedOpen] = useState(false);
   const [parked, setParked] = useState<ParkedSale[]>([]);
   const [parkedAt, setParkedAt] = useState(0);
@@ -109,6 +114,17 @@ export function SellScreen({
     state: TenderState;
     payable: number;
   }>();
+
+  const tenderState = tender?.state;
+  useEffect(() => {
+    if (desktop === undefined || !pricing) return;
+    const next = displayStateFor({
+      lines: pricing.lines,
+      totals: pricing.totals,
+      tender: tenderState,
+    });
+    (next === null ? desktop.display.clear() : desktop.display.show(next)).catch(reportError);
+  }, [desktop, pricing, tenderState]);
 
   const say = useCallback(
     (message: string, tone: "info" | "danger" | "success" = "info") => {
@@ -177,6 +193,7 @@ export function SellScreen({
       override === undefined &&
       !catalogOpen &&
       !opsOpen &&
+      !devicesOpen &&
       !parkedOpen &&
       tender === undefined,
   );
@@ -342,6 +359,16 @@ export function SellScreen({
           </Text>
         )}
         <View style={s.barActions}>
+          {desktop === undefined ? null : (
+            <Button
+              label="Devices"
+              variant="ghost"
+              onPress={() => {
+                setDevicesOpen(true);
+              }}
+              testID="devices"
+            />
+          )}
           <Button
             label="Till"
             variant="ghost"
@@ -454,6 +481,16 @@ export function SellScreen({
             const done = tender.state.phase === "done";
             setTender(undefined);
             if (done) model?.finish().catch(reportError);
+          }}
+        />
+      )}
+
+      {desktop === undefined ? null : (
+        <DevicesSheet
+          visible={devicesOpen}
+          bridge={desktop}
+          onClose={() => {
+            setDevicesOpen(false);
           }}
         />
       )}

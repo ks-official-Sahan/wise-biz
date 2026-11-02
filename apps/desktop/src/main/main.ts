@@ -3,10 +3,24 @@ import tcp from "node:net";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { BrowserWindow, app, ipcMain, net, protocol, safeStorage, session } from "electron";
+import {
+  BrowserWindow,
+  Menu,
+  app,
+  ipcMain,
+  net,
+  protocol,
+  safeStorage,
+  screen,
+  session,
+} from "electron";
 
+import { DISPLAY_PUSH } from "../shared/channels.ts";
+
+import { createDisplayController } from "./display.ts";
 import { createHardwareService, parseHardwareConfig } from "./hardware.ts";
 import { registerIpc } from "./ipc.ts";
+import { createKiosk, isBlockedKioskKey, parseKioskRecord } from "./kiosk.ts";
 import {
   APP_ORIGIN,
   buildCsp,
@@ -16,10 +30,11 @@ import {
 } from "./security.ts";
 import { createStorageService } from "./storage.ts";
 import { createVaultStore } from "./vault.ts";
-import { createMainWindow } from "./window.ts";
+import { createDisplayWindow, createMainWindow } from "./window.ts";
 
 import type { SerialLike } from "./hardware.ts";
 import type { Driver } from "./storage.ts";
+import type { DisplayState } from "../shared/channels.ts";
 
 // Replaced at build time (scripts/build.mjs). The renderer bundle talks to this API origin and no other.
 declare const __API_ORIGIN__: string;
@@ -102,16 +117,19 @@ if (gotLock)
     .then(() => {
       const csp = buildCsp({ apiOrigin: __API_ORIGIN__, dev });
       const root = rendererRoot();
+      const displayRoot = path.join(app.getAppPath(), "display");
 
       protocol.handle("app", async (request) => {
         if (request.method !== "GET" && request.method !== "HEAD")
           return new Response("Method not allowed", { status: 405 });
         const url = new URL(request.url);
-        if (url.host !== "pos") return new Response("Not found", { status: 404 });
-        let file = resolveAsset(root, url.pathname);
+        if (url.host !== "pos" && url.host !== "display")
+          return new Response("Not found", { status: 404 });
+        const base = url.host === "pos" ? root : displayRoot;
+        let file = resolveAsset(base, url.pathname);
         if (file === undefined) return new Response("Bad request", { status: 400 });
         if (!fs.existsSync(file) && needsHtmlFallback(url.pathname))
-          file = path.join(root, "index.html");
+          file = path.join(base, "index.html");
         if (!fs.existsSync(file)) return new Response("Not found", { status: 404 });
         const res = await net.fetch(pathToFileURL(file).toString());
         const headers = new Headers();
@@ -156,9 +174,10 @@ if (gotLock)
       });
       const configFile = path.join(userData, "hardware.json");
       const hardware = createHardwareService({
+        dev,
         loadConfig: () => {
           try {
-            return parseHardwareConfig(JSON.parse(fs.readFileSync(configFile, "utf8")));
+            return parseHardwareConfig(JSON.parse(fs.readFileSync(configFile, "utf8")), { dev });
           } catch {
             return undefined;
           }
@@ -192,19 +211,105 @@ if (gotLock)
           }));
         },
       });
+      Menu.setApplicationMenu(null);
+      const main = createMainWindow({
+        url: `${APP_ORIGIN}/`,
+        preload: path.join(__dirname, "preload.cjs"),
+      });
+
+      const displayFile = path.join(userData, "display.json");
+      const display = createDisplayController({
+        screens: () =>
+          screen.getAllDisplays().map((d) => ({
+            id: d.id,
+            label: d.label === "" ? `Screen ${String(d.id)}` : d.label,
+            primary: d.id === screen.getDisplayMatching(main.getBounds()).id,
+            width: d.size.width,
+            height: d.size.height,
+          })),
+        // The e2e run has one screen, so the display may open on it there.
+        primaryId: () => (e2e ? undefined : screen.getDisplayMatching(main.getBounds()).id),
+        open: (screenId) => {
+          const bounds = screen.getAllDisplays().find((d) => d.id === screenId)?.bounds;
+          const win = createDisplayWindow({
+            url: "app://display/",
+            preload: path.join(__dirname, "display-preload.cjs"),
+            bounds: bounds ?? { x: 0, y: 0, width: 800, height: 600 },
+          });
+          let latest: DisplayState | null = null;
+          let ready = false;
+          win.webContents.once("did-finish-load", () => {
+            ready = true;
+            win.webContents.send(DISPLAY_PUSH, latest);
+          });
+          return {
+            send: (state) => {
+              latest = state;
+              if (ready && !win.isDestroyed()) win.webContents.send(DISPLAY_PUSH, state);
+            },
+            close: () => {
+              if (!win.isDestroyed()) win.close();
+            },
+            isLoaded: () => ready,
+          };
+        },
+        load: () => {
+          try {
+            const v = (JSON.parse(fs.readFileSync(displayFile, "utf8")) as { screen?: unknown })
+              .screen;
+            return typeof v === "number" ? v : null;
+          } catch {
+            return null;
+          }
+        },
+        save: (id) => {
+          atomicWrite(displayFile, Buffer.from(JSON.stringify({ screen: id })));
+        },
+      });
+      main.on("closed", () => {
+        display.closeAll();
+      });
+
+      const kioskFile = path.join(userData, "kiosk.json");
+      let kioskOn = false;
+      main.webContents.on("before-input-event", (event, input) => {
+        if (kioskOn && isBlockedKioskKey(input)) event.preventDefault();
+      });
+      main.on("close", (event) => {
+        if (kioskOn) event.preventDefault();
+      });
+      const kiosk = createKiosk({
+        load: () => {
+          try {
+            return parseKioskRecord(JSON.parse(fs.readFileSync(kioskFile, "utf8")));
+          } catch {
+            return undefined;
+          }
+        },
+        save: (r) => {
+          atomicWrite(kioskFile, Buffer.from(JSON.stringify(r)));
+        },
+        now: Date.now,
+        apply: (enabled) => {
+          kioskOn = enabled;
+          main.setKiosk(enabled);
+          main.setAlwaysOnTop(enabled, "screen-saver");
+        },
+      });
+      kiosk.start();
+
       registerIpc(
         {
           handle: (channel, listener) => {
             ipcMain.handle(channel, listener);
           },
         },
-        { storage, vault, hardware },
+        { storage, vault, hardware, display, kiosk },
       );
       app.on("before-quit", () => {
+        kioskOn = false;
         storage.close();
       });
-
-      createMainWindow({ url: `${APP_ORIGIN}/`, preload: path.join(__dirname, "preload.cjs") });
     })
     .catch((e: unknown) => {
       console.error(e instanceof Error ? e.message : "The app failed to start.");

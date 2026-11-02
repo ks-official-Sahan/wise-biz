@@ -12,6 +12,11 @@ import type { TcpSocketLike } from "@wise-biz/hardware";
 const MAX_JOB_BYTES = 512 * 1024;
 const HOST =
   /^(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$/;
+const PRINTER_PORTS = new Set([9100, 9101, 9102, 9103, 9104, 9105, 9106, 9107, 9108, 9109]);
+const MAX_QUEUE = 20;
+const JOB_TIMEOUT_MS = 15_000;
+const SERIAL_PATH =
+  /^(?:COM\d{1,3}|\/dev\/tty(?:USB|ACM|S)\d{1,3}|\/dev\/(?:tty|cu)\.[A-Za-z0-9._-]{1,40})$/;
 const BAUDS = new Set([1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200]);
 
 export const DEFAULT_CONFIG: HardwareConfig = {
@@ -29,11 +34,7 @@ const isObj = (v: unknown): v is Record<string, unknown> =>
 function serialOf(v: Record<string, unknown>): { path: string; baudRate: number } {
   const { path, baudRate } = v;
   // A device path or COM name only: no shell syntax, no traversal.
-  if (
-    typeof path !== "string" ||
-    !/^(?:COM\d{1,3}|\/dev\/[A-Za-z0-9._/-]{1,60})$/.test(path) ||
-    path.includes("..")
-  )
+  if (typeof path !== "string" || !SERIAL_PATH.test(path))
     throw new ConfigError("Invalid serial port.");
   if (typeof baudRate !== "number" || !BAUDS.has(baudRate))
     throw new ConfigError("Invalid baud rate.");
@@ -41,7 +42,7 @@ function serialOf(v: Record<string, unknown>): { path: string; baudRate: number 
 }
 
 /** Validates what the renderer sends; anything unexpected is refused rather than coerced. */
-export function parseHardwareConfig(raw: unknown): HardwareConfig {
+export function parseHardwareConfig(raw: unknown, opts: { dev?: boolean } = {}): HardwareConfig {
   if (!isObj(raw) || !isObj(raw.printer) || !isObj(raw.scale))
     throw new ConfigError("Invalid configuration.");
   const p = raw.printer;
@@ -53,6 +54,15 @@ export function parseHardwareConfig(raw: unknown): HardwareConfig {
       throw new ConfigError("Invalid printer address.");
     if (typeof port !== "number" || !Number.isInteger(port) || port < 1 || port > 65535)
       throw new ConfigError("Invalid printer port.");
+    // Receipt printers listen on 9100 to 9109. Loopback, link-local and "this host" addresses are never a printer
+    // (a developer machine may use any port on loopback for a virtual printer).
+    if (opts.dev !== true && !PRINTER_PORTS.has(port))
+      throw new ConfigError("Invalid printer port.");
+    if (
+      /^(?:0\.0\.0\.0|169\.254\.|localhost$)/i.test(host) ||
+      (opts.dev !== true && host.startsWith("127."))
+    )
+      throw new ConfigError("Invalid printer address.");
     printer = { kind: "network", host, port };
   } else if (p.kind === "serial") printer = { kind: "serial", ...serialOf(p) };
   else throw new ConfigError("Invalid printer type.");
@@ -78,6 +88,8 @@ export interface HardwareDeps {
   readonly connect: (host: string, port: number) => TcpSocketLike;
   readonly openSerial: (path: string, baudRate: number) => Promise<SerialLike>;
   readonly listSerial: () => Promise<PortInfo[]>;
+  /** True on a developer or test machine: loopback printers and any port are accepted. */
+  readonly dev?: boolean;
 }
 
 /**
@@ -87,8 +99,31 @@ export interface HardwareDeps {
 export function createHardwareService(deps: HardwareDeps) {
   let config: HardwareConfig = deps.loadConfig() ?? DEFAULT_CONFIG;
   let queue: Promise<unknown> = Promise.resolve();
+  let pending = 0;
   const serial = <T>(fn: () => Promise<T>): Promise<T> => {
-    const run = queue.then(fn, fn);
+    if (pending >= MAX_QUEUE)
+      return Promise.reject(new HardwareError("offline", "The printer is busy."));
+    pending++;
+    // A device that never answers must not hold the line for everything behind it.
+    const guarded = () =>
+      new Promise<T>((resolve, reject) => {
+        const timer = setTimeout(() => {
+          reject(new HardwareError("timeout", "The device did not answer."));
+        }, JOB_TIMEOUT_MS);
+        fn().then(
+          (v) => {
+            clearTimeout(timer);
+            resolve(v);
+          },
+          (e: unknown) => {
+            clearTimeout(timer);
+            reject(e instanceof Error ? e : new Error("Device error."));
+          },
+        );
+      });
+    const run = queue.then(guarded, guarded).finally(() => {
+      pending--;
+    });
     queue = run.catch(() => undefined);
     return run;
   };
@@ -139,7 +174,7 @@ export function createHardwareService(deps: HardwareDeps) {
   return {
     config: (): HardwareConfig => config,
     setConfig(raw: unknown): HardwareConfig {
-      config = parseHardwareConfig(raw);
+      config = parseHardwareConfig(raw, { dev: deps.dev === true });
       deps.saveConfig(config);
       return config;
     },
@@ -162,6 +197,8 @@ export type HardwareService = ReturnType<typeof createHardwareService>;
  * `US` marks an unstable reading; lines without a marker count as stable. Grams, rounded.
  */
 export function parseScaleLine(line: string): ScaleReading | undefined {
+  // Scale lines are short; a long one is noise, and matching it would only burn time.
+  if (line.length > 64) return undefined;
   const m =
     /^\s*(?:(ST|US)\s*,\s*)?(?:(?:GS|NT|G|N)\s*,?\s*)?([+-]?\d+(?:\.\d+)?)\s*(kg|g)\b/i.exec(line);
   if (m === null) return undefined;

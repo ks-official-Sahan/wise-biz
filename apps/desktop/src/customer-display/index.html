@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Customer display</title>
+    <link rel="stylesheet" href="display.css" />
+  </head>
+  <body>
+    <main id="root" aria-live="polite">
+      <p id="message" class="message"></p>
+      <ul id="lines" class="lines"></ul>
+      <section class="totals">
+        <div class="row"><span>Total</span><strong id="total"></strong></div>
+        <div class="row change" id="change-row" hidden>
+          <span>Change</span><strong id="change"></strong>
+        </div>
+      </section>
+      <p id="link" class="link"></p>
+    </main>
+    <script src="display.js"></script>
+  </body>
+</html>

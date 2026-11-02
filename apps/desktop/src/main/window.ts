@@ -30,3 +30,37 @@ export function createMainWindow(o: { url: string; preload: string }): BrowserWi
   });
   return win;
 }
+
+/** The customer-facing window: frameless and fullscreen on the chosen screen, listen-only preload, never focused. */
+export function createDisplayWindow(o: {
+  url: string;
+  preload: string;
+  bounds: { x: number; y: number; width: number; height: number };
+}): BrowserWindow {
+  const win = new BrowserWindow({
+    ...o.bounds,
+    show: false,
+    frame: false,
+    fullscreen: true,
+    focusable: false,
+    skipTaskbar: true,
+    backgroundColor: "#ffffff",
+    title: "Customer display",
+    webPreferences: {
+      preload: o.preload,
+      contextIsolation: true,
+      sandbox: true,
+      nodeIntegration: false,
+      webSecurity: true,
+      spellcheck: false,
+      devTools: false,
+    },
+  });
+  win.once("ready-to-show", () => {
+    win.showInactive();
+  });
+  win.loadURL(o.url).catch((e: unknown) => {
+    console.error(e instanceof Error ? e.message : "The display failed to load.");
+  });
+  return win;
+}

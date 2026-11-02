@@ -3,8 +3,10 @@ import path from "node:path";
 import Database from "better-sqlite3";
 import { describe, expect, it } from "vitest";
 
+import { createDisplayController } from "../src/main/display.ts";
 import { createHardwareService } from "../src/main/hardware.ts";
 import { registerIpc } from "../src/main/ipc.ts";
+import { createKiosk } from "../src/main/kiosk.ts";
 import {
   APP_ORIGIN,
   buildCsp,
@@ -19,6 +21,24 @@ import { ALL_CHANNELS, CHANNELS } from "../src/shared/channels.ts";
 
 import type { Driver } from "../src/main/storage.ts";
 import type { SafeStorage, VaultFiles } from "../src/main/vault.ts";
+
+const shell = () => ({
+  display: createDisplayController({
+    screens: () => [],
+    primaryId: () => undefined,
+    open: () => {
+      throw new Error("no windows in unit tests");
+    },
+    load: () => null,
+    save: () => undefined,
+  }),
+  kiosk: createKiosk({
+    load: () => undefined,
+    save: () => undefined,
+    now: Date.now,
+    apply: () => undefined,
+  }),
+});
 
 const hw = () =>
   createHardwareService({
@@ -178,6 +198,7 @@ describe("ipc", () => {
       {
         storage: s,
         hardware: hw(),
+        ...shell(),
         vault: createVaultStore({
           file: "f",
           safe: {
@@ -248,6 +269,7 @@ describe("hardening", () => {
       {
         storage: storage(),
         hardware: hw(),
+        ...shell(),
         vault: createVaultStore({
           file: "f",
           safe: {

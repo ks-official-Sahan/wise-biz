@@ -22,7 +22,18 @@ export const CHANNELS = {
   hwKick: "wb:hw:kick",
   hwPorts: "wb:hw:ports",
   hwScale: "wb:hw:scale",
+  displayShow: "wb:display:show",
+  displayClear: "wb:display:clear",
+  displayScreens: "wb:display:screens",
+  displayChoose: "wb:display:choose",
+  kioskStatus: "wb:kiosk:status",
+  kioskSetPin: "wb:kiosk:set-pin",
+  kioskSetEnabled: "wb:kiosk:set-enabled",
+  kioskVerify: "wb:kiosk:verify",
 } as const;
+
+/** Main to the customer display window (a separate, listen-only preload; not part of the invoke allowlist). */
+export const DISPLAY_PUSH = "wb:display:state";
 
 export type Channel = (typeof CHANNELS)[keyof typeof CHANNELS];
 
@@ -53,6 +64,30 @@ export interface ScaleReading {
   readonly stable: boolean;
 }
 
+export interface DisplayState {
+  readonly lines: readonly {
+    readonly name: string;
+    readonly qty: string;
+    readonly totalMinor: number;
+  }[];
+  readonly totalMinor: number;
+  readonly changeMinor: number;
+  readonly currency: string;
+  readonly message?: string | undefined;
+  readonly qrUrl?: string | undefined;
+}
+export interface ScreenInfo {
+  readonly id: number;
+  readonly label: string;
+  readonly primary: boolean;
+  readonly width: number;
+  readonly height: number;
+}
+export interface KioskStatus {
+  readonly enabled: boolean;
+  readonly hasPin: boolean;
+}
+
 export type DesktopPlatform = "windows" | "macos" | "linux";
 
 /** What `window.wiseDesktop` looks like in the renderer. */
@@ -77,6 +112,18 @@ export interface DesktopBridge {
     readonly kick: () => Promise<void>;
     readonly ports: () => Promise<PortInfo[]>;
     readonly scale: () => Promise<ScaleReading | undefined>;
+  };
+  readonly display: {
+    readonly show: (state: DisplayState) => Promise<void>;
+    readonly clear: () => Promise<void>;
+    readonly screens: () => Promise<{ screens: ScreenInfo[]; chosen: number | null }>;
+    readonly choose: (screenId: number | null) => Promise<void>;
+  };
+  readonly kiosk: {
+    readonly status: () => Promise<KioskStatus>;
+    readonly setPin: (pin: string, current?: string) => Promise<void>;
+    readonly setEnabled: (enabled: boolean, pin?: string) => Promise<void>;
+    readonly verify: (pin: string) => Promise<boolean>;
   };
   readonly vault: {
     readonly load: () => Promise<string | undefined>;

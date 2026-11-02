@@ -50,7 +50,7 @@ test("the renderer has no Node and only the allowlisted bridge", async () => {
   expect(facts.require).toBe("undefined");
   // The bundle shims `process.env` for Expo; real Node (versions.node) must not be there.
   expect(facts.nodeVersion).toBeNull();
-  expect(facts.keys).toEqual(["db", "hw", "platform", "vault", "version"]);
+  expect(facts.keys).toEqual(["db", "display", "hw", "kiosk", "platform", "vault", "version"]);
   expect(facts.db).toEqual(
     ["all", "begin", "close", "commit", "exec", "get", "open", "rollback", "run"].sort(),
   );

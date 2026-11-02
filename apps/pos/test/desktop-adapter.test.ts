@@ -60,9 +60,25 @@ function fakeBridge(): DesktopBridge & { vaultValue: string | undefined } {
       },
     },
     hw: {
-      config: () => Promise.resolve({ printer: { kind: "none" } }),
+      config: () =>
+        Promise.resolve({ printer: { kind: "none" as const }, scale: { kind: "none" as const } }),
+      setConfig: (c) => Promise.resolve(c),
       print: () => Promise.resolve(),
       kick: () => Promise.resolve(),
+      ports: () => Promise.resolve([]),
+      scale: () => Promise.resolve(undefined),
+    },
+    display: {
+      show: () => Promise.resolve(),
+      clear: () => Promise.resolve(),
+      screens: () => Promise.resolve({ screens: [], chosen: null }),
+      choose: () => Promise.resolve(),
+    },
+    kiosk: {
+      status: () => Promise.resolve({ enabled: false, hasPin: false }),
+      setPin: () => Promise.resolve(),
+      setEnabled: () => Promise.resolve(),
+      verify: () => Promise.resolve(true),
     },
     vault: {
       load: () => Promise.resolve(vaultValue),
@@ -139,7 +155,14 @@ describe("desktop printer and drawer", () => {
     expect(
       await desktopPrinterConfigured({
         ...bridge,
-        hw: { ...bridge.hw, config: () => Promise.resolve({ printer: { kind: "network" } }) },
+        hw: {
+          ...bridge.hw,
+          config: () =>
+            Promise.resolve({
+              printer: { kind: "network" as const, host: "h", port: 1 },
+              scale: { kind: "none" as const },
+            }),
+        },
       }),
     ).toBe(true);
     expect(

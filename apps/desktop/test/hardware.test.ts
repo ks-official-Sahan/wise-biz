@@ -100,6 +100,7 @@ const service = (o: {
   createHardwareService({
     loadConfig: () => o.config,
     saveConfig: (c) => void o.saved?.push(c),
+    dev: true,
     connect: tcp,
     openSerial: (p, b) => (o.serial ?? fakeSerial()).open(p, b),
     listSerial: () => Promise.resolve([{ path: "COM3" }]),
@@ -254,4 +255,67 @@ describe("scale", () => {
       service({ config: cfg, serial: fakeSerial({ fail: "open" }) }).scale(),
     ).rejects.toThrow("cannot open");
   });
+});
+
+describe("production rules", () => {
+  const prod = (printer: unknown) => () =>
+    parseHardwareConfig({ printer, scale: { kind: "none" } }, { dev: false });
+
+  it("accepts only printer ports and refuses loopback and link-local hosts", () => {
+    expect(prod({ kind: "network", host: "192.168.1.50", port: 9100 })).not.toThrow();
+    expect(prod({ kind: "network", host: "printer.lan", port: 9103 })).not.toThrow();
+    expect(prod({ kind: "network", host: "192.168.1.50", port: 6379 })).toThrow("printer port");
+    expect(prod({ kind: "network", host: "127.0.0.1", port: 9100 })).toThrow("printer address");
+    expect(prod({ kind: "network", host: "localhost", port: 9100 })).toThrow("printer address");
+    expect(prod({ kind: "network", host: "169.254.169.254", port: 9100 })).toThrow(
+      "printer address",
+    );
+    expect(prod({ kind: "network", host: "0.0.0.0", port: 9100 })).toThrow("printer address");
+    // Developer machines may use loopback and any port.
+    expect(() =>
+      parseHardwareConfig(
+        { printer: { kind: "network", host: "127.0.0.1", port: 40123 }, scale: { kind: "none" } },
+        { dev: true },
+      ),
+    ).not.toThrow();
+  });
+
+  it("accepts serial devices by name only", () => {
+    for (const path of [
+      "COM3",
+      "/dev/ttyUSB0",
+      "/dev/ttyACM1",
+      "/dev/ttyS0",
+      "/dev/cu.usbserial-1410",
+    ])
+      expect(prod({ kind: "serial", path, baudRate: 9600 }), path).not.toThrow();
+    for (const path of ["/dev/sda", "/dev/mem", "/dev/null", "/dev/tty", "/dev/ttyUSB0/../sda"])
+      expect(prod({ kind: "serial", path, baudRate: 9600 }), path).toThrow("serial port");
+  });
+});
+
+describe("limits", () => {
+  it("ignores overlong scale lines", () => {
+    expect(parseScaleLine("ST,GS," + " ".repeat(5000) + "1.0kg")).toBeUndefined();
+  });
+
+  it("does not let a hung serial device block the queue forever, and bounds the queue", async () => {
+    const hang = createHardwareService({
+      loadConfig: () => ({
+        printer: { kind: "serial", path: "COM3", baudRate: 9600 },
+        scale: { kind: "none" },
+      }),
+      saveConfig: () => undefined,
+      connect: tcp,
+      openSerial: () => {
+        return new Promise(() => undefined);
+      },
+      listSerial: () => Promise.resolve([]),
+    });
+    const jobs = Array.from({ length: 25 }, () =>
+      hang.print(Uint8Array.of(1)).catch((e: unknown) => (e instanceof Error ? e.message : "")),
+    );
+    const results = await Promise.all(jobs.slice(20));
+    expect(results.every((m) => m === "The printer is busy.")).toBe(true);
+  }, 5000);
 });

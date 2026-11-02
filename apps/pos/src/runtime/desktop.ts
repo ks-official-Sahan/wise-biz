@@ -22,15 +22,55 @@ export interface DesktopBridge {
     readonly close: () => Promise<void>;
   };
   readonly hw: {
-    readonly config: () => Promise<{ readonly printer: { readonly kind: string } }>;
+    readonly config: () => Promise<HardwareConfig>;
+    readonly setConfig: (config: HardwareConfig) => Promise<HardwareConfig>;
     readonly print: (bytes: Uint8Array) => Promise<void>;
     readonly kick: () => Promise<void>;
+    readonly ports: () => Promise<{ path: string; manufacturer?: string | undefined }[]>;
+    readonly scale: () => Promise<{ grams: number; stable: boolean } | undefined>;
+  };
+  readonly display: {
+    readonly show: (state: DisplayState) => Promise<void>;
+    readonly clear: () => Promise<void>;
+    readonly screens: () => Promise<{ screens: ScreenInfo[]; chosen: number | null }>;
+    readonly choose: (screenId: number | null) => Promise<void>;
+  };
+  readonly kiosk: {
+    readonly status: () => Promise<{ enabled: boolean; hasPin: boolean }>;
+    readonly setPin: (pin: string, current?: string) => Promise<void>;
+    readonly setEnabled: (enabled: boolean, pin?: string) => Promise<void>;
+    readonly verify: (pin: string) => Promise<boolean>;
   };
   readonly vault: {
     readonly load: () => Promise<string | undefined>;
     readonly save: (value: string) => Promise<void>;
     readonly clear: () => Promise<void>;
   };
+}
+
+export type PrinterConfig =
+  | { readonly kind: "none" }
+  | { readonly kind: "network"; readonly host: string; readonly port: number }
+  | { readonly kind: "serial"; readonly path: string; readonly baudRate: number };
+export interface HardwareConfig {
+  readonly printer: PrinterConfig;
+  readonly scale:
+    | { readonly kind: "none" }
+    | { readonly kind: "serial"; readonly path: string; readonly baudRate: number };
+}
+export interface DisplayState {
+  readonly lines: readonly { name: string; qty: string; totalMinor: number }[];
+  readonly totalMinor: number;
+  readonly changeMinor: number;
+  readonly currency: string;
+  readonly message?: string | undefined;
+}
+export interface ScreenInfo {
+  readonly id: number;
+  readonly label: string;
+  readonly primary: boolean;
+  readonly width: number;
+  readonly height: number;
 }
 
 /** The bridge when the app runs inside the desktop shell, otherwise undefined (browser, Android, iOS). */

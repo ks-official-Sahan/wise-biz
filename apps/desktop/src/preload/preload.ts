@@ -36,6 +36,18 @@ const bridge: DesktopBridge = {
     ports: () => call(CHANNELS.hwPorts),
     scale: () => call(CHANNELS.hwScale),
   },
+  display: {
+    show: (s) => call(CHANNELS.displayShow, s),
+    clear: () => call(CHANNELS.displayClear),
+    screens: () => call(CHANNELS.displayScreens),
+    choose: (id) => call(CHANNELS.displayChoose, id),
+  },
+  kiosk: {
+    status: () => call(CHANNELS.kioskStatus),
+    setPin: (pin, current) => call(CHANNELS.kioskSetPin, pin, current),
+    setEnabled: (enabled, pin) => call(CHANNELS.kioskSetEnabled, enabled, pin),
+    verify: (pin) => call(CHANNELS.kioskVerify, pin),
+  },
   vault: {
     load: () => call(CHANNELS.vaultLoad),
     save: (v) => call(CHANNELS.vaultSave, v),
