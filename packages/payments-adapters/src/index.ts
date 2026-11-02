@@ -141,7 +141,7 @@ export async function takeCardPayment(o: CardPaymentOptions): Promise<CardOutcom
   ) {
     return {
       ok: false,
-      reason: "error",
+      reason: "uncertain",
       intent,
       message: "The terminal returned a different payment. Check it before trying again.",
     };

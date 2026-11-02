@@ -405,6 +405,9 @@ importers:
       '@wise-biz/crypto':
         specifier: workspace:*
         version: link:../../packages/crypto
+      '@wise-biz/hardware':
+        specifier: workspace:*
+        version: link:../../packages/hardware
       '@wise-biz/http-signatures':
         specifier: workspace:*
         version: link:../../packages/http-signatures
@@ -414,9 +417,15 @@ importers:
       '@wise-biz/money':
         specifier: workspace:*
         version: link:../../packages/money
+      '@wise-biz/payments-adapters':
+        specifier: workspace:*
+        version: link:../../packages/payments-adapters
       '@wise-biz/pricing-engine':
         specifier: workspace:*
         version: link:../../packages/pricing-engine
+      '@wise-biz/receipt':
+        specifier: workspace:*
+        version: link:../../packages/receipt
       '@wise-biz/sync':
         specifier: workspace:*
         version: link:../../packages/sync
@@ -493,6 +502,9 @@ importers:
       '@wise-biz/config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@wise-biz/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
       '@wise-biz/testing':
         specifier: workspace:*
         version: link:../../packages/testing

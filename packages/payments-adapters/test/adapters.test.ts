@@ -215,7 +215,7 @@ describe("review fixes", () => {
     };
     expect(await takeCardPayment({ ...base, adapter: wrong, pollMs: 1 })).toMatchObject({
       ok: false,
-      reason: "error",
+      reason: "uncertain",
     });
   });
 
