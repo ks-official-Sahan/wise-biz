@@ -42,6 +42,21 @@ export const PERMISSION_GROUPS: readonly { module: string; items: readonly Permi
     ],
   },
   {
+    module: "Pricing",
+    items: [
+      {
+        permission: "pricing:read",
+        label: "View pricing",
+        allows: "See price lists, tax regions, fees and promotions.",
+      },
+      {
+        permission: "pricing:write",
+        label: "Edit pricing",
+        allows: "Change prices, tax, fees and promotions, and publish promotions.",
+      },
+    ],
+  },
+  {
     module: "Audit log",
     items: [
       {

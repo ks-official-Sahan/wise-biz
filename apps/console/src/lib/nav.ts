@@ -1,6 +1,6 @@
 /** Navigation and command registry: one list feeds the sidebar, bottom nav and the command palette. */
 export interface NavItem {
-  readonly href: "/" | "/catalog" | "/people" | "/roles" | "/audit" | "/settings";
+  readonly href: "/" | "/catalog" | "/pricing" | "/people" | "/roles" | "/audit" | "/settings";
   readonly label: string;
   /** Extra words the command palette matches on. */
   readonly keywords: readonly string[];
@@ -15,6 +15,12 @@ export const NAV: readonly NavItem[] = [
     label: "Products",
     keywords: ["catalog", "items", "sku", "barcode", "import", "inventory"],
     primary: true,
+  },
+  {
+    href: "/pricing",
+    label: "Pricing",
+    keywords: ["prices", "price list", "tax", "promotions", "discounts", "coupons", "fees"],
+    primary: false,
   },
   {
     href: "/people",

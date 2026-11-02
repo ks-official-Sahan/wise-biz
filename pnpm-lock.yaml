@@ -344,6 +344,9 @@ importers:
       '@wise-biz/ids':
         specifier: workspace:*
         version: link:../../packages/ids
+      '@wise-biz/money':
+        specifier: workspace:*
+        version: link:../../packages/money
       '@wise-biz/theme':
         specifier: workspace:*
         version: link:../../packages/theme
