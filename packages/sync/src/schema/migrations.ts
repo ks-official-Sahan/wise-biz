@@ -13,6 +13,8 @@ import type { StorageAdapter } from "../storage/port.ts";
  *   variant_search   FTS5 over variant name and sku; rowid is variant_rowid in `variant_index`
  *   drafts           carts that are not sales yet
  *   local_movements  stock decrements made on this device and not yet confirmed by a pulled balance
+ *   local_shifts / local_sales / local_returns / local_cash_movements  what this terminal sold, returned and counted (v2):
+ *                    the source for returns, voids, reprints and the Z-report while offline
  */
 export const MIGRATIONS: readonly { readonly version: number; readonly sql: readonly string[] }[] =
   [
@@ -25,7 +27,7 @@ export const MIGRATIONS: readonly { readonly version: number; readonly sql: read
        ) WITHOUT ROWID`,
         `CREATE TABLE device_outbox (
          seq integer PRIMARY KEY,
-         id text NOT NULL UNIQUE,
+         id text NOT NULL,
          type text NOT NULL,
          body text NOT NULL,
          hash text NOT NULL,
@@ -34,7 +36,8 @@ export const MIGRATIONS: readonly { readonly version: number; readonly sql: read
          created_at integer NOT NULL,
          status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'acked', 'rejected')),
          ack text,
-         attempts integer NOT NULL DEFAULT 0
+         attempts integer NOT NULL DEFAULT 0,
+         UNIQUE (type, id)
        )`,
         // The push loop reads the oldest pending commands; acked rows stay until pruned (audit, support export).
         `CREATE INDEX device_outbox_pending_idx ON device_outbox (seq) WHERE status = 'pending'`,
@@ -68,6 +71,55 @@ export const MIGRATIONS: readonly { readonly version: number; readonly sql: read
          created_at integer NOT NULL
        ) WITHOUT ROWID`,
         `CREATE INDEX local_movements_variant_idx ON local_movements (variant_id, location_id)`,
+      ],
+    },
+    {
+      // Everything a shift needs to be counted and every sale needs to be returned or voided, on the device and offline.
+      version: 2,
+      sql: [
+        `CREATE TABLE local_shifts (
+         id text PRIMARY KEY,
+         opened_at integer NOT NULL,
+         business_date text NOT NULL,
+         currency text NOT NULL,
+         opening_float_minor integer NOT NULL,
+         closed_at integer,
+         counted_minor integer,
+         expected_minor integer,
+         auto_closed integer NOT NULL DEFAULT 0
+       ) WITHOUT ROWID`,
+        `CREATE INDEX local_shifts_open_idx ON local_shifts (opened_at) WHERE closed_at IS NULL`,
+        `CREATE TABLE local_sales (
+         id text PRIMARY KEY,
+         shift_id text NOT NULL,
+         sale_no integer NOT NULL,
+         completed_at integer NOT NULL,
+         body text NOT NULL,
+         voided_at integer,
+         voided_shift_id text
+       ) WITHOUT ROWID`,
+        `CREATE INDEX local_sales_recent_idx ON local_sales (completed_at DESC)`,
+        `CREATE INDEX local_sales_shift_idx ON local_sales (shift_id)`,
+        `CREATE INDEX local_sales_void_shift_idx ON local_sales (voided_shift_id)`,
+        `CREATE TABLE local_returns (
+         id text PRIMARY KEY,
+         sale_id text,
+         shift_id text NOT NULL,
+         return_no integer NOT NULL,
+         occurred_at integer NOT NULL,
+         body text NOT NULL
+       ) WITHOUT ROWID`,
+        `CREATE INDEX local_returns_sale_idx ON local_returns (sale_id)`,
+        `CREATE INDEX local_returns_shift_idx ON local_returns (shift_id)`,
+        `CREATE TABLE local_cash_movements (
+         id text PRIMARY KEY,
+         shift_id text NOT NULL,
+         kind text NOT NULL,
+         amount_minor integer NOT NULL,
+         reason text NOT NULL,
+         at integer NOT NULL
+       ) WITHOUT ROWID`,
+        `CREATE INDEX local_cash_movements_shift_idx ON local_cash_movements (shift_id)`,
       ],
     },
   ];

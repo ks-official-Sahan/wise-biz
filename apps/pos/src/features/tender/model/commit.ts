@@ -1,3 +1,5 @@
+import { ensureShift } from "../../shift/model/shift.ts";
+
 import { buildCompleteSale, businessDateOf, overrideCommands } from "./sale-command.ts";
 
 import type { TenderEntry } from "./tender.ts";
@@ -7,13 +9,6 @@ import type { CartPricing } from "../../sell/model/view.ts";
 import type { OutboxTx, Queryable } from "@wise-biz/sync";
 
 const SALE_NO_KEY = "pos.sale_no";
-const SHIFT_KEY = "pos.shift";
-
-export interface Shift {
-  readonly id: string;
-  readonly openedAt: number;
-  readonly businessDate: string;
-}
 
 export interface CommitDeps {
   /** `client.transaction`: domain rows and signed commands commit together or not at all. */
@@ -76,26 +71,11 @@ export async function commitSale(deps: CommitDeps, input: CommitInput): Promise<
     );
 
     const businessDate = businessDateOf(completedAt);
-    const shiftRow = await tx.get<{ value: string }>("SELECT value FROM kv WHERE key = ?", [
-      SHIFT_KEY,
-    ]);
-    let shift = shiftRow === undefined ? undefined : (JSON.parse(shiftRow.value) as Shift);
-    // A new calendar day starts a new shift (closing the old one is the shift screen's job, P1-11).
-    if (shift?.businessDate !== businessDate) {
-      shift = { id: deps.newId(), openedAt: completedAt, businessDate };
-      await tx.run(
-        "INSERT INTO kv (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
-        [SHIFT_KEY, JSON.stringify(shift)],
-      );
-      await tx.enqueue("open_shift", {
-        id: shift.id,
-        operatorId: deps.operatorId,
-        businessDate,
-        openedAt: new Date(completedAt).toISOString(),
-        currency: priced.currency,
-        openingFloatMinor: 0,
-      });
-    }
+    const shift = await ensureShift(tx, deps, {
+      completedAt,
+      businessDate,
+      currency: priced.currency,
+    });
 
     for (const p of priced.lines) {
       await tx.run(
@@ -107,19 +87,32 @@ export async function commitSale(deps: CommitDeps, input: CommitInput): Promise<
     for (const o of overrideCommands(input.approvals, saleId))
       await tx.enqueue("record_override", o);
 
-    await tx.enqueue(
-      "complete_sale",
-      buildCompleteSale(priced, input.cart, deps.ctx, input.tenders, {
+    const command = buildCompleteSale(priced, input.cart, deps.ctx, input.tenders, {
+      saleId,
+      saleNo,
+      shiftId: shift.id,
+      operatorId: deps.operatorId,
+      customerId: input.customerId,
+      completedAt,
+      businessDate,
+      locationOf: deps.locationOf,
+      newId: deps.newId,
+    });
+    await tx.enqueue("complete_sale", command);
+    await tx.run(
+      "INSERT INTO local_sales (id, shift_id, sale_no, completed_at, body) VALUES (?, ?, ?, ?, ?)",
+      [
         saleId,
+        shift.id,
         saleNo,
-        shiftId: shift.id,
-        operatorId: deps.operatorId,
-        customerId: input.customerId,
         completedAt,
-        businessDate,
-        locationOf: deps.locationOf,
-        newId: deps.newId,
-      }),
+        JSON.stringify({
+          currency: priced.currency,
+          payableMinor: priced.payableMinor,
+          lines: command.lines,
+          tenders: command.tenders,
+        }),
+      ],
     );
     return { saleId, saleNo, completedAt, shiftId: shift.id };
   });

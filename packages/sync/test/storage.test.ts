@@ -133,7 +133,9 @@ describe("openLocalDb", () => {
   it("creates the schema once, idempotently, with durable pragmas", async () => {
     const file = tmp();
     let db = await openLocalDb(betterSqliteAdapter(file), { now: () => 1234 });
-    expect(await db.all("select applied_at from _migrations")).toEqual([{ applied_at: 1234 }]);
+    expect(await db.all("select applied_at from _migrations")).toEqual(
+      MIGRATIONS.map(() => ({ applied_at: 1234 })),
+    );
     const mode = await db.get<{ journal_mode: string }>("PRAGMA journal_mode");
     const sync = await db.get<{ synchronous: number }>("PRAGMA synchronous");
     expect(mode?.journal_mode).toBe("wal");
@@ -147,13 +149,19 @@ describe("openLocalDb", () => {
       "drafts",
       "entities",
       "kv",
+      "local_cash_movements",
       "local_movements",
+      "local_returns",
+      "local_sales",
+      "local_shifts",
       "variant_index",
       "variant_search",
     ]);
     await db.close();
     db = await openLocalDb(betterSqliteAdapter(file));
-    expect(await db.all("select version from _migrations")).toEqual([{ version: LATEST_VERSION }]);
+    expect(await db.all("select version from _migrations order by version")).toEqual(
+      MIGRATIONS.map((m) => ({ version: m.version })),
+    );
     await db.close();
   });
 
@@ -166,7 +174,7 @@ describe("openLocalDb", () => {
   });
 
   it("a failed migration leaves no half-applied version", async () => {
-    expect(MIGRATIONS.map((m) => m.version)).toEqual([1]);
+    expect(MIGRATIONS.map((m) => m.version)).toEqual([1, 2]);
     const adapter = betterSqliteAdapter(tmp());
     const begin = adapter.begin.bind(adapter);
     let begins = 0;
