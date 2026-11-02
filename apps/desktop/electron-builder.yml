@@ -1,0 +1,64 @@
+# Packaging for the desktop terminal. `pnpm -F @wise-biz/desktop pack` builds an unpacked app for the current OS;
+# `dist` builds installers. Release builds set WISE_BIZ_RELEASE=1 and WISE_BIZ_API_URL (https) for `build` first.
+appId: biz.wise.pos
+productName: Wise Biz POS
+copyright: Wise Biz
+directories:
+  output: release
+  buildResources: build
+
+files:
+  - package.json
+  - dist/**
+  - display/**
+  - renderer/**
+  - "!**/*.map"
+
+# Native addons (N-API, so no Electron rebuild is needed) cannot load from inside the asar archive.
+asar: true
+asarUnpack:
+  - "**/node_modules/better-sqlite3/**"
+  - "**/node_modules/@serialport/**"
+  - "**/node_modules/serialport/**"
+npmRebuild: false
+
+afterPack: scripts/after-pack.mjs
+
+win:
+  target:
+    - nsis
+  # Signing: set WIN_CSC_LINK (path or base64 of the .pfx) and WIN_CSC_KEY_PASSWORD in CI, or use Azure Trusted
+  # Signing through `azureSignOptions`. Unsigned builds install with a SmartScreen warning; never ship them.
+  signAndEditExecutable: true
+nsis:
+  oneClick: false
+  perMachine: true
+  allowToChangeInstallationDirectory: true
+  deleteAppDataOnUninstall: false
+
+mac:
+  category: public.app-category.business
+  target:
+    - dmg
+    - zip
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  # Notarization: set APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD and APPLE_TEAM_ID (or an App Store Connect API key) in CI,
+  # and CSC_LINK / CSC_KEY_PASSWORD for the Developer ID certificate.
+  notarize: true
+
+linux:
+  category: Office
+  target:
+    - AppImage
+    - deb
+  maintainer: Wise Biz
+  synopsis: Point of sale terminal
+
+# Updates are fetched from a static origin (S3 or any HTTPS host): `latest.yml` for production and `staging.yml` for the
+# staging channel, published next to the installers. The channel is set at runtime from WISE_BIZ_UPDATE_CHANNEL
+# (defaults to production) and the feed from WISE_BIZ_UPDATE_URL at build time.
+publish:
+  - provider: generic
+    url: https://updates.example.invalid/wise-biz-pos
+    channel: latest

@@ -96,3 +96,13 @@ Workflows pin every third-party action to a commit SHA (Renovate `helpers:pinGit
 - Metrics: RED per route, outbox lag, consumer lag, sync queue depth per tenant, device online ratio, p95 checkout timings reported by devices.
 - Alerts: SLO burn rate, outbox lag > 60 s, DLQ growth, device fleet offline spikes, auth failure spikes.
 - Client errors: Sentry (POS, desktop, console, storefront) with PII scrubbing.
+
+## Desktop terminal (apps/desktop)
+
+- Build the POS web export first (`pnpm -F @wise-biz/pos export:web` with `EXPO_PUBLIC_API_URL` set to the production API), then `WISE_BIZ_RELEASE=1 WISE_BIZ_API_URL=https://api.example.com pnpm -F @wise-biz/desktop build`. The API origin goes into the CSP `connect-src`; a release build refuses a non-https URL.
+- `pnpm -F @wise-biz/desktop run package` makes an unpacked app for the current OS, `dist` makes the installers (NSIS on Windows, dmg and zip on macOS, AppImage and deb on Linux), `package:smoke` starts the unpacked app and checks the fuses and that the POS renders with the bridge. Build each OS on its own runner; cross-building is not supported for signing and notarization.
+- Fuses are flipped in `scripts/after-pack.mjs`: no run-as-node, no `NODE_OPTIONS`, no Node inspector, app code only from the signed asar with integrity validation, encrypted cookies.
+- Signing (placeholders in `electron-builder.yml`, secrets only in CI): Windows `WIN_CSC_LINK` + `WIN_CSC_KEY_PASSWORD` (or Azure Trusted Signing); macOS `CSC_LINK`, `CSC_KEY_PASSWORD` and notarization with `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`. Never ship an unsigned installer.
+- Updates: static feed (S3 or any HTTPS host) next to the installers. `latest.yml` is production, `staging.yml` is staging; replace the placeholder `publish.url` per environment with `--config.publish.url=...`, and publish staging builds with `--config.publish.channel=staging`. A terminal picks its channel from `WISE_BIZ_UPDATE_CHANNEL` (default production). Updates download in the background and install on the next quit; the updater never downgrades.
+- Kiosk hardening the app cannot do: disable the Windows key and Task Manager with an OS policy or a shell replacement (Windows assigned access / kiosk mode), run the terminal as a standard user, and set auto-login for the till account.
+- Runtime data lives in the OS profile (`%APPDATA%/@wise-biz/desktop`): `wise-biz-<device>.db`, `identity.bin` (encrypted with the OS credential store), `hardware.json`, `display.json`, `kiosk.json`. Back up nothing from it: a terminal re-enrols and re-syncs.

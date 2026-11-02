@@ -14,6 +14,7 @@ import {
   screen,
   session,
 } from "electron";
+import { autoUpdater } from "electron-updater";
 
 import { DISPLAY_PUSH } from "../shared/channels.ts";
 
@@ -29,6 +30,7 @@ import {
   resolveAsset,
 } from "./security.ts";
 import { createStorageService } from "./storage.ts";
+import { startUpdater } from "./updater.ts";
 import { createVaultStore } from "./vault.ts";
 import { createDisplayWindow, createMainWindow } from "./window.ts";
 
@@ -297,6 +299,14 @@ if (gotLock)
         },
       });
       kiosk.start();
+      startUpdater({
+        updater: autoUpdater,
+        packaged: app.isPackaged,
+        channel: process.env.WISE_BIZ_UPDATE_CHANNEL,
+        log: (line) => {
+          console.warn(line);
+        },
+      });
 
       registerIpc(
         {

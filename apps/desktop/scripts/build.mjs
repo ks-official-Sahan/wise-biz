@@ -17,7 +17,7 @@ fs.rmSync(path.join(root, "dist"), { recursive: true, force: true });
 
 const common = {
   platform: "node",
-  external: ["electron", "better-sqlite3", "serialport"],
+  external: ["electron", "electron-updater", "better-sqlite3", "serialport"],
   output: { format: "cjs", dir: path.join(root, "dist"), sourcemap: false },
 };
 
