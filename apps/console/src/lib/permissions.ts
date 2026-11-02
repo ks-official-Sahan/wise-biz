@@ -27,6 +27,21 @@ export const PERMISSION_GROUPS: readonly { module: string; items: readonly Permi
     ],
   },
   {
+    module: "Products",
+    items: [
+      {
+        permission: "catalog:read",
+        label: "View products",
+        allows: "See products, variants, barcodes, categories and tags.",
+      },
+      {
+        permission: "catalog:write",
+        label: "Edit products",
+        allows: "Create and change products, import spreadsheets, archive and restore.",
+      },
+    ],
+  },
+  {
     module: "Audit log",
     items: [
       {

@@ -19,6 +19,7 @@
   "dependencies": {
     "@better-auth/passkey": "1.7.12",
     "@tanstack/react-query": "5.104.5",
+    "@wise-biz/barcode": "workspace:*",
     "@wise-biz/ids": "workspace:*",
     "@wise-biz/theme": "workspace:*",
     "better-auth": "1.7.12",

@@ -1,9 +1,15 @@
 /**
  * Strict nonce-based CSP for the console (security.md "Web security"). Scripts load only with the per-request nonce
  * (`strict-dynamic` lets Next's own chunks load); styles likewise. The API is same-origin (proxied under /v1), so
- * connect-src stays 'self'. Dev adds 'unsafe-eval' for React Refresh only.
+ * connect-src stays 'self' plus, when set, the object-store origin for presigned uploads. Dev adds 'unsafe-eval' for React Refresh only.
  */
-export function buildCsp(nonce: string, opts: { dev: boolean }): string {
+export function buildCsp(
+  nonce: string,
+  opts: {
+    dev: boolean;
+    /** Object-store origin that file uploads (imports, product images) go to with a presigned URL. */ uploadOrigin?: string;
+  },
+): string {
   const directives: Record<string, string[]> = {
     "default-src": ["'self'"],
     "script-src": [
@@ -15,7 +21,11 @@ export function buildCsp(nonce: string, opts: { dev: boolean }): string {
     "style-src": ["'self'", `'nonce-${nonce}'`],
     "img-src": ["'self'", "data:", "blob:"],
     "font-src": ["'self'"],
-    "connect-src": ["'self'", ...(opts.dev ? ["ws:"] : [])],
+    "connect-src": [
+      "'self'",
+      ...(opts.dev ? ["ws:"] : []),
+      ...(opts.uploadOrigin === undefined ? [] : [opts.uploadOrigin]),
+    ],
     "frame-ancestors": ["'none'"],
     "base-uri": ["'none'"],
     "form-action": ["'self'"],
@@ -48,3 +58,20 @@ export const SECURITY_HEADERS: readonly { key: string; value: string }[] = [
     value: "camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()",
   },
 ];
+
+/**
+ * The object-store origin for presigned uploads, from CONSOLE_UPLOAD_ORIGIN: a bare https origin (http only in dev).
+ * Anything else (a path, a wildcard, another scheme, a typo) is ignored, so a bad value can never widen connect-src.
+ */
+export function parseUploadOrigin(value: string | undefined, dev: boolean): string | undefined {
+  if (value === undefined || value === "") return undefined;
+  try {
+    const u = new URL(value);
+    const schemeOk = u.protocol === "https:" || (dev && u.protocol === "http:");
+    if (!schemeOk || u.username !== "" || u.password !== "" || u.hostname.includes("*"))
+      return undefined;
+    return u.origin;
+  } catch {
+    return undefined;
+  }
+}

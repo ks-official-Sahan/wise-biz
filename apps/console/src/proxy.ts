@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { buildCsp, generateNonce } from "./lib/csp.ts";
+import { buildCsp, generateNonce, parseUploadOrigin } from "./lib/csp.ts";
 
 import type { NextRequest } from "next/server";
 
@@ -11,7 +11,9 @@ import type { NextRequest } from "next/server";
  */
 export function proxy(request: NextRequest): NextResponse {
   const nonce = generateNonce();
-  const csp = buildCsp(nonce, { dev: process.env.NODE_ENV !== "production" });
+  const dev = process.env.NODE_ENV !== "production";
+  const uploadOrigin = parseUploadOrigin(process.env.CONSOLE_UPLOAD_ORIGIN, dev);
+  const csp = buildCsp(nonce, { dev, ...(uploadOrigin === undefined ? {} : { uploadOrigin }) });
   const headers = new Headers(request.headers);
   headers.set("x-nonce", nonce);
   headers.set("content-security-policy", csp);

@@ -1,6 +1,6 @@
 /** Navigation and command registry: one list feeds the sidebar, bottom nav and the command palette. */
 export interface NavItem {
-  readonly href: "/" | "/people" | "/roles" | "/audit" | "/settings";
+  readonly href: "/" | "/catalog" | "/people" | "/roles" | "/audit" | "/settings";
   readonly label: string;
   /** Extra words the command palette matches on. */
   readonly keywords: readonly string[];
@@ -11,12 +11,18 @@ export interface NavItem {
 export const NAV: readonly NavItem[] = [
   { href: "/", label: "Home", keywords: ["dashboard", "overview"], primary: true },
   {
+    href: "/catalog",
+    label: "Products",
+    keywords: ["catalog", "items", "sku", "barcode", "import", "inventory"],
+    primary: true,
+  },
+  {
     href: "/people",
     label: "People",
     keywords: ["members", "staff", "invite", "team"],
     primary: true,
   },
-  { href: "/roles", label: "Roles", keywords: ["permissions", "access"], primary: true },
+  { href: "/roles", label: "Roles", keywords: ["permissions", "access"], primary: false },
   {
     href: "/audit",
     label: "Audit log",
@@ -56,6 +62,18 @@ export const COMMANDS: readonly Command[] = [
     label: "Add a branch",
     keywords: ["store", "shop", "warehouse"],
     href: "/settings?tab=branches&new=1",
+  },
+  {
+    id: "act:product",
+    label: "Add a product",
+    keywords: ["new", "item", "sku"],
+    href: "/catalog/new",
+  },
+  {
+    id: "act:import",
+    label: "Import products from a CSV",
+    keywords: ["upload", "spreadsheet", "excel"],
+    href: "/catalog/import",
   },
   { id: "act:role", label: "Create a role", keywords: ["permission"], href: "/roles?new=1" },
   {

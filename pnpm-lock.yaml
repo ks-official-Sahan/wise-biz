@@ -338,6 +338,9 @@ importers:
       '@tanstack/react-query':
         specifier: 5.104.5
         version: 5.104.5(@types/react@19.3.0)(react@19.3.0)
+      '@wise-biz/barcode':
+        specifier: workspace:*
+        version: link:../../packages/barcode
       '@wise-biz/ids':
         specifier: workspace:*
         version: link:../../packages/ids

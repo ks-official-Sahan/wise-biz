@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildCsp, generateNonce, SECURITY_HEADERS } from "./csp.ts";
+import { buildCsp, generateNonce, parseUploadOrigin, SECURITY_HEADERS } from "./csp.ts";
 import { diffJson, show } from "./diff.ts";
 import { COMMANDS, filterCommands, NAV } from "./nav.ts";
 import { diffGrants, KNOWN_PERMISSIONS } from "./permissions.ts";
@@ -119,4 +119,34 @@ describe("safeNext", () => {
       expect(safeNext(raw)).toBe("/");
     },
   );
+});
+
+describe("csp upload origin", () => {
+  it("allows the object store for presigned uploads only when configured", () => {
+    expect(buildCsp("n", { dev: false })).toContain("connect-src 'self';");
+    expect(buildCsp("n", { dev: false, uploadOrigin: "https://files.example.com" })).toContain(
+      "connect-src 'self' https://files.example.com;",
+    );
+  });
+});
+
+describe("upload origin", () => {
+  it("accepts a bare https origin and nothing that widens connect-src", () => {
+    expect(parseUploadOrigin("https://files.example.com", false)).toBe("https://files.example.com");
+    expect(parseUploadOrigin("https://files.example.com/bucket/x?y=1", false)).toBe(
+      "https://files.example.com",
+    );
+    expect(parseUploadOrigin("http://localhost:9000", true)).toBe("http://localhost:9000");
+    for (const bad of [
+      "http://files.example.com",
+      "*",
+      "https://*.example.com",
+      "javascript:alert(1)",
+      "https://u:p@x.com",
+      "not a url",
+      "",
+      undefined,
+    ])
+      expect(parseUploadOrigin(bad, false), String(bad)).toBeUndefined();
+  });
 });

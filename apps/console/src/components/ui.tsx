@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { forwardRef, useEffect, useId, useRef } from "react";
 
 import s from "./ui.module.css";
@@ -305,3 +306,20 @@ export function Dialog({
 }
 
 export { s as styles };
+
+/** A link that looks like a button (navigation, not an action): same sizes and variants as Button. */
+export function LinkButton({
+  href,
+  variant = "primary",
+  children,
+}: {
+  readonly href: string;
+  readonly variant?: Variant;
+  readonly children: ReactNode;
+}) {
+  return (
+    <Link href={href} className={cx(s.button, s[variant])}>
+      {children}
+    </Link>
+  );
+}
