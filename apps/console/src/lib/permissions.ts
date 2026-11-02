@@ -42,6 +42,31 @@ export const PERMISSION_GROUPS: readonly { module: string; items: readonly Permi
     ],
   },
   {
+    module: "Stock",
+    items: [
+      {
+        permission: "inventory:read",
+        label: "View stock",
+        allows: "See stock on hand, batches, low stock and expiry.",
+      },
+      {
+        permission: "inventory:receive",
+        label: "Receive stock",
+        allows: "Record deliveries with cost, lot and expiry.",
+      },
+      {
+        permission: "inventory:adjust",
+        label: "Adjust stock",
+        allows: "Correct stock for damage, loss or counts. Large adjustments may need approval.",
+      },
+      {
+        permission: "inventory:write",
+        label: "Edit stock settings",
+        allows: "Set low-stock minimums and batch sale prices.",
+      },
+    ],
+  },
+  {
     module: "Pricing",
     items: [
       {

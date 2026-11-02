@@ -1,0 +1,94 @@
+.tabs {
+  display: flex;
+  gap: var(--wb-space-2);
+  border-bottom: 1px solid var(--wb-color-border);
+  overflow-x: auto;
+}
+.tab {
+  appearance: none;
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  padding: var(--wb-space-3) var(--wb-space-4);
+  min-height: 44px;
+  font: inherit;
+  color: var(--wb-color-text-muted, inherit);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.tab[aria-selected="true"] {
+  color: var(--wb-color-text);
+  border-bottom-color: var(--wb-color-accent, currentColor);
+  font-weight: 600;
+}
+.form {
+  display: grid;
+  gap: var(--wb-space-3);
+}
+.grid {
+  display: grid;
+  gap: var(--wb-space-3);
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+}
+.num {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.line {
+  display: grid;
+  gap: var(--wb-space-3);
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  padding: var(--wb-space-3);
+  border: 1px solid var(--wb-color-border);
+  border-radius: var(--wb-radius-md);
+}
+.sheet {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
+  gap: var(--wb-space-3);
+}
+.label {
+  display: grid;
+  gap: 2px;
+  justify-items: start;
+  padding: var(--wb-space-2);
+  border: 1px dashed var(--wb-color-border);
+  border-radius: var(--wb-radius-sm, 4px);
+  background: #fff;
+  color: #000;
+  break-inside: avoid;
+}
+.label svg {
+  max-width: 100%;
+  height: auto;
+}
+.labelName {
+  font-weight: 600;
+  font-size: 0.85rem;
+  line-height: 1.2;
+}
+.labelMeta {
+  font-size: 0.75rem;
+}
+.zpl {
+  font-family: ui-monospace, monospace;
+  font-size: 0.8rem;
+  max-height: 16rem;
+  overflow: auto;
+  padding: var(--wb-space-3);
+  border: 1px solid var(--wb-color-border);
+  border-radius: var(--wb-radius-md);
+  white-space: pre;
+}
+@media print {
+  .noPrint {
+    display: none !important;
+  }
+  .sheet {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .label {
+    border-style: solid;
+    border-color: #999;
+  }
+}

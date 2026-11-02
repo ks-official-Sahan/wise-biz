@@ -1,8 +1,8 @@
 "use client";
 
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 import {
   Alert,
@@ -18,6 +18,7 @@ import {
   TextField,
   styles,
 } from "@/components/ui.tsx";
+import { VariantPicker } from "@/components/variant-picker.tsx";
 import { ApiError, api } from "@/lib/api.ts";
 import { useCategories } from "@/lib/catalog.ts";
 import {
@@ -38,74 +39,8 @@ import { useTenant } from "@/lib/tenant.tsx";
 
 import s from "../../pricing.module.css";
 
+import type { Hit } from "@/components/variant-picker.tsx";
 import type { Promotion, PromotionForm } from "@/lib/pricing.ts";
-
-interface Hit {
-  readonly variantId: string;
-  readonly title: string;
-  readonly sku: string;
-}
-
-function useDebounced(value: string, ms: number): string {
-  const [v, setV] = useState(value);
-  useEffect(() => {
-    const id = setTimeout(() => {
-      setV(value);
-    }, ms);
-    return () => {
-      clearTimeout(id);
-    };
-  }, [value, ms]);
-  return v;
-}
-
-/** Search box that hands back the chosen variant. */
-function VariantPicker({ label, onPick }: { label: string; onPick: (hit: Hit) => void }) {
-  const { tenant } = useTenant();
-  const t = tenant.tenantId;
-  const [query, setQuery] = useState("");
-  const q = useDebounced(query.trim(), 250);
-  const search = useQuery({
-    queryKey: [t, "catalog", "search", q],
-    queryFn: ({ signal }) =>
-      api<{ hits: Hit[] }>("GET", `/v1/search/variants?q=${encodeURIComponent(q)}&limit=8`, {
-        signal,
-      }),
-    enabled: q !== "",
-    staleTime: 15_000,
-  });
-  return (
-    <div>
-      <TextField
-        label={label}
-        type="search"
-        value={query}
-        onChange={(e) => {
-          setQuery(e.target.value);
-        }}
-      />
-      {q === "" ? null : (
-        <ul className={s.summary}>
-          {(search.data?.hits ?? []).map((h) => (
-            <li key={h.variantId}>
-              {h.title} <span className={styles.muted}>{h.sku}</span>{" "}
-              <Button
-                variant="ghost"
-                onClick={() => {
-                  onPick(h);
-                  setQuery("");
-                }}
-              >
-                Add
-              </Button>
-            </li>
-          ))}
-          {search.isSuccess && search.data.hits.length === 0 ? <li>Nothing found.</li> : null}
-        </ul>
-      )}
-    </div>
-  );
-}
 
 const EFFECTS = [
   { value: "percent", label: "Percentage off" },

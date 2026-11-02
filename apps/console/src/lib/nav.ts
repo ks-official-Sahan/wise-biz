@@ -1,6 +1,7 @@
 /** Navigation and command registry: one list feeds the sidebar, bottom nav and the command palette. */
 export interface NavItem {
-  readonly href: "/" | "/catalog" | "/pricing" | "/people" | "/roles" | "/audit" | "/settings";
+  readonly href:
+    "/" | "/catalog" | "/pricing" | "/stock" | "/people" | "/roles" | "/audit" | "/settings";
   readonly label: string;
   /** Extra words the command palette matches on. */
   readonly keywords: readonly string[];
@@ -15,6 +16,12 @@ export const NAV: readonly NavItem[] = [
     label: "Products",
     keywords: ["catalog", "items", "sku", "barcode", "import", "inventory"],
     primary: true,
+  },
+  {
+    href: "/stock",
+    label: "Stock",
+    keywords: ["inventory", "receive", "adjust", "low stock", "expiry", "labels", "barcode"],
+    primary: false,
   },
   {
     href: "/pricing",
@@ -80,6 +87,18 @@ export const COMMANDS: readonly Command[] = [
     label: "Import products from a CSV",
     keywords: ["upload", "spreadsheet", "excel"],
     href: "/catalog/import",
+  },
+  {
+    id: "act:receive",
+    label: "Receive stock",
+    keywords: ["delivery", "supplier", "goods in"],
+    href: "/stock",
+  },
+  {
+    id: "act:labels",
+    label: "Print labels",
+    keywords: ["barcode", "shelf", "zpl", "sticker"],
+    href: "/stock/labels",
   },
   { id: "act:role", label: "Create a role", keywords: ["permission"], href: "/roles?new=1" },
   {

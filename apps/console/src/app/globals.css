@@ -95,3 +95,12 @@ a {
     transition-duration: 1ms !important;
   }
 }
+
+/* Label sheets print on their own: the app chrome stays off the paper. */
+@media print {
+  body > * nav,
+  nav[aria-label],
+  header[class] {
+    display: none !important;
+  }
+}
