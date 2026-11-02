@@ -8,6 +8,8 @@ linkWorkspacePackages: true
 
 allowBuilds:
   lefthook: true
+  # Downloads the Electron binary for apps/desktop (MIT).
+  electron: true
   unrs-resolver: true
   # Pulled in via testcontainers (docker-modem/ssh2, grpc): optional native crypto addons and a
   # postinstall version check; none is needed to talk to Docker over the local socket.

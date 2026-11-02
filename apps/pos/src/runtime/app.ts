@@ -4,6 +4,7 @@ import { Platform as RnPlatform } from "react-native";
 import { createPosStore, loadPersisted } from "../state/store.ts";
 
 import { createController } from "./controller.ts";
+import { createDesktopVault, getDesktop, openDesktopSqlite } from "./desktop.ts";
 import { reportError, setReportSink } from "./report.ts";
 import { openExpoSqlite } from "./sqlite-adapter.ts";
 import { createKeyValue, createVault, isLowTrustPlatform } from "./vault.ts";
@@ -24,6 +25,8 @@ if (configuredUrl === undefined && process.env.NODE_ENV === "production") {
 const API_URL = configuredUrl ?? "http://localhost:3000";
 
 const platformName = (): Platform => {
+  const desktop = getDesktop();
+  if (desktop !== undefined) return desktop.platform;
   switch (RnPlatform.OS) {
     case "android":
     case "ios":
@@ -45,15 +48,17 @@ export function getApp(): Promise<App> {
     const storage = createKeyValue();
     const { ui } = await loadPersisted(storage);
     const store = createPosStore({ storage, ui });
+    // Inside the Electron shell the database and the device key live in the main process (better-sqlite3, safeStorage).
+    const desktop = getDesktop();
     const controller = createController({
       store,
-      vault: createVault(),
-      openStorage: openExpoSqlite,
+      vault: desktop === undefined ? createVault() : createDesktopVault(desktop),
+      openStorage: desktop === undefined ? openExpoSqlite : (id) => openDesktopSqlite(desktop, id),
       fetch: (input, init) => fetch(input, init),
       baseUrl: API_URL,
       platform: platformName(),
       appVersion: Constants.expoConfig?.version ?? "0.0.0",
-      lowTrust: isLowTrustPlatform,
+      lowTrust: desktop === undefined && isLowTrustPlatform,
       onError: reportError,
       // Web has a streaming fetch; React Native polls (the hint stream is an optimisation).
       ...(RnPlatform.OS === "web" ? { streamingFetch: fetch.bind(globalThis) } : {}),

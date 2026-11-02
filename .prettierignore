@@ -9,3 +9,5 @@ CHANGELOG.md
 /*.md
 docs/
 .claude/
+apps/desktop/renderer
+apps/desktop/release
