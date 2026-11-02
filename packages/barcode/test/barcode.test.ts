@@ -214,3 +214,17 @@ describe("wedge detector", () => {
     expect(out.at(-1)).toEqual({ type: "scan", code: "EFGHIJKL" });
   });
 });
+
+describe("review fixes", () => {
+  it("a late Enter still completes the scan, and Shift does not break a burst", () => {
+    const d = createWedgeDetector();
+    for (const [i, k] of [..."AB12"].entries()) d.push(k, i * 5);
+    expect(d.push("Shift", 25).type).toBe("capturing");
+    expect(d.push("Enter", 500)).toEqual({ type: "scan", code: "AB12" });
+  });
+
+  it("knows AIs 12, 16 and 33xx-36xx measures", () => {
+    expect(parseGs1("(01)09506000134352(12)261231(16)270101")).toMatchObject({ ok: true });
+    expect(parseGs1("(01)09506000134352(3302)000125")).toMatchObject({ ok: true });
+  });
+});

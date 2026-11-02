@@ -18,6 +18,8 @@ export interface CustomRule {
 
 export interface CustomCode {
   readonly rule: CustomRule;
+  /** The full EAN-13 as scanned. */
+  readonly code: string;
   readonly item: string;
   readonly kind: CustomRule["kind"];
   readonly value: number;
@@ -53,6 +55,7 @@ export function parseCustom(
   const valueStart = itemStart + rule.itemDigits;
   return {
     rule,
+    code,
     item: code.slice(itemStart, valueStart),
     kind: rule.kind,
     value: Number(code.slice(valueStart, valueStart + rule.valueDigits)),

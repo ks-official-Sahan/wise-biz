@@ -19,6 +19,8 @@ export default defineConfig({
     },
   },
   fullyParallel: true,
+  // Each test boots the app and a local SQLite: more than four at once starves the machine and times out.
+  workers: 4,
   forbidOnly: process.env.CI !== undefined,
   retries: process.env.CI !== undefined ? 1 : 0,
   reporter: process.env.CI !== undefined ? [["list"], ["html", { open: "never" }]] : "list",

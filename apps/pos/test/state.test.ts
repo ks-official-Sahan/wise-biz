@@ -70,7 +70,10 @@ describe("cart", () => {
         variantId: "v1",
         name: "Tea",
         qty: "1",
-        unitPriceMinor: 500,
+        sku: "S",
+        taxCategory: "std",
+        categoryIds: [],
+        addedAt: 0,
       }),
     );
     state = c(
@@ -80,18 +83,38 @@ describe("cart", () => {
         variantId: "v2",
         name: "Rice",
         qty: "0.750",
-        unitPriceMinor: 300,
+        sku: "S",
+        taxCategory: "std",
+        categoryIds: [],
+        addedAt: 0,
       }),
     );
     state = c(state, cartSlice.actions.lineQuantityChanged({ id: "l1", qty: "3" }));
     state = c(state, cartSlice.actions.customerSet("c1"));
     expect(state.ids).toEqual(["l1", "l2"]);
+    // Same variant merges into the existing line; decimals add exactly.
+    state = c(
+      state,
+      cartSlice.actions.lineAdded({
+        id: "l3",
+        variantId: "v2",
+        name: "Rice",
+        qty: "0.2501",
+        sku: "S",
+        taxCategory: "std",
+        categoryIds: [],
+        addedAt: 0,
+      }),
+    );
+    expect(state.ids).toEqual(["l1", "l2"]);
+    expect(state.entities.l2?.qty).toBe("1.0001");
+    state = c(state, cartSlice.actions.lineQuantityChanged({ id: "l2", qty: "0.750" }));
     expect(state.entities.l1?.qty).toBe("3");
     expect(state.entities.l2?.qty).toBe("0.750");
     state = c(state, cartSlice.actions.lineRemoved("l1"));
     expect(state.ids).toEqual(["l2"]);
     state = c(state, cartSlice.actions.cleared());
-    expect(state).toMatchObject({ ids: [], customerId: null });
+    expect(state).toMatchObject({ ids: [], customerId: null, approvals: [] });
   });
 });
 
@@ -111,7 +134,10 @@ describe("store and persistence", () => {
           variantId: "v1",
           name: "Tea",
           qty: "1",
-          unitPriceMinor: 500,
+          sku: "S",
+          taxCategory: "std",
+          categoryIds: [],
+          addedAt: 0,
         }),
       );
       expect(m.data.size).toBe(0);

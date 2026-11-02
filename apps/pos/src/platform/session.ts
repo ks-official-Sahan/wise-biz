@@ -5,6 +5,7 @@ export interface OperatorSession {
   readonly sessionId: string;
   readonly userId: string;
   readonly expiresAt: string;
+  readonly permissions?: string[] | "all";
 }
 
 /** `POST /v1/devices/pin-login` (online). The offline verifier arrives with the policy snapshot. */

@@ -104,7 +104,7 @@ test("enroll, first sync, PIN unlock, lock", async ({ page }) => {
     await page.getByRole("button", { name: `Digit ${digit}` }).click();
   await page.getByTestId("pin-submit").click();
 
-  await expect(page.getByRole("heading", { name: "Ready to sell" })).toBeVisible();
+  await expect(page.getByTestId("sell-search")).toBeVisible();
   await expect(page.getByTestId("sync-chip")).toBeVisible();
 
   await page.getByTestId("lock").click();

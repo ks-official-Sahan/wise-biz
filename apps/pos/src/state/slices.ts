@@ -1,5 +1,7 @@
 import { createEntityAdapter, createSlice } from "@reduxjs/toolkit";
 
+import { addQty } from "../features/sell/model/qty.ts";
+
 import type { PayloadAction } from "@reduxjs/toolkit";
 
 // --- session -------------------------------------------------------------------------------------------------------
@@ -18,6 +20,8 @@ export interface OperatorSummary {
   readonly userId: string;
   readonly sessionId: string;
   readonly expiresAt: string;
+  /** What this operator may do on the terminal (`all` for the owner); absent means nothing beyond selling. */
+  permissions?: string[] | "all";
 }
 
 export interface SessionState {
@@ -114,24 +118,76 @@ export const uiSlice = createSlice({
 export interface CartLine {
   readonly id: string;
   readonly variantId: string;
+  readonly sku: string;
   readonly name: string;
+  readonly taxCategory: string;
+  readonly categoryIds: readonly string[];
   /** Decimal quantity as text (weighed goods): never a float. */
   readonly qty: string;
-  readonly unitPriceMinor: number;
+  /** When the line was added (ms): the undo window for removal without a permission runs from here. */
+  readonly addedAt: number;
+  /** Manual price per base unit, set only through an approved override or a price-label scan. */
+  readonly priceOverrideMinor?: number;
+  readonly note?: string;
+}
+
+/** A supervisor's approval of one action, kept with the cart so the sale command can carry it. */
+export interface Approval {
+  readonly id: string;
+  readonly permission: string;
+  readonly approverId: string;
+  readonly requesterId: string;
+  readonly reason: string;
+  readonly subjectId: string;
+  readonly at: number;
 }
 
 export const cartAdapter = createEntityAdapter<CartLine>();
 
-/** Normalized: lines by id plus their order. The sell screen (P1-09) drives it; totals come from the pricing engine. */
+export interface CartExtras {
+  customerId: string | null;
+  note: string | null;
+  approvals: Approval[];
+}
+
+/** Normalized: lines by id plus their order. Totals come from the pricing engine, never from this state. */
 export const cartSlice = createSlice({
   name: "cart",
-  initialState: cartAdapter.getInitialState({ customerId: null as string | null }),
+  initialState: cartAdapter.getInitialState<CartExtras>({
+    customerId: null,
+    note: null,
+    approvals: [],
+  }),
   reducers: {
+    /** Adds a line, or adds to the quantity of the line already holding that variant (same SKU merges). */
     lineAdded(state, a: PayloadAction<CartLine>) {
-      cartAdapter.addOne(state, a.payload);
+      const same = Object.values(state.entities).find(
+        (l) =>
+          l.variantId === a.payload.variantId &&
+          l.priceOverrideMinor === a.payload.priceOverrideMinor,
+      );
+      if (same === undefined) {
+        cartAdapter.addOne(state, a.payload);
+        return;
+      }
+      const sum = addQty(same.qty, a.payload.qty);
+      if (sum !== undefined) cartAdapter.updateOne(state, { id: same.id, changes: { qty: sum } });
     },
     lineQuantityChanged(state, a: PayloadAction<{ id: string; qty: string }>) {
       cartAdapter.updateOne(state, { id: a.payload.id, changes: { qty: a.payload.qty } });
+    },
+    lineNoted(state, a: PayloadAction<{ id: string; note: string | null }>) {
+      const { id, note } = a.payload;
+      cartAdapter.updateOne(state, { id, changes: note === null ? { note: "" } : { note } });
+    },
+    /** Removes several lines at once (parking takes only what it saved). */
+    linesRemoved(state, a: PayloadAction<string[]>) {
+      cartAdapter.removeMany(state, a.payload);
+      if (state.ids.length === 0) {
+        state.customerId = null;
+        state.note = null;
+        state.approvals = [];
+      }
     },
     lineRemoved(state, a: PayloadAction<string>) {
       cartAdapter.removeOne(state, a.payload);
@@ -139,9 +195,32 @@ export const cartSlice = createSlice({
     customerSet(state, a: PayloadAction<string | null>) {
       state.customerId = a.payload;
     },
+    noteSet(state, a: PayloadAction<string | null>) {
+      state.note = a.payload;
+    },
+    approvalRecorded(state, a: PayloadAction<Approval>) {
+      state.approvals.push(a.payload);
+    },
+    /** Replaces the whole cart (resume of a parked sale). */
+    restored(
+      state,
+      a: PayloadAction<{
+        lines: CartLine[];
+        customerId: string | null;
+        note: string | null;
+        approvals: Approval[];
+      }>,
+    ) {
+      cartAdapter.setAll(state, a.payload.lines);
+      state.customerId = a.payload.customerId;
+      state.note = a.payload.note;
+      state.approvals = a.payload.approvals;
+    },
     cleared(state) {
       cartAdapter.removeAll(state);
       state.customerId = null;
+      state.note = null;
+      state.approvals = [];
     },
   },
 });

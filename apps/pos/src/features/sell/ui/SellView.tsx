@@ -1,4 +1,11 @@
-import { IconBarcode, IconPlayerPause, IconTrash, IconUser } from "@tabler/icons-react-native";
+import {
+  IconBarcode,
+  IconLayoutGrid,
+  IconPlayerPause,
+  IconPlayerPlay,
+  IconTrash,
+  IconUser,
+} from "@tabler/icons-react-native";
 import { money } from "@wise-biz/money";
 import {
   Badge,
@@ -67,6 +74,7 @@ const useStyles = createStyles((t) => ({
 
 function Header(p: SellViewProps) {
   const s = useStyles();
+  const { width } = useWindowDimensions();
   return (
     <View style={s.header}>
       <View style={s.grow}>
@@ -80,6 +88,24 @@ function Header(p: SellViewProps) {
           testID="sell-search"
         />
       </View>
+      {width < 600 && p.onShowCatalog !== undefined ? (
+        <IconButton
+          icon={IconLayoutGrid}
+          accessibilityLabel="Browse products"
+          onPress={p.onShowCatalog}
+          variant="secondary"
+          testID="sell-catalog"
+        />
+      ) : null}
+      {p.onShowParked !== undefined && (p.parkedCount ?? 0) > 0 ? (
+        <IconButton
+          icon={IconPlayerPlay}
+          accessibilityLabel={`Parked sales (${String(p.parkedCount)})`}
+          onPress={p.onShowParked}
+          variant="secondary"
+          testID="sell-parked"
+        />
+      ) : null}
       <IconButton
         icon={IconBarcode}
         accessibilityLabel="Scan with camera"
@@ -91,7 +117,7 @@ function Header(p: SellViewProps) {
   );
 }
 
-function Catalog(p: SellViewProps) {
+export function Catalog(p: SellViewProps) {
   const s = useStyles();
   return (
     <View style={s.pane}>
@@ -106,7 +132,7 @@ function Catalog(p: SellViewProps) {
           <Card
             key={q.id}
             style={s.tile}
-            accessibilityLabel={`Add ${q.name}`}
+            accessibilityLabel={`Add ${q.name}, ${new Intl.NumberFormat(p.locale, { style: "currency", currency: p.totals.currency }).format(q.priceMinor / 100)}`}
             onPress={() => {
               p.onAddQuick(q.id);
             }}
@@ -133,15 +159,20 @@ function LineRow({ line, p }: { line: SellLine; p: SellViewProps }) {
   const compact = width < 600;
   const controls = (
     <>
-      <QuantityStepper
-        value={line.qty}
-        min={1}
-        max={999}
-        label={`Quantity of ${line.name}`}
-        onChange={(n) => {
-          p.onQty(line.id, n);
-        }}
-      />
+      {Number.isInteger(line.qty) ? (
+        <QuantityStepper
+          value={line.qty}
+          min={1}
+          max={999}
+          label={`Quantity of ${line.name}`}
+          onChange={(n) => {
+            p.onQty(line.id, n);
+          }}
+        />
+      ) : (
+        // Weighed goods keep their decimal quantity: the stepper would round it.
+        <Text variant="label" numeric>{`${String(line.qty)} kg`}</Text>
+      )}
       {compact ? <View style={s.grow} /> : null}
       <MoneyText
         value={money(line.lineTotalMinor, p.totals.currency)}

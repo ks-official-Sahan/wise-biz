@@ -285,6 +285,13 @@ export function createController(deps: ControllerDeps) {
             pendingBootstrap: DATASETS,
           })
         : client.health(),
+    /** Local database and in-memory indexes for the sell screen; undefined until sync has started. */
+    sellDeps():
+      { db: SyncClient["db"]; indexes: SyncClient["indexes"]; branchId: string } | undefined {
+      const branchId = store.getState().session.device?.branchId;
+      if (client === undefined || branchId === undefined) return undefined;
+      return { db: client.db, indexes: client.indexes, branchId };
+    },
     nudge: (): void => {
       client?.nudge();
     },

@@ -37,13 +37,14 @@ export function createWedgeDetector(options: WedgeOptions = {}) {
     push(key: string, t: number): WedgeResult {
       const gap = t - last;
       last = t;
-      if (gap > maxGap) reset();
       if (key === "Enter") {
         const code = buffer;
         const wasBurst = burst;
         reset();
         return wasBurst && code.length >= minLength ? { type: "scan", code } : { type: "pass" };
       }
+      if (key === "Shift" || key === "CapsLock") return { type: burst ? "capturing" : "pass" };
+      if (gap > maxGap) reset();
       if (key.length !== 1) {
         reset();
         return { type: "pass" };

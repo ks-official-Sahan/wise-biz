@@ -42,6 +42,10 @@ export interface SellViewProps {
   readonly onCustomer: () => void;
   readonly onPay: () => void;
   readonly onScan: () => void;
+  /** Phone only: opens the product grid as a sheet. */
+  readonly onShowCatalog?: () => void;
+  readonly parkedCount?: number;
+  readonly onShowParked?: () => void;
 }
 
 export type LayoutClass = "phone" | "tabletPortrait" | "tabletLandscape" | "desktop";

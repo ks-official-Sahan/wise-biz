@@ -6,7 +6,11 @@ export default [
   {
     // Unit tests run in Node and e2e in Playwright: both may use Node built-ins.
     files: ["test/**/*.ts", "e2e/**/*.ts", "e2e/**/*.mjs"],
-    rules: { "no-restricted-imports": "off", "no-restricted-syntax": "off" },
+    rules: {
+      "no-restricted-imports": "off",
+      "no-restricted-syntax": "off",
+      "@typescript-eslint/no-non-null-assertion": "off",
+    },
   },
   {
     // Expo Router loads routes by default export.

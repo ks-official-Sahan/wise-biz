@@ -11,8 +11,10 @@ const FIXED: Readonly<Record<string, number>> = {
   "01": 14,
   "02": 14,
   "11": 6,
+  "12": 6,
   "13": 6,
   "15": 6,
+  "16": 6,
   "17": 6,
 };
 const VARIABLE: Readonly<Record<string, number>> = {
@@ -58,7 +60,7 @@ function aiLength(data: string, at: number): string | undefined {
     const ai = data.slice(at, at + n);
     if (ai in FIXED || ai in VARIABLE) return ai;
     // 310n..369n: measures with an implied decimal point; 4 digits, fixed 6-digit value.
-    if (n === 4 && /^(31|32)\d\d$/.test(ai)) return ai;
+    if (n === 4 && /^3[1-6]\d\d$/.test(ai)) return ai;
   }
   return undefined;
 }
@@ -88,7 +90,7 @@ function split(
     if (ai === undefined)
       return { ok: false, reason: `unknown application identifier at ${String(i)}` };
     i += ai.length;
-    const fixed = FIXED[ai] ?? (/^(31|32)\d\d$/.test(ai) ? 6 : undefined);
+    const fixed = FIXED[ai] ?? (/^3[1-6]\d\d$/.test(ai) ? 6 : undefined);
     if (fixed !== undefined) {
       const v = data.slice(i, i + fixed);
       if (v.length !== fixed) return { ok: false, reason: `AI ${ai} is too short` };
