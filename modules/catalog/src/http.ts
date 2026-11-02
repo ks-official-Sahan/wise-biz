@@ -9,7 +9,13 @@ import {
   updateProductCommand,
   updateVariantCommand,
 } from "./application/products.ts";
-import { getProduct, listProducts, lookupBarcode, parseInclude } from "./application/queries.ts";
+import {
+  getProduct,
+  listProducts,
+  lookupBarcode,
+  lookupVariants,
+  parseInclude,
+} from "./application/queries.ts";
 import { notFound, pgErrors } from "./application/shared.ts";
 import {
   createCategoryCommand,
@@ -31,6 +37,7 @@ import {
   CreateUnitConversionSchema,
   CreateUnitSchema,
   ListProductsQuerySchema,
+  LookupVariantsQuerySchema,
   ProductPageSchema,
   ProductSchema,
   SetBarcodesSchema,
@@ -42,6 +49,7 @@ import {
   UpdateVariantSchema,
   uuid7,
   VariantInputSchema,
+  VariantLookupSchema,
   VariantSchema,
 } from "./schemas.ts";
 
@@ -138,6 +146,15 @@ const routes = {
         ...json(z.object({ variantId: z.string(), barcodes: z.array(BarcodeSchema) })),
       },
     },
+  }),
+  lookupVariants: createRoute({
+    method: "get",
+    path: "/v1/catalog/variants",
+    tags,
+    summary: "Variants by id (up to 100) with their product name",
+    middleware: read,
+    request: { query: LookupVariantsQuerySchema },
+    responses: { 200: { description: "Variants", ...json(VariantLookupSchema) } },
   }),
   lookupBarcode: createRoute({
     method: "get",
@@ -281,6 +298,14 @@ export function mountRoutes(app: OpenAPIHono<AppEnv>, deps: ModuleDeps): void {
     return command(c, SetBarcodesSchema, (tx, b, ctx) => setBarcodesCommand(tx, ctx, id, b));
   });
 
+  app.openapi(routes.lookupVariants, async (c) => {
+    const tenant = requireTenant(c);
+    const { ids } = c.req.valid("query");
+    const variants = await withTenantTx(deps.pool, tenant, (tx) =>
+      lookupVariants(tx, tenant.tenantId, [...new Set(ids.split(","))]),
+    );
+    return c.json({ variants }, 200);
+  });
   app.openapi(routes.lookupBarcode, async (c) => {
     const device = c.get("device");
     const scope =

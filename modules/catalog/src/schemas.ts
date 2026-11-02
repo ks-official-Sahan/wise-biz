@@ -215,3 +215,13 @@ export const UnitSchema = z
 export const UnitConversionSchema = z
   .object({ id: z.string(), fromUnitId: z.string(), toUnitId: z.string(), factor: z.string() })
   .openapi("UnitConversion");
+
+export const LookupVariantsQuerySchema = z.object({
+  ids: z
+    .string()
+    .regex(/^[0-9a-f-]{36}(,[0-9a-f-]{36}){0,99}$/, "1 to 100 comma-separated variant ids")
+    .openapi({ description: "Comma list of up to 100 variant ids" }),
+});
+export const VariantLookupSchema = z
+  .object({ variants: z.array(VariantSchema.extend({ productName: z.string() })) })
+  .openapi("VariantLookup");

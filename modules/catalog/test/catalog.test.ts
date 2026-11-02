@@ -255,6 +255,39 @@ describe("products", () => {
   });
 });
 
+describe("variant lookup", () => {
+  it("returns variants with their product name, only this tenant's, and refuses bad input", async () => {
+    const a = await product({ name: "Lookup Tea" });
+    const b = await product({ name: "Lookup Rice" });
+    const ids = [a.variants[0]?.id, b.variants[0]?.id].filter((x): x is string => x !== undefined);
+    const res = await send("GET", `/v1/catalog/variants?ids=${[...ids, ids[0]].join(",")}`);
+    expect(res.status).toBe(200);
+    const out = await json<{ variants: { id: string; productName: string; sku: string }[] }>(res);
+    expect(out.variants.map((v) => v.productName).sort()).toEqual(["Lookup Rice", "Lookup Tea"]);
+    expect(out.variants).toHaveLength(2);
+
+    // Another business sees nothing of these ids.
+    tenantId = OTHER;
+    try {
+      const other = await send("GET", `/v1/catalog/variants?ids=${ids.join(",")}`);
+      expect((await json<{ variants: unknown[] }>(other)).variants).toEqual([]);
+    } finally {
+      tenantId = T;
+    }
+
+    expect((await send("GET", "/v1/catalog/variants")).status).toBe(422);
+    expect((await send("GET", "/v1/catalog/variants?ids=nope")).status).toBe(422);
+    const tooMany = Array.from({ length: 101 }, () => uuidv7()).join(",");
+    expect((await send("GET", `/v1/catalog/variants?ids=${tooMany}`)).status).toBe(422);
+    role = "nobody";
+    try {
+      expect((await send("GET", `/v1/catalog/variants?ids=${ids.join(",")}`)).status).toBe(404);
+    } finally {
+      role = "owner";
+    }
+  });
+});
+
 describe("barcode lookup", () => {
   it("finds sellable variants for users and active terminals; archived and suspended are refused", async () => {
     const code = nextEan();

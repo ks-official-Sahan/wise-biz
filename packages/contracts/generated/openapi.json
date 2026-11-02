@@ -4628,6 +4628,32 @@
         "required": ["sku", "name"],
         "type": "object"
       },
+      "VariantLookup": {
+        "properties": {
+          "variants": {
+            "items": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Variant"
+                },
+                {
+                  "default": undefined,
+                  "properties": {
+                    "productName": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["productName"],
+                  "type": "object"
+                }
+              ]
+            },
+            "type": "array"
+          }
+        },
+        "required": ["variants"],
+        "type": "object"
+      },
       "Version": {
         "properties": {
           "version": {
@@ -5635,6 +5661,37 @@
           }
         },
         "summary": "Create a unit",
+        "tags": ["catalog"]
+      }
+    },
+    "/v1/catalog/variants": {
+      "get": {
+        "parameters": [
+          {
+            "description": "Comma list of up to 100 variant ids",
+            "in": "query",
+            "name": "ids",
+            "required": true,
+            "schema": {
+              "description": "Comma list of up to 100 variant ids",
+              "pattern": "^[0-9a-f-]{36}(,[0-9a-f-]{36}){0,99}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VariantLookup"
+                }
+              }
+            },
+            "description": "Variants"
+          }
+        },
+        "summary": "Variants by id (up to 100) with their product name",
         "tags": ["catalog"]
       }
     },

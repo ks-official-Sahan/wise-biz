@@ -245,3 +245,17 @@ export async function lookupBarcode(tx: TxHandle, tenantId: string, code: string
     product: { id: row.product_id, name: row.p_name, categoryId: row.p_category_id },
   };
 }
+
+/** Up to 100 variants by id with their product's name (price lists, stock screens): one query, tenant-leading index. */
+export async function lookupVariants(tx: TxHandle, tenantId: string, ids: readonly string[]) {
+  if (ids.length === 0) return [];
+  const r = await tx.query<VariantRow & { product_name: string }>(
+    `select ${VARIANT_COLUMNS}, p.name as product_name
+       from catalog.variants v
+       join catalog.products p on p.tenant_id = v.tenant_id and p.id = v.product_id
+      where v.tenant_id = $1 and v.id = any($2::uuid[])
+      order by v.id`,
+    [tenantId, ids],
+  );
+  return r.rows.map((row) => ({ ...variantDto(row), productName: row.product_name }));
+}
