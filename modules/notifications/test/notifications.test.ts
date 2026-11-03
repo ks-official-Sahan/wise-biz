@@ -207,6 +207,21 @@ describe("fan-out", () => {
     });
   });
 
+  it("tells only the requester when an export is ready", async () => {
+    const t = uuidv7();
+    const [asker, other] = [uuidv7(), uuidv7()];
+    await deliver(t, [other], "reporting.export.ready", {
+      exportId: uuidv7(),
+      requestedBy: asker,
+      kind: "sales_lines",
+      rowCount: 1200,
+    });
+    const mine = (await (await appFor(t, asker).request("/v1/notifications")).json()) as Listed;
+    const theirs = (await (await appFor(t, other).request("/v1/notifications")).json()) as Listed;
+    expect(mine.notifications[0]).toMatchObject({ kind: "export_ready", link: "/reports" });
+    expect(theirs.notifications).toHaveLength(0);
+  });
+
   it("rejects a malformed payload so the bus retries or dead-letters it", async () => {
     await expect(
       deliver(uuidv7(), [uuidv7()], "inventory.balance.low", { qty: 1 }),

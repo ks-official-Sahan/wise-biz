@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api } from "./api.ts";
 import { STALE } from "./queries.ts";
@@ -133,6 +133,74 @@ export const useOperatorsReport = (t: string, f: ReportFilter) =>
     staleTime: STALE.list,
     select: (d) => d.rows,
   });
+
+// ---- exports (large files built in the background) ----
+
+export interface ExportRow {
+  readonly id: string;
+  readonly kind: string;
+  readonly status: "queued" | "running" | "ready" | "failed";
+  readonly from: string;
+  readonly to: string;
+  readonly rowCount: number | null;
+  readonly error: string | null;
+  readonly createdAt: string;
+  readonly expiresAt: string;
+  readonly downloadable: boolean;
+}
+
+export const EXPORT_POLL_MS = 5000;
+export const isOpenExport = (e: Pick<ExportRow, "status">): boolean =>
+  e.status === "queued" || e.status === "running";
+
+/** What a person reads next to an export: plain words, with the row count once it exists. */
+export function exportStatusText(e: ExportRow): string {
+  switch (e.status) {
+    case "queued":
+      return "Waiting to start";
+    case "running":
+      return "Building the file";
+    case "failed":
+      return e.error ?? "Could not be built";
+    case "ready":
+      return e.downloadable
+        ? `Ready, ${String(e.rowCount ?? 0)} rows`
+        : "Expired. Request it again.";
+  }
+}
+
+export const exportDownloadUrl = (id: string): `/v1/${string}` =>
+  `/v1/reporting/exports/${id}/download`;
+
+const exportsKey = (t: string) => [t, "reports", "exports"] as const;
+
+/** Polls while any export is still being built, and stops once all are finished. */
+export const useExports = (t: string) =>
+  useQuery({
+    queryKey: exportsKey(t),
+    queryFn: ({ signal }) =>
+      api<{ exports: ExportRow[] }>("GET", "/v1/reporting/exports", { signal }),
+    staleTime: 0,
+    refetchInterval: (q) =>
+      q.state.data?.exports.some(isOpenExport) === true ? EXPORT_POLL_MS : false,
+    select: (d) => d.exports,
+  });
+
+export function useRequestExport(t: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (f: ReportFilter) =>
+      api<ExportRow>("POST", "/v1/reporting/exports", {
+        body: {
+          kind: "sales_lines",
+          from: f.from,
+          to: f.to,
+          ...(f.branchId ? { branchId: f.branchId } : {}),
+        },
+      }),
+    onSettled: () => qc.invalidateQueries({ queryKey: exportsKey(t) }),
+  });
+}
 
 const NIL_OPERATOR = "00000000-0000-0000-0000-000000000000";
 

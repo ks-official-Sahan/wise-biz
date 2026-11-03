@@ -1313,6 +1313,9 @@ importers:
       '@wise-biz/policy':
         specifier: workspace:*
         version: link:../../packages/policy
+      '@wise-biz/storage':
+        specifier: workspace:*
+        version: link:../../packages/storage
       hono:
         specifier: 4.13.13
         version: 4.13.13

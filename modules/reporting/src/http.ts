@@ -5,6 +5,7 @@ import { authorize, requireTenant, runCommand } from "@wise-biz/module-kit";
 import { z } from "zod";
 
 import { rebuild } from "./apply.ts";
+import { mountExportRoutes } from "./http-exports.ts";
 import { operators, payments, products, salesSummary, tax, toCsv } from "./queries.ts";
 import {
   OperatorsReportSchema,
@@ -22,6 +23,7 @@ import {
 import type { Range } from "./queries.ts";
 import type { OpenAPIHono } from "@hono/zod-openapi";
 import type { AppEnv, ModuleDeps } from "@wise-biz/module-kit";
+import type { ObjectStore } from "@wise-biz/storage";
 import type { MiddlewareHandler } from "hono";
 
 /** authorize runs before validation: an unauthorised caller gets 404 and learns nothing about the request shape. */
@@ -131,7 +133,8 @@ function scoped(
   return { ...range, branchIds: wanted };
 }
 
-export function mountRoutes(app: OpenAPIHono<AppEnv>, deps: ModuleDeps): void {
+export function mountRoutes(app: OpenAPIHono<AppEnv>, deps: ModuleDeps, store: ObjectStore): void {
+  mountExportRoutes(app, deps, store);
   const reading = <T>(
     c: Parameters<typeof requireTenant>[0],
     fn: (tx: Parameters<Parameters<typeof withTenantTx>[2]>[0], tenantId: string) => Promise<T>,

@@ -4,6 +4,8 @@ import { useState } from "react";
 
 import { BarChart } from "@/components/bar-chart.tsx";
 import {
+  Alert,
+  Button,
   Card,
   Empty,
   ErrorState,
@@ -15,6 +17,7 @@ import {
   TextField,
   styles,
 } from "@/components/ui.tsx";
+import { ApiError } from "@/lib/api.ts";
 import { formatPrice } from "@/lib/pricing.ts";
 import { useBranches, useProfile } from "@/lib/queries.ts";
 import {
@@ -23,7 +26,11 @@ import {
   presetRange,
   salesCsvUrl,
   totals,
+  exportDownloadUrl,
+  exportStatusText,
   operatorLabel,
+  useExports,
+  useRequestExport,
   useOperatorsReport,
   usePaymentsReport,
   useProductsReport,
@@ -41,6 +48,7 @@ const TABS = [
   { id: "products", label: "Products" },
   { id: "payments", label: "Payments" },
   { id: "staff", label: "Staff" },
+  { id: "exports", label: "Exports" },
   { id: "tax", label: "Tax" },
 ] as const;
 type TabId = (typeof TABS)[number]["id"];
@@ -154,6 +162,8 @@ export default function ReportsPage() {
           <PaymentsTab filter={filter} currency={currency} />
         ) : tab === "staff" ? (
           <StaffTab filter={filter} currency={currency} />
+        ) : tab === "exports" ? (
+          <ExportsTab filter={filter} />
         ) : (
           <TaxTab filter={filter} currency={currency} />
         )}
@@ -386,6 +396,82 @@ function PaymentsTab({ filter, currency }: { filter: ReportFilter; currency: str
         </tbody>
       </table>
     </div>
+  );
+}
+
+function ExportsTab({ filter }: { filter: ReportFilter }) {
+  const { tenant } = useTenant();
+  const list = useExports(tenant.tenantId);
+  const request = useRequestExport(tenant.tenantId);
+  return (
+    <Stack>
+      <Card>
+        <h2>Sale lines</h2>
+        <p className={styles.muted}>
+          {`Every sold line from ${filter.from} to ${filter.to}, one row each, as a compressed CSV. Big files are built in the background and you are told when one is ready.`}
+        </p>
+        {request.isError ? (
+          <Alert tone="danger">
+            {request.error instanceof ApiError && request.error.status === 404
+              ? "Exports are for people who can see every branch."
+              : "Could not start the export. Try again."}
+          </Alert>
+        ) : null}
+        <Button
+          disabled={request.isPending}
+          onClick={() => {
+            request.mutate(filter);
+          }}
+        >
+          {request.isPending ? "Requesting…" : "Request export"}
+        </Button>
+      </Card>
+      {list.isPending ? <SkeletonRows label="Loading exports" rows={3} /> : null}
+      {list.isError ? (
+        <ErrorState
+          error={list.error}
+          onRetry={() => {
+            void list.refetch();
+          }}
+        />
+      ) : null}
+      {list.isSuccess && list.data.length === 0 ? <Empty title="No exports yet" /> : null}
+      {list.isSuccess && list.data.length > 0 ? (
+        <div className={styles.tableWrap}>
+          <table className={styles.table}>
+            <caption className="sr-only">Your recent exports</caption>
+            <thead>
+              <tr>
+                <th scope="col">Period</th>
+                <th scope="col">Status</th>
+                <th scope="col">
+                  <span className="sr-only">Download</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {list.data.map((e) => (
+                <tr key={e.id}>
+                  <th scope="row">{`${e.from} to ${e.to}`}</th>
+                  <td>
+                    <span role={e.status === "failed" ? "alert" : undefined}>
+                      {exportStatusText(e)}
+                    </span>
+                  </td>
+                  <td>
+                    {e.downloadable ? (
+                      <a href={exportDownloadUrl(e.id)} download>
+                        Download
+                      </a>
+                    ) : null}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+    </Stack>
   );
 }
 

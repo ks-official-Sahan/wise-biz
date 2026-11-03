@@ -29,6 +29,21 @@ const salesRow = (key: string, net: number, count = 3) => ({
   netMinor: net,
 });
 
+const exportBodies: unknown[] = [];
+const exportRow = (status: string) => ({
+  id: "0190a000-0000-7000-8000-0000000000e1",
+  kind: "sales_lines",
+  status,
+  from: day(-7),
+  to: day(0),
+  rowCount: status === "ready" ? 1200 : null,
+  error: null,
+  createdAt: new Date().toISOString(),
+  finishedAt: null,
+  expiresAt: new Date(Date.now() + 86_400_000).toISOString(),
+  downloadable: status === "ready",
+});
+
 async function mockApi(page: Page): Promise<string[]> {
   const requests: string[] = [];
   await page.route("**/v1/**", async (route: Route) => {
@@ -130,6 +145,13 @@ async function mockApi(page: Page): Promise<string[]> {
           },
         ],
       });
+    if (path === "/v1/reporting/exports") {
+      if (req.method() === "POST") {
+        exportBodies.push(req.postDataJSON());
+        return json(201, exportRow("queued"));
+      }
+      return json(200, { exports: [exportRow("ready")] });
+    }
     if (path === "/v1/reporting/operators")
       return json(200, {
         rows: [
@@ -234,4 +256,20 @@ test("the home page compares today with the same weekday last week", async ({ pa
   await expect(page.getByText("$150.00")).toBeVisible();
   await expect(page.getByText(/Same weekday last week: up 50%/)).toBeVisible();
   await a11y(page);
+});
+
+test("requests an export and offers a finished one for download", async ({ page }) => {
+  await mockApi(page);
+  exportBodies.length = 0;
+  await page.goto("/reports");
+  await page.getByRole("tab", { name: "Exports" }).click();
+  await expect(page.getByText("Ready, 1200 rows")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Download" })).toHaveAttribute(
+    "href",
+    //v1/reporting/exports/.+/download$/,
+  );
+  await a11y(page);
+  await page.getByRole("button", { name: "Request export" }).click();
+  await expect.poll(() => exportBodies.length).toBe(1);
+  expect(exportBodies[0]).toMatchObject({ kind: "sales_lines" });
 });

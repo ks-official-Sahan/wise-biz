@@ -1,4 +1,5 @@
 import { join } from "node:path";
+import { gunzipSync } from "node:zlib";
 
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { createPool, migrate, withTenantTx } from "@wise-biz/db";
@@ -6,6 +7,7 @@ import { DomainError, toProblem } from "@wise-biz/errors";
 import { uuidv7 } from "@wise-biz/ids";
 import { policyMiddleware } from "@wise-biz/module-kit";
 import { createCatalog, matrixFromRows } from "@wise-biz/policy";
+import { createMemoryStore } from "@wise-biz/storage";
 import { testDatabase } from "@wise-biz/testing/containers";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -17,7 +19,8 @@ import {
   rebuild,
 } from "../src/apply.ts";
 import { createReportingConsumer } from "../src/consumer.ts";
-import { reportingModule } from "../src/index.ts";
+import { runExports } from "../src/export-job.ts";
+import { createReportingModule } from "../src/index.ts";
 import { csvCell, operators, salesSummary } from "../src/queries.ts";
 
 import type { Q } from "../src/apply.ts";
@@ -29,6 +32,7 @@ const migrationsDir = join(import.meta.dirname, "..", "migrations");
 const infraDir = join(import.meta.dirname, "..", "..", "infra", "migrations");
 const auditDir = join(import.meta.dirname, "..", "..", "audit", "migrations");
 
+const store = createMemoryStore();
 let db: TestDatabase;
 let app: pg.Pool;
 let worker: pg.Pool;
@@ -564,6 +568,7 @@ describe("the consumer", () => {
 
 // ---- HTTP ----
 
+const reportingModule = createReportingModule({ store });
 const matrix = matrixFromRows(createCatalog(reportingModule.permissions), [
   { role: "analyst", permission: "reporting:read" },
   { role: "admin", permission: "reporting:read" },
@@ -577,7 +582,12 @@ const idempotencyCache: IdempotencyCache = {
     return Promise.resolve();
   },
 };
-function appFor(tenantId: string, role: string, branchScope: "all" | string[] = "all") {
+function appFor(
+  tenantId: string,
+  role: string,
+  branchScope: "all" | string[] = "all",
+  userId: string = ACTOR,
+) {
   const deps: ModuleDeps = {
     pool: app,
     clock: { now: () => Date.UTC(2026, 10, 4) },
@@ -593,7 +603,7 @@ function appFor(tenantId: string, role: string, branchScope: "all" | string[] = 
     c.set("requestId", "req-12345678");
     c.set("auth", {
       kind: "user",
-      userId: ACTOR,
+      userId,
       sessionId: "01900000-0000-7000-8000-0000000000aa",
       tenantId,
       roles: [role],
@@ -800,6 +810,126 @@ describe("reports API", () => {
       rows: unknown[];
     };
     expect(res.rows).toEqual([]);
+  });
+});
+
+describe("exports", () => {
+  const tenantId = uuidv7();
+  const g = generate(9);
+  const me = uuidv7();
+  beforeAll(async () => {
+    await feed(tenantId, g);
+  });
+  const post = (a: ReturnType<typeof appFor>, body: unknown) =>
+    a.request("/v1/reporting/exports", {
+      method: "POST",
+      headers: { "content-type": "application/json", "idempotency-key": `k-${uuidv7()}` },
+      body: JSON.stringify(body),
+    });
+  const jobDeps = (s = store) => ({
+    pool: worker,
+    store: s,
+    ids: { uuidv7 },
+    now: () => new Date(),
+  });
+  const REQ = { kind: "sales_lines", from: "2026-11-01", to: "2026-11-03" };
+  interface Exp {
+    id: string;
+    status: string;
+    rowCount: number | null;
+    error: string | null;
+    downloadable: boolean;
+  }
+  const mine = async (a: ReturnType<typeof appFor>) =>
+    ((await (await a.request("/v1/reporting/exports")).json()) as { exports: Exp[] }).exports;
+
+  it("queues a request, the worker builds the file, and only the requester can download it", async () => {
+    const a = appFor(tenantId, "analyst", "all", me);
+    const res = await post(a, REQ);
+    expect(res.status).toBe(201);
+    const queued = (await res.json()) as Exp;
+    expect(queued).toMatchObject({ status: "queued", downloadable: false });
+    expect((await a.request(`/v1/reporting/exports/${queued.id}/download`)).status).toBe(404);
+
+    expect(await runExports(jobDeps())).toBeGreaterThanOrEqual(1);
+    const done = (await mine(a)).find((x) => x.id === queued.id);
+    const lines = g.sales.reduce((n, x) => n + x.lines.length, 0);
+    expect(done).toMatchObject({ status: "ready", rowCount: lines, downloadable: true });
+
+    // The file: gzip CSV, a header and one row per sale line, voided sales flagged.
+    const key = `tenants/${tenantId}/exports/${queued.id}.csv.gz`;
+    const text = gunzipSync(store.objects.get(key) ?? new Uint8Array()).toString("utf8");
+    const rows = text.trim().split("\n");
+    expect(rows[0]).toContain("business date");
+    expect(rows).toHaveLength(lines + 1);
+    expect(rows.filter((r) => r.includes(",voided,")).length).toBe(
+      g.sales.filter((x) => x.voided).reduce((n, x) => n + x.lines.length, 0),
+    );
+
+    const dl = await a.request(`/v1/reporting/exports/${queued.id}/download`);
+    expect(dl.status).toBe(302);
+    expect(dl.headers.get("location")).toContain(queued.id);
+    // Someone else, or another business, gets a 404 for the same id.
+    expect(
+      (
+        await appFor(tenantId, "analyst", "all", uuidv7()).request(
+          `/v1/reporting/exports/${queued.id}/download`,
+        )
+      ).status,
+    ).toBe(404);
+    expect(
+      (
+        await appFor(uuidv7(), "analyst", "all", me).request(
+          `/v1/reporting/exports/${queued.id}/download`,
+        )
+      ).status,
+    ).toBe(404);
+    expect(await mine(appFor(tenantId, "analyst", "all", uuidv7()))).toEqual([]);
+
+    // Told once through the outbox; running the job again builds nothing.
+    const events = await withTenantTx(admin, { tenantId, requestId: "test" }, (tx) =>
+      tx.query(
+        "select payload->'data'->>'requestedBy' as who from infra.outbox where type = 'reporting.export.ready'",
+      ),
+    );
+    expect(events.rows).toEqual([{ who: me }]);
+    expect(await runExports(jobDeps())).toBe(0);
+  });
+
+  it("limits an export to one branch when asked", async () => {
+    const a = appFor(tenantId, "analyst", "all", me);
+    const branch = g.branches[0] ?? "";
+    const created = (await (await post(a, { ...REQ, branchId: branch })).json()) as Exp;
+    await runExports(jobDeps());
+    const text = gunzipSync(
+      store.objects.get(`tenants/${tenantId}/exports/${created.id}.csv.gz`) ?? new Uint8Array(),
+    ).toString("utf8");
+    const want = g.sales
+      .filter((x) => x.branchId === branch)
+      .reduce((n, x) => n + x.lines.length, 0);
+    expect(text.trim().split("\n")).toHaveLength(want + 1);
+  });
+
+  it("fails with a plain message when the file cannot be stored, and can be asked again", async () => {
+    const a = appFor(tenantId, "analyst", "all", me);
+    const created = (await (await post(a, REQ)).json()) as Exp;
+    const broken = { ...store, put: () => Promise.reject(new Error("bucket down")) };
+    await runExports(jobDeps(broken));
+    const failed = (await mine(a)).find((x) => x.id === created.id);
+    expect(failed?.status).toBe("failed");
+    expect(failed?.error).toContain("could not be built");
+    expect(failed?.error).not.toContain("bucket");
+  });
+
+  it("is refused for a branch-limited reader, a non-reader and a bad range", async () => {
+    expect((await post(appFor(tenantId, "analyst", [g.branches[0] ?? ""], me), REQ)).status).toBe(
+      404,
+    );
+    expect((await post(appFor(tenantId, "nobody", "all", me), REQ)).status).toBe(404);
+    const a = appFor(tenantId, "analyst", "all", me);
+    expect((await post(a, { ...REQ, to: "2025-01-01" })).status).toBe(422);
+    expect((await post(a, { ...REQ, kind: "everything" })).status).toBe(422);
+    expect((await post(a, { ...REQ, from: "2024-01-01" })).status).toBe(422);
   });
 });
 

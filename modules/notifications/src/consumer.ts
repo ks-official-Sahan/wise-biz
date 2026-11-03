@@ -11,6 +11,7 @@ const EVENTS = [
   "inventory.balance.low@v1",
   "inventory.batch.expiring@v1",
   "devices.heartbeat.missed@v1",
+  "reporting.export.ready@v1",
 ] as const;
 
 export interface NotificationsDeps {
@@ -45,6 +46,11 @@ const Missed = z.object({
   branchId: z.string(),
   name: z.string(),
   silentMinutes: z.number(),
+});
+const ExportReady = z.object({
+  exportId: z.string(),
+  requestedBy: z.string(),
+  rowCount: z.number(),
 });
 const Expiring = z.object({
   lotCode: z.string().nullable(),
@@ -108,6 +114,16 @@ export function createNotificationsConsumer(deps: NotificationsDeps): Notificati
           `${lot} expires on ${p.expiresOn}. Sell it first or mark it down.`,
           event.id,
         );
+      } else if (event.type === "reporting.export.ready") {
+        // Only the person who asked is told, not everyone who can read reports.
+        const p = envelope(ExportReady).parse(event.payload).data;
+        await notify(ctx.client, event.tenantId, [p.requestedBy], {
+          kind: "export_ready",
+          title: "Your export is ready",
+          body: `Sale lines: ${String(p.rowCount)} rows. Download it from Reports; it stays available for 7 days.`,
+          link: "/reports",
+          dedupeKey: event.id,
+        });
       } else if (event.type === "devices.heartbeat.missed") {
         const p = envelope(Missed).parse(event.payload).data;
         await tell(

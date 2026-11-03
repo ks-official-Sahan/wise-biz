@@ -130,3 +130,28 @@ export const TaxReportSchema = z
 export const RebuildResultSchema = z
   .object({ sales: z.number().int(), returns: z.number().int() })
   .meta({ id: "RebuildResult" });
+
+export const CreateExportSchema = z
+  .object({ kind: z.enum(["sales_lines"]), from: date, to: date, branchId: uuid.optional() })
+  .refine((r) => r.from <= r.to, { path: ["to"], message: "must not be before from" })
+  .refine((r) => days(r.from, r.to) <= 366, { path: ["to"], message: "at most 366 days" });
+
+export const ExportSchema = z
+  .object({
+    id: z.string(),
+    kind: z.string(),
+    status: z.enum(["queued", "running", "ready", "failed"]),
+    from: z.string(),
+    to: z.string(),
+    rowCount: z.number().int().nullable(),
+    error: z.string().nullable(),
+    createdAt: z.string(),
+    finishedAt: z.string().nullable(),
+    expiresAt: z.string(),
+    downloadable: z.boolean(),
+  })
+  .meta({ id: "ReportExport" });
+
+export const ExportListSchema = z
+  .object({ exports: z.array(ExportSchema) })
+  .meta({ id: "ReportExportList" });

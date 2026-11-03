@@ -32,7 +32,8 @@ import {
   runDriftCheck,
   runExpiringBatches,
 } from "@wise-biz/module-inventory";
-import { storeFromEnv } from "@wise-biz/storage";
+import { runExports } from "@wise-biz/module-reporting";
+import { createMemoryStore, storeFromEnv } from "@wise-biz/storage";
 
 import { createConsumers } from "./consumers.ts";
 import { createLogger } from "./logger.ts";
@@ -87,6 +88,8 @@ export function startWorker(
   });
   if (env.NODE_ENV !== "production") instrumentPool(pool);
   const realtime = createRealtimePublisher(env.REDIS_URL, logger);
+  // Object store for jobs that write files (exports). Tests that pass their own consumers get an in-memory one.
+  const store = consumerEnv === undefined ? createMemoryStore() : storeFromEnv(consumerEnv);
   const consumerSet =
     consumers ??
     createConsumers({
@@ -96,7 +99,7 @@ export function startWorker(
       inviteSecret: consumerEnv?.INVITE_SECRET ?? "",
       imports: {
         pool,
-        store: storeFromEnv(consumerEnv ?? defineEnv(CONSUMER_ENV, source)),
+        store,
         onError: (err, importId) => {
           logger.error({ err, importId }, "catalog import job failed; POST /start resumes it");
         },
@@ -179,6 +182,9 @@ export function startWorker(
       runExpiringBatches(inventoryDeps, env.INVENTORY_EXPIRY_HORIZON_DAYS),
     ),
     inventoryJob("inventory-drift", 24 * HOUR_MS, () => runDriftCheck(inventoryDeps)),
+    inventoryJob("reporting-exports", 30_000, () =>
+      runExports({ pool, store, ids: { uuidv7 }, now: () => new Date() }),
+    ),
     inventoryJob("devices-missed-heartbeats", 5 * 60_000, () =>
       runMissedHeartbeats(inventoryDeps, env.DEVICE_SILENT_MINUTES),
     ),

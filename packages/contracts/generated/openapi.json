@@ -2495,6 +2495,70 @@
         "required": ["locationId", "currency", "lines"],
         "type": "object"
       },
+      "ReportExport": {
+        "properties": {
+          "createdAt": {
+            "type": "string"
+          },
+          "downloadable": {
+            "type": "boolean"
+          },
+          "error": {
+            "type": ["string", "null"]
+          },
+          "expiresAt": {
+            "type": "string"
+          },
+          "finishedAt": {
+            "type": ["string", "null"]
+          },
+          "from": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "rowCount": {
+            "type": ["integer", "null"]
+          },
+          "status": {
+            "enum": ["queued", "running", "ready", "failed"],
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "status",
+          "from",
+          "to",
+          "rowCount",
+          "error",
+          "createdAt",
+          "finishedAt",
+          "expiresAt",
+          "downloadable"
+        ],
+        "type": "object"
+      },
+      "ReportExportList": {
+        "properties": {
+          "exports": {
+            "items": {
+              "$ref": "#/components/schemas/ReportExport"
+            },
+            "type": "array"
+          }
+        },
+        "required": ["exports"],
+        "type": "object"
+      },
       "RestoreThemeVersion": {
         "properties": {
           "version": {
@@ -9125,6 +9189,91 @@
         },
         "summary": "Replace a region's settings and rule set (optimistic lock on version)",
         "tags": ["pricing"]
+      }
+    },
+    "/v1/reporting/exports": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportExportList"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "My recent exports",
+        "tags": ["reporting"]
+      },
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "branchId": {
+                    "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                    "type": "string"
+                  },
+                  "from": {
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                    "type": "string"
+                  },
+                  "kind": {
+                    "enum": ["sales_lines"],
+                    "type": "string"
+                  },
+                  "to": {
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                    "type": "string"
+                  }
+                },
+                "required": ["kind", "from", "to"],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportExport"
+                }
+              }
+            },
+            "description": "Queued"
+          }
+        },
+        "summary": "Ask for a large export (sale lines); you are notified when the file is ready",
+        "tags": ["reporting"]
+      }
+    },
+    "/v1/reporting/exports/{id}/download": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Redirect to the file"
+          }
+        },
+        "summary": "Download a finished export (redirects to a short-lived link)",
+        "tags": ["reporting"]
       }
     },
     "/v1/reporting/operators": {

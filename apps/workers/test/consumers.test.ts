@@ -25,7 +25,12 @@ describe("consumer set", () => {
       ["reporting.rollups", expect.arrayContaining(["sales.sale.completed@v1"])],
       [
         "notifications.fanout",
-        ["inventory.balance.low@v1", "inventory.batch.expiring@v1", "devices.heartbeat.missed@v1"],
+        [
+          "inventory.balance.low@v1",
+          "inventory.batch.expiring@v1",
+          "devices.heartbeat.missed@v1",
+          "reporting.export.ready@v1",
+        ],
       ],
       ["inventory.low-stock", ["inventory.movement.recorded@v1"]],
       ["catalog.import-runner", ["catalog.import.requested@v1"]],

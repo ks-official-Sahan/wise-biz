@@ -6,6 +6,9 @@ import {
   delta,
   describeDelta,
   eachDay,
+  exportDownloadUrl,
+  exportStatusText,
+  isOpenExport,
   isoDay,
   operatorLabel,
   presetRange,
@@ -72,6 +75,43 @@ describe("staff labels", () => {
     expect(operatorLabel("00000000-0000-0000-0000-000000000000")).toBe(
       "Before staff were recorded",
     );
+  });
+});
+
+describe("exports", () => {
+  const base = {
+    id: "e1",
+    kind: "sales_lines",
+    from: "2026-11-01",
+    to: "2026-11-03",
+    rowCount: null,
+    error: null,
+    createdAt: "2026-11-03T10:00:00Z",
+    expiresAt: "2026-11-10T10:00:00Z",
+    downloadable: false,
+  } as const;
+
+  it("says in plain words where an export is", () => {
+    expect(exportStatusText({ ...base, status: "queued" })).toBe("Waiting to start");
+    expect(exportStatusText({ ...base, status: "running" })).toBe("Building the file");
+    expect(exportStatusText({ ...base, status: "ready", rowCount: 1200, downloadable: true })).toBe(
+      "Ready, 1200 rows",
+    );
+    expect(exportStatusText({ ...base, status: "ready", rowCount: 5 })).toBe(
+      "Expired. Request it again.",
+    );
+    expect(exportStatusText({ ...base, status: "failed", error: "Too many rows." })).toBe(
+      "Too many rows.",
+    );
+    expect(exportStatusText({ ...base, status: "failed" })).toBe("Could not be built");
+  });
+
+  it("polls only while a file is being built", () => {
+    expect(isOpenExport({ status: "queued" })).toBe(true);
+    expect(isOpenExport({ status: "running" })).toBe(true);
+    expect(isOpenExport({ status: "ready" })).toBe(false);
+    expect(isOpenExport({ status: "failed" })).toBe(false);
+    expect(exportDownloadUrl("abc")).toBe("/v1/reporting/exports/abc/download");
   });
 });
 
