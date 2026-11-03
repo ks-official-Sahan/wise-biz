@@ -15,4 +15,22 @@ export const ExportReadyV1 = defineEvent(
   }),
 );
 
-export const REPORTING_EVENTS = [ExportReadyV1] as const;
+/** Yesterday's sales for one business, per currency (once per business date). */
+export const DigestReadyV1 = defineEvent(
+  "reporting.digest.ready",
+  1,
+  z.object({
+    businessDate: z.string(),
+    totals: z.array(
+      z.object({
+        currency: z.string(),
+        salesCount: z.number().int(),
+        netMinor: z.number().int(),
+        voidsCount: z.number().int(),
+        returnsCount: z.number().int(),
+      }),
+    ),
+  }),
+);
+
+export const REPORTING_EVENTS = [ExportReadyV1, DigestReadyV1] as const;

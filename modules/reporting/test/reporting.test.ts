@@ -19,6 +19,7 @@ import {
   rebuild,
 } from "../src/apply.ts";
 import { createReportingConsumer } from "../src/consumer.ts";
+import { runDailyDigests } from "../src/digest-job.ts";
 import { expireOld, runExports } from "../src/export-job.ts";
 import { createReportingModule } from "../src/index.ts";
 import { csvCell, operators, salesSummary } from "../src/queries.ts";
@@ -948,6 +949,52 @@ describe("exports", () => {
     expect((await post(a, { ...REQ, to: "2025-01-01" })).status).toBe(422);
     expect((await post(a, { ...REQ, kind: "everything" })).status).toBe(422);
     expect((await post(a, { ...REQ, from: "2024-01-01" })).status).toBe(422);
+  });
+});
+
+describe("daily digest", () => {
+  const t = uuidv7();
+  const g = generate(11);
+  const at = (iso: string) => ({ pool: worker, ids: { uuidv7 }, now: () => new Date(iso) });
+  beforeAll(async () => {
+    await feed(t, g);
+  });
+  const raised = () =>
+    withTenantTx(admin, { tenantId: t, requestId: "test" }, (tx) =>
+      tx.query(
+        "select payload->'data' as data from infra.outbox where type = 'reporting.digest.ready' order by id",
+      ),
+    );
+
+  it("waits for the UTC morning, then raises yesterday once, with the day's totals", async () => {
+    // 03:00 on the 4th: yesterday may still be running somewhere, so nothing yet.
+    expect(await runDailyDigests(at("2026-11-04T03:00:00Z"))).toBe(0);
+    expect((await raised()).rows).toHaveLength(0);
+    expect(await runDailyDigests(at("2026-11-04T07:00:00Z"))).toBeGreaterThanOrEqual(1);
+    const rows = (await raised()).rows as {
+      data: {
+        businessDate: string;
+        totals: { currency: string; salesCount: number; netMinor: number }[];
+      };
+    }[];
+    expect(rows).toHaveLength(1);
+    const data = rows[0]?.data;
+    expect(data?.businessDate).toBe("2026-11-03");
+    const day = g.sales.filter((x) => x.businessDate === "2026-11-03" && !x.voided);
+    const returned = g.returns
+      .filter((x) => x.businessDate === "2026-11-03")
+      .reduce((n, x) => n + x.totalMinor, 0);
+    expect(data?.totals[0]?.salesCount).toBe(day.length);
+    expect(data?.totals[0]?.netMinor).toBe(
+      day.reduce((n, x) => n + x.lines.reduce((m, l) => m + l.totalMinor, 0), 0) - returned,
+    );
+    // Hourly reruns, and a second replica, raise nothing more.
+    expect(await runDailyDigests(at("2026-11-04T08:00:00Z"))).toBe(0);
+    expect((await raised()).rows).toHaveLength(1);
+  });
+
+  it("skips a day nobody sold on", async () => {
+    expect(await runDailyDigests(at("2026-12-20T09:00:00Z"))).toBe(0);
   });
 });
 

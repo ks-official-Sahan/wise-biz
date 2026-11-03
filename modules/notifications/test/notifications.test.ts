@@ -235,6 +235,28 @@ describe("fan-out", () => {
     expect(theirs.notifications).toHaveLength(0);
   });
 
+  it("summarises yesterday for people who read reports, formatting money by the currency", async () => {
+    const t = uuidv7();
+    const u = uuidv7();
+    await deliver(t, [u], "reporting.digest.ready", {
+      businessDate: "2026-11-03",
+      totals: [
+        { currency: "USD", salesCount: 12, netMinor: 123_456, voidsCount: 1, returnsCount: 0 },
+        { currency: "JPY", salesCount: 3, netMinor: 5000, voidsCount: 0, returnsCount: 0 },
+      ],
+    });
+    const body = (await (await appFor(t, u).request("/v1/notifications")).json()) as Listed & {
+      notifications: { body: string }[];
+    };
+    expect(body.notifications[0]).toMatchObject({
+      kind: "daily_summary",
+      title: "Sales on 2026-11-03",
+      link: "/reports",
+    });
+    expect(body.notifications[0]?.body).toContain("12 sales, $1,234.56 net of returns");
+    expect(body.notifications[0]?.body).toContain("3 sales, ¥5,000 net of returns");
+  });
+
   it("rejects a malformed payload so the bus retries or dead-letters it", async () => {
     await expect(
       deliver(uuidv7(), [uuidv7()], "inventory.balance.low", { qty: 1 }),

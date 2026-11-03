@@ -30,6 +30,7 @@ describe("consumer set", () => {
           "inventory.batch.expiring@v1",
           "devices.heartbeat.missed@v1",
           "reporting.export.ready@v1",
+          "reporting.digest.ready@v1",
         ],
       ],
       ["inventory.low-stock", ["inventory.movement.recorded@v1"]],

@@ -13,6 +13,7 @@ const EVENTS = [
   "inventory.batch.expiring@v1",
   "devices.heartbeat.missed@v1",
   "reporting.export.ready@v1",
+  "reporting.digest.ready@v1",
 ] as const;
 
 export interface NotificationsDeps {
@@ -50,6 +51,25 @@ const Missed = z.object({
   name: z.string(),
   silentMinutes: z.number(),
 });
+const Digest = z.object({
+  businessDate: z.string(),
+  totals: z.array(
+    z.object({
+      currency: z.string(),
+      salesCount: z.number(),
+      netMinor: z.number(),
+      voidsCount: z.number(),
+      returnsCount: z.number(),
+    }),
+  ),
+});
+
+/** 12345 + USD -> "$123.45"; the minor-unit digits come from the currency itself (JPY 0, KWD 3). */
+function money(minor: number, currency: string): string {
+  const f = new Intl.NumberFormat("en", { style: "currency", currency });
+  const digits = f.resolvedOptions().maximumFractionDigits ?? 2;
+  return f.format(minor / 10 ** digits);
+}
 const ExportReady = z.object({
   exportId: z.string(),
   requestedBy: z.string(),
@@ -130,6 +150,22 @@ export function createNotificationsConsumer(deps: NotificationsDeps): Notificati
         });
         if (deps.mail !== undefined)
           await sendPendingEmails(ctx.client, deps.mail, event.tenantId, event.id);
+      } else if (event.type === "reporting.digest.ready") {
+        const p = envelope(Digest).parse(event.payload).data;
+        const lines = p.totals.map(
+          (t) => `${String(t.salesCount)} sales, ${money(t.netMinor, t.currency)} net of returns`,
+        );
+        await tell(
+          ctx.client,
+          event.tenantId,
+          "daily_summary",
+          "reporting:read",
+          {},
+          `Sales on ${p.businessDate}`,
+          `${lines.join("; ")}. Open Reports for the detail.`,
+          event.id,
+          "/reports",
+        );
       } else if (event.type === "devices.heartbeat.missed") {
         const p = envelope(Missed).parse(event.payload).data;
         await tell(

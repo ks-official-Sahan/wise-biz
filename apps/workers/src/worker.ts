@@ -32,7 +32,7 @@ import {
   runDriftCheck,
   runExpiringBatches,
 } from "@wise-biz/module-inventory";
-import { runExports } from "@wise-biz/module-reporting";
+import { runDailyDigests, runExports } from "@wise-biz/module-reporting";
 import { createMemoryStore, storeFromEnv } from "@wise-biz/storage";
 
 import { createConsumers } from "./consumers.ts";
@@ -182,6 +182,9 @@ export function startWorker(
       runExpiringBatches(inventoryDeps, env.INVENTORY_EXPIRY_HORIZON_DAYS),
     ),
     inventoryJob("inventory-drift", 24 * HOUR_MS, () => runDriftCheck(inventoryDeps)),
+    inventoryJob("reporting-digest", HOUR_MS, () =>
+      runDailyDigests({ pool, ids: { uuidv7 }, now: () => new Date() }),
+    ),
     inventoryJob("reporting-exports", 30_000, () =>
       runExports({ pool, store, ids: { uuidv7 }, now: () => new Date() }),
     ),

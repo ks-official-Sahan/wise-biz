@@ -14,7 +14,9 @@ export type { ReportingConsumer } from "./consumer.ts";
 export { rebuild } from "./apply.ts";
 export { runExports, MAX_EXPORT_ROWS } from "./export-job.ts";
 export type { ExportJobDeps } from "./export-job.ts";
-export { ExportReadyV1 } from "./events.ts";
+export { runDailyDigests, DIGEST_FROM_UTC_HOUR } from "./digest-job.ts";
+export type { DigestJobDeps } from "./digest-job.ts";
+export { DigestReadyV1, ExportReadyV1 } from "./events.ts";
 
 /**
  * MIS reports from rollups that the worker keeps current from the sales events. The API reads rollups (plus the rebuild
