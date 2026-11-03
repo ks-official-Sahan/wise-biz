@@ -16,6 +16,8 @@ export interface ObjectStore {
   /** The object's bytes as a stream (null when it does not exist). */
   get(key: string): Promise<ReadableStream<Uint8Array> | null>;
   put(key: string, body: Uint8Array | string, contentType: string): Promise<void>;
+  /** Removes the object. Deleting one that does not exist is not an error (S3 answers 204 either way). */
+  delete(key: string): Promise<void>;
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -106,6 +108,11 @@ export function createS3Store(cfg: S3StoreConfig): ObjectStore {
       const res = await send("PUT", key, body, contentType);
       if (!res.ok) throw new Error(`storage PUT failed: ${String(res.status)}`);
     },
+    delete: async (key) => {
+      const res = await send("DELETE", key);
+      if (!res.ok && res.status !== 404)
+        throw new Error(`storage DELETE failed: ${String(res.status)}`);
+    },
   };
 }
 
@@ -132,6 +139,10 @@ export function createMemoryStore(): ObjectStore & { readonly objects: Map<strin
     },
     put: (key, body) => {
       objects.set(key, typeof body === "string" ? new TextEncoder().encode(body) : body);
+      return Promise.resolve();
+    },
+    delete: (key) => {
+      objects.delete(key);
       return Promise.resolve();
     },
   };

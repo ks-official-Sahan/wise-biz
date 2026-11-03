@@ -47,6 +47,19 @@ describe("s3 store", () => {
     expect(get.searchParams.get("X-Amz-SignedHeaders")).toBe("host");
   });
 
+  it("deletes, and treats a missing object as already gone", async () => {
+    await createS3Store({ ...cfg, fetch: fake(204, null) }).delete(tenantKey(T, "x"));
+    expect(calls.at(-1)?.init.method).toBe("DELETE");
+    await createS3Store({ ...cfg, fetch: fake(404, null) }).delete(tenantKey(T, "x"));
+    await expect(
+      createS3Store({ ...cfg, fetch: fake(403, "") }).delete(tenantKey(T, "x")),
+    ).rejects.toThrow();
+    const mem = createMemoryStore();
+    await mem.put("k", "v", "text/plain");
+    await mem.delete("k");
+    expect(mem.objects.has("k")).toBe(false);
+  });
+
   it("virtual-host style without forcePathStyle", () => {
     const s = createS3Store({ ...cfg, endpoint: undefined, forcePathStyle: false });
     expect(new URL(s.presignGet(tenantKey(T, "x"), 60)).host).toBe(

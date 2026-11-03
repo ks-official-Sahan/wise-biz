@@ -425,6 +425,7 @@ describe("POST /v1/sync/commands", () => {
       store: {
         presignPut: () => "",
         presignGet: () => "",
+        delete: () => Promise.resolve(),
         get: () => Promise.resolve(null),
         put: () => Promise.resolve(),
       },

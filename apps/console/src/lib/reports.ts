@@ -139,7 +139,7 @@ export const useOperatorsReport = (t: string, f: ReportFilter) =>
 export interface ExportRow {
   readonly id: string;
   readonly kind: string;
-  readonly status: "queued" | "running" | "ready" | "failed";
+  readonly status: "queued" | "running" | "ready" | "failed" | "expired";
   readonly from: string;
   readonly to: string;
   readonly rowCount: number | null;
@@ -162,6 +162,8 @@ export function exportStatusText(e: ExportRow): string {
       return "Building the file";
     case "failed":
       return e.error ?? "Could not be built";
+    case "expired":
+      return "Expired. Request it again.";
     case "ready":
       return e.downloadable
         ? `Ready, ${String(e.rowCount ?? 0)} rows`

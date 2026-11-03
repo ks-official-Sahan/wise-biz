@@ -140,7 +140,7 @@ export const ExportSchema = z
   .object({
     id: z.string(),
     kind: z.string(),
-    status: z.enum(["queued", "running", "ready", "failed"]),
+    status: z.enum(["queued", "running", "ready", "failed", "expired"]),
     from: z.string(),
     to: z.string(),
     rowCount: z.number().int().nullable(),

@@ -19,7 +19,7 @@ import {
   rebuild,
 } from "../src/apply.ts";
 import { createReportingConsumer } from "../src/consumer.ts";
-import { runExports } from "../src/export-job.ts";
+import { expireOld, runExports } from "../src/export-job.ts";
 import { createReportingModule } from "../src/index.ts";
 import { csvCell, operators, salesSummary } from "../src/queries.ts";
 
@@ -894,6 +894,24 @@ describe("exports", () => {
     );
     expect(events.rows).toEqual([{ who: me }]);
     expect(await runExports(jobDeps())).toBe(0);
+  });
+
+  it("deletes the file of an expired export and says so", async () => {
+    const a = appFor(tenantId, "analyst", "all", me);
+    const created = (await (await post(a, REQ)).json()) as Exp;
+    await runExports(jobDeps());
+    const key = `tenants/${tenantId}/exports/${created.id}.csv.gz`;
+    expect(store.objects.has(key)).toBe(true);
+    // Not yet expired: the sweep leaves it.
+    expect(await expireOld(jobDeps())).toBe(0);
+    const later = { ...jobDeps(), now: () => new Date(Date.now() + 8 * 86_400_000) };
+    expect(await expireOld(later)).toBeGreaterThanOrEqual(1);
+    expect(store.objects.has(key)).toBe(false);
+    const row = (await mine(a)).find((x) => x.id === created.id);
+    expect(row).toMatchObject({ status: "expired", downloadable: false });
+    expect((await a.request(`/v1/reporting/exports/${created.id}/download`)).status).toBe(404);
+    // A second sweep finds nothing more for it.
+    expect(await expireOld(later)).toBe(0);
   });
 
   it("limits an export to one branch when asked", async () => {

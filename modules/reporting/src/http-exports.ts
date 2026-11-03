@@ -18,7 +18,7 @@ const LIST_LIMIT = 30;
 interface Row {
   id: string;
   kind: string;
-  status: "queued" | "running" | "ready" | "failed";
+  status: "queued" | "running" | "ready" | "failed" | "expired";
   params: { from: string; to: string };
   row_count: string | null;
   error: string | null;

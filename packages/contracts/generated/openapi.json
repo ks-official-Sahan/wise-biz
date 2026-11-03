@@ -2525,7 +2525,7 @@
             "type": ["integer", "null"]
           },
           "status": {
-            "enum": ["queued", "running", "ready", "failed"],
+            "enum": ["queued", "running", "ready", "failed", "expired"],
             "type": "string"
           },
           "to": {

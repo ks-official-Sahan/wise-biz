@@ -69,8 +69,40 @@ interface SaleRow {
   tenders: { kind: string; amountMinor: number }[];
 }
 
-/** Runs every open export once. Returns how many files were built. */
+/** Runs every open export once, then removes expired files. Returns how many files were built. */
 export async function runExports(deps: ExportJobDeps): Promise<number> {
+  const built = await buildOpen(deps);
+  await expireOld(deps);
+  return built;
+}
+
+/**
+ * Deletes the stored file of every export past its expiry, then marks the row expired. The object goes first: a crash
+ * between the two leaves a ready row whose file is gone, which the next sweep finishes (deleting is idempotent).
+ */
+export async function expireOld(deps: ExportJobDeps): Promise<number> {
+  const old = await deps.pool.query<{ tenant_id: string; id: string; object_key: string }>(
+    `select tenant_id, id, object_key from reporting.exports
+      where status = 'ready' and expires_at <= $1 order by expires_at limit $2`,
+    [deps.now(), SCAN],
+  );
+  for (const e of old.rows) {
+    await deps.store.delete(e.object_key);
+    await withTenantTx(
+      deps.pool,
+      { tenantId: e.tenant_id, requestId: "job-reporting-export" },
+      (tx) =>
+        tx.query(
+          `update reporting.exports set status = 'expired', object_key = null
+          where tenant_id = $1 and id = $2 and status = 'ready'`,
+          [e.tenant_id, e.id],
+        ),
+    );
+  }
+  return old.rows.length;
+}
+
+async function buildOpen(deps: ExportJobDeps): Promise<number> {
   const cutoff = new Date(deps.now().getTime() - STALE_MS);
   const open = await deps.pool.query<{ tenant_id: string; id: string }>(
     `select tenant_id, id from reporting.exports
