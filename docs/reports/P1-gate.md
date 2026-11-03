@@ -1,0 +1,41 @@
+# P1 gate report (draft, 2026-11-04)
+
+Status: **not ready for go/no-go**. This file records what is verified, what is not, and what needs the owner. The gate prompt (`docs/prompts/p1/16-gate.md`) says to report before tagging; nothing is tagged.
+
+## Verified
+
+| Check | Result |
+|---|---|
+| Per-package `turbo run check`, one group at a time | modules 51/51, packages 78/78, apps and services 22/23, then the three load-sensitive api files re-run alone and green. A single all-at-once `pnpm check` has not completed on the build machine (memory). |
+| Hourly rollup, reporting, workers, console | Reporting 33, workers 31, console 91 unit tests and the mocked-API Playwright reports spec pass (commit `1b35596`). |
+| Dependency audit (`pnpm audit --prod`) | 13 findings before, 2 moderate after pinning `node-forge >= 1.4.1`. Left: `minimatch` (Expo tooling, build time) and `glob` (testcontainers, tests only). Both need a major bump upstream; re-check on each Renovate PR. |
+| Tenant isolation, RLS, idempotency, audit | Covered by DB tests in every module (see PROGRESS rows). |
+
+## Not done, and why
+
+| Check | Blocker |
+|---|---|
+| 1. Full flows on Maestro and Electron | Needs devices and a built mobile and desktop app; the real-stack web flow (P1-13b) is also open. |
+| 2. Offline chaos drill (`scripts/drills/offline.ts`) | Script not written; the 24 h and clock-skew cases need the POS client on a device. |
+| 3. Performance on low-end Android and mid-range Windows | Needs the physical devices. Record in `docs/reports/P1-perf.md`. |
+| 4. Load (k6 on staging) | Needs a staging environment (P1-15 hosting choice). |
+| 5. Security: scan, reviewers, PII scan | Dependency audit done. `ecc:security-reviewer` pass across devices, sync, payments and desktop still to run. |
+| 6. Accessibility with screen readers on Android and iOS | Needs devices. Console and POS web axe checks run in CI already. |
+| 7. Restore drill | Needs the hosted Postgres and object store (P1-15). |
+| 8. Usability sessions | Owner runs them; the script and metric sheet are still to prepare. |
+
+## Needs the owner
+
+1. Hosting platform and Postgres provider (default proposed: managed container platform plus Neon).
+2. Devices for the performance, accessibility and offline drills.
+3. Go-ahead to push, open a PR and tag.
+
+## Risk register (so far)
+
+- Four DB-heavy tests are load-sensitive (api `/ready`, `sync-burst`, `wiring` hooks, workers `relay` lease). They pass alone; make them independent of container start time before CI relies on them.
+- XLSX and PDF export, tax-by-rate rollups, the approvals inbox and mobile push registration are open P1-13b/13c/14 items (see PROGRESS).
+- Push receipts are not read; a rejected message other than `DeviceNotRegistered` is not retried.
+
+## Go / no-go
+
+**No-go** until checks 1 to 8 have results.
