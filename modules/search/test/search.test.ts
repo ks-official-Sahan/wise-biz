@@ -108,6 +108,7 @@ async function deliver(
       unitId: null,
       taxCategory: "standard",
       tracksBatches: false,
+      categoryIds: [],
       categoryPath: ["Drinks"],
       tags: ["cold"],
       archived: false,

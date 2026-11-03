@@ -162,9 +162,7 @@ function bySku(lines: readonly Line[], sign: 1 | -1): SkuAgg[] {
     m.set(l.variantId, a);
   }
   // Rows are locked in this order by the upsert: sorting keeps two sales that share products from deadlocking.
-  return [...m.values()].sort((a, b) =>
-    a.variantId < b.variantId ? -1 : a.variantId > b.variantId ? 1 : 0,
-  );
+  return [...m.values()].sort((a, b) => a.variantId.localeCompare(b.variantId));
 }
 function byKind(
   tenders: readonly Tender[],
@@ -177,7 +175,7 @@ function byKind(
     a.minor += sign * t.amountMinor;
     m.set(t.kind, a);
   }
-  return [...m.values()].sort((a, b) => (a.kind < b.kind ? -1 : a.kind > b.kind ? 1 : 0));
+  return [...m.values()].sort((a, b) => a.kind.localeCompare(b.kind));
 }
 
 /** Adds (+1) or removes (-1) one completed sale from every rollup. A void is the removal plus a void count. */
@@ -270,7 +268,7 @@ async function applyReturn(q: Q, f: ReturnFact): Promise<void> {
     m.set(l.variantId, a);
   }
   const skus = [...m.values()]
-    .sort((a, b) => (a.variant_id < b.variant_id ? -1 : a.variant_id > b.variant_id ? 1 : 0))
+    .sort((a, b) => a.variant_id.localeCompare(b.variant_id))
     .map((a) => ({ ...a, qty: unscaled(a.qty) }));
   if (skus.length > 0)
     await q.query(

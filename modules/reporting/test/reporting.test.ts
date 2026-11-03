@@ -429,6 +429,55 @@ describe("rollups equal an independent aggregation of random data", () => {
     ).rejects.toThrow(/not projected/);
   });
 
+  it("handles a sale with no lines or tenders, and sorts several products and tenders", async () => {
+    const t = uuidv7();
+    const branchId = uuidv7();
+    const terminalId = uuidv7();
+    const shiftId = uuidv7();
+    await asWorker(t, (q) =>
+      onShiftOpened(q, {
+        tenantId: t,
+        data: { shiftId, branchId, terminalId, businessDate: "2026-11-01", currency: "USD" },
+      }),
+    );
+    const base = { branchId, terminalId, businessDate: "2026-11-01", shiftId };
+    const [va, vb] = [uuidv7(), uuidv7()].sort();
+    const line = (variantId: string, sku: string, total: number) => ({
+      variantId,
+      sku,
+      qty: "1",
+      discountMinor: 0,
+      taxMinor: 0,
+      totalMinor: total,
+      unitCostMinor: null,
+    });
+    const empty: GenSale = { saleId: uuidv7(), ...base, lines: [], tenders: [], voided: false };
+    const mixed: GenSale = {
+      saleId: uuidv7(),
+      ...base,
+      // Listed out of order and repeated, so the sort and the merge both run.
+      lines: [line(vb ?? "", "B", 200), line(va ?? "", "A", 100), line(vb ?? "", "B", 50)],
+      tenders: [
+        { kind: "cash", amountMinor: 150 },
+        { kind: "card", amountMinor: 100 },
+        { kind: "cash", amountMinor: 100 },
+      ],
+      voided: false,
+    };
+    for (const sale of [empty, mixed]) {
+      await asWorker(t, (q) => onSaleCompleted(q, saleEnvelope(t, sale)));
+      // The same event again changes nothing.
+      await asWorker(t, (q) => onSaleCompleted(q, saleEnvelope(t, sale)));
+    }
+    await asWorker(t, (q) => rebuild(q, t, "2026-11-01", "2026-11-01"));
+    for (const sale of [empty, mixed])
+      await asWorker(t, (q) => onSaleVoided(q, { tenantId: t, data: { saleId: sale.saleId } }));
+    const totals = await asApp(t, (q) =>
+      q.query("select coalesce(sum(revenue_minor), 0)::int as n from reporting.rollup_sku_day"),
+    );
+    expect(totals.rows[0]).toEqual({ n: 0 });
+  });
+
   it("one business never sees another's rollups", async () => {
     const a = uuidv7();
     const b = uuidv7();

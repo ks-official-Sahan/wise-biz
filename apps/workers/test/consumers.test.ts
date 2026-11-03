@@ -21,6 +21,9 @@ describe("consumer set", () => {
         "sync.changes",
         expect.arrayContaining(["pricing.price.changed@v1", "inventory.movement.recorded@v1"]),
       ],
+      ["shortlinks.receipt-links", ["sales.sale.completed@v1"]],
+      ["reporting.rollups", expect.arrayContaining(["sales.sale.completed@v1"])],
+      ["notifications.fanout", ["inventory.balance.low@v1", "inventory.batch.expiring@v1"]],
       ["inventory.low-stock", ["inventory.movement.recorded@v1"]],
       ["catalog.import-runner", ["catalog.import.requested@v1"]],
     ]);
