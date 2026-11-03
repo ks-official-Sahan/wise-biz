@@ -30,6 +30,20 @@ export const toTheme = (r: ThemeRow) => ({
   publishedAt: r.published_at === null ? null : r.published_at.toISOString(),
 });
 
+/** Two first saves racing hit the unique index: the loser gets the same answer as a stale version. */
+export async function raced<T>(fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn();
+  } catch (e) {
+    if ((e as { code?: string }).code === "23505")
+      throw new DomainError(
+        "CONFLICT",
+        "Someone else saved at the same time. Reload and try again.",
+      );
+    throw e;
+  }
+}
+
 const notFound = (): never => {
   throw new DomainError("NOT_FOUND", "Not found");
 };
@@ -257,7 +271,8 @@ export async function saveTemplateCommand(
     [tenantId, branchId],
   );
   const existing = cur.rows[0];
-  if (existing !== undefined && body.version !== undefined && body.version !== existing.version)
+  // Replacing needs the version the editor loaded: a save without one would silently overwrite someone else's work.
+  if (existing !== undefined && body.version !== existing.version)
     throw new DomainError("CONFLICT", "Someone else changed this receipt. Reload and try again.");
   const blocks = JSON.stringify(body.blocks);
   const r =

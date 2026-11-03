@@ -269,6 +269,11 @@ describe("receipt templates", () => {
     });
   });
 
+  it("refuses to replace a template without the version it was loaded at", async () => {
+    const app = appFor(T1, "writer");
+    expect((await send(app, "PUT", "/v1/theming/receipt-templates", tpl())).status).toBe(409);
+  });
+
   it("refuses a save made from an old version", async () => {
     const app = appFor(T1, "writer");
     expect(

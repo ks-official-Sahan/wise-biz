@@ -4,6 +4,7 @@ export interface NavItem {
     | "/"
     | "/catalog"
     | "/pricing"
+    | "/branding"
     | "/sales"
     | "/shifts"
     | "/devices"
@@ -43,6 +44,12 @@ export const NAV: readonly NavItem[] = [
     href: "/devices",
     label: "Terminals",
     keywords: ["devices", "pos", "enroll", "revoke", "suspend", "register"],
+    primary: false,
+  },
+  {
+    href: "/branding",
+    label: "Branding",
+    keywords: ["theme", "colors", "logo", "receipt", "fonts", "look", "invoice"],
     primary: false,
   },
   {

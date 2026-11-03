@@ -69,6 +69,21 @@ export const PERMISSION_GROUPS: readonly { module: string; items: readonly Permi
     ],
   },
   {
+    module: "Branding",
+    items: [
+      {
+        permission: "theming:read",
+        label: "View branding",
+        allows: "See the theme and receipt layout.",
+      },
+      {
+        permission: "theming:write",
+        label: "Edit branding",
+        allows: "Change colours, fonts and the receipt, and publish them to every terminal.",
+      },
+    ],
+  },
+  {
     module: "Stock",
     items: [
       {

@@ -6,6 +6,7 @@ import {
   listVersions,
   loadTemplates,
   loadTheme,
+  raced,
   publishCommand,
   restoreCommand,
   saveDraftCommand,
@@ -128,7 +129,7 @@ export function mountRoutes(app: OpenAPIHono<AppEnv>, deps: ModuleDeps): void {
       runCommand(c, deps, {
         permission: "theming:write",
         input: SaveDraftSchema,
-        handler: (tx, b, ctx) => saveDraftCommand(tx, ctx, b),
+        handler: (tx, b, ctx) => raced(() => saveDraftCommand(tx, ctx, b)),
       }) as never,
   );
   app.openapi(
@@ -155,7 +156,7 @@ export function mountRoutes(app: OpenAPIHono<AppEnv>, deps: ModuleDeps): void {
       runCommand(c, deps, {
         permission: "theming:write",
         input: SaveReceiptTemplateSchema,
-        handler: (tx, b, ctx) => saveTemplateCommand(tx, ctx, b),
+        handler: (tx, b, ctx) => raced(() => saveTemplateCommand(tx, ctx, b)),
       }) as never,
   );
 }
