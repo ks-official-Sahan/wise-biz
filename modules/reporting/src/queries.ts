@@ -129,6 +129,23 @@ export async function operators(q: Q, tenantId: string, r: Range) {
   });
 }
 
+/** Sales by hour of the branch's local day over a range (busiest hours). Sales with no known zone are not counted. */
+export async function hours(q: Q, tenantId: string, r: Range) {
+  const res = await q.query(
+    `select hour, currency, sum(sales_count) as sales_count, sum(payable_minor) as payable_minor
+       from reporting.rollup_hour
+      where tenant_id = $1 and business_date between $2 and $3 and ($4::uuid[] is null or branch_id = any($4::uuid[]))
+      group by hour, currency order by hour, currency`,
+    [tenantId, r.from, r.to, r.branchIds === undefined ? null : [...r.branchIds]],
+  );
+  return res.rows.map((x) => ({
+    hour: n(x.hour),
+    currency: String(x.currency),
+    salesCount: n(x.sales_count),
+    payableMinor: n(x.payable_minor),
+  }));
+}
+
 /** Tax collected per day (rollup_day carries the sale-level tax; per-rate lines are a later rollup). */
 export async function tax(q: Q, tenantId: string, r: Range) {
   const res = await q.query(

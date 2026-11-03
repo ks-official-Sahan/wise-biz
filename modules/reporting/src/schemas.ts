@@ -81,6 +81,19 @@ export const ProductsReportSchema = z
   .object({ rows: z.array(ProductRowSchema) })
   .meta({ id: "ProductsReport" });
 
+export const HoursReportSchema = z
+  .object({
+    rows: z.array(
+      z.object({
+        hour: z.number().int().min(0).max(23),
+        currency: z.string(),
+        salesCount: z.number().int(),
+        payableMinor: money,
+      }),
+    ),
+  })
+  .meta({ id: "HoursReport" });
+
 export const OperatorsReportSchema = z
   .object({
     rows: z.array(

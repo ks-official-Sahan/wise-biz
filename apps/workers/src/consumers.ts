@@ -45,7 +45,15 @@ export function createConsumers(deps: ConsumerDeps): readonly ConsumerDefinition
     createInventoryFactsConsumer(),
     createSyncChangesConsumer(deps.notify),
     createReceiptLinkConsumer(),
-    createReportingConsumer(),
+    createReportingConsumer({
+      zoneOf: async (client, tenantId, branchId) => {
+        const r = await client.query<{ timezone: string }>(
+          "SELECT timezone FROM tenancy.branches WHERE tenant_id = $1 AND id = $2",
+          [tenantId, branchId],
+        );
+        return r.rows[0]?.timezone ?? null;
+      },
+    }),
     createNotificationsConsumer({
       holders: permissionHolders,
       mail: { send: (m) => deps.mailer.send(m), consoleUrl: deps.consoleUrl },

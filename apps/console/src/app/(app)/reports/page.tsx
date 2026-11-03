@@ -28,9 +28,11 @@ import {
   totals,
   exportDownloadUrl,
   exportStatusText,
+  hourLabel,
   operatorLabel,
   useExports,
   useRequestExport,
+  useHoursReport,
   useOperatorsReport,
   usePaymentsReport,
   useProductsReport,
@@ -47,6 +49,7 @@ const TABS = [
   { id: "sales", label: "Sales" },
   { id: "products", label: "Products" },
   { id: "payments", label: "Payments" },
+  { id: "hours", label: "Hours" },
   { id: "staff", label: "Staff" },
   { id: "exports", label: "Exports" },
   { id: "tax", label: "Tax" },
@@ -160,6 +163,8 @@ export default function ReportsPage() {
           <ProductsTab filter={filter} currency={currency} />
         ) : tab === "payments" ? (
           <PaymentsTab filter={filter} currency={currency} />
+        ) : tab === "hours" ? (
+          <HoursTab filter={filter} currency={currency} />
         ) : tab === "staff" ? (
           <StaffTab filter={filter} currency={currency} />
         ) : tab === "exports" ? (
@@ -472,6 +477,56 @@ function ExportsTab({ filter }: { filter: ReportFilter }) {
         </div>
       ) : null}
     </Stack>
+  );
+}
+
+function HoursTab({ filter, currency }: { filter: ReportFilter; currency: string }) {
+  const { tenant } = useTenant();
+  const report = useHoursReport(tenant.tenantId, filter);
+  const m = (minor: number) => formatPrice(minor, currency);
+  if (report.isPending) return <SkeletonRows label="Loading sales by hour" />;
+  if (report.isError)
+    return (
+      <ErrorState
+        error={report.error}
+        onRetry={() => {
+          void report.refetch();
+        }}
+      />
+    );
+  const rows = report.data.filter((r) => r.currency === currency && r.salesCount > 0);
+  if (rows.length === 0) return <Empty title="No sales by hour in this period" />;
+  const peak = Math.max(...rows.map((r) => r.salesCount));
+  return (
+    <div className={styles.tableWrap}>
+      <table className={styles.table}>
+        <caption className="sr-only">Sales by hour of the local day</caption>
+        <thead>
+          <tr>
+            <th scope="col">Hour</th>
+            <th scope="col" className={s.num}>
+              Sales
+            </th>
+            <th scope="col" className={s.num}>
+              Taken
+            </th>
+            <th scope="col">Share of busiest hour</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.hour}>
+              <th scope="row">{hourLabel(r.hour)}</th>
+              <td className={s.num}>{r.salesCount}</td>
+              <td className={s.num}>{m(r.payableMinor)}</td>
+              <td>
+                <meter min={0} max={peak} value={r.salesCount} aria-label={hourLabel(r.hour)} />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 

@@ -8,6 +8,7 @@ import {
   eachDay,
   exportDownloadUrl,
   exportStatusText,
+  hourLabel,
   isOpenExport,
   isoDay,
   operatorLabel,
@@ -182,5 +183,12 @@ describe("chart data", () => {
       averageMinor: 616,
     });
     expect(totals([], "USD").averageMinor).toBe(0);
+  });
+});
+
+describe("hour labels", () => {
+  it("spans the hour, and wraps after 23", () => {
+    expect(hourLabel(9)).toBe("09:00–10:00");
+    expect(hourLabel(23)).toBe("23:00–00:00");
   });
 });

@@ -36,6 +36,7 @@ export const SaleCompleted = z.object({
     branchId: uuid,
     terminalId: uuid,
     operatorId: uuid.optional(),
+    completedAt: z.string().optional(),
     businessDate: date,
     currency,
     subtotalMinor: int,
@@ -94,6 +95,8 @@ export interface SaleFact {
   terminalId: string;
   /** The nil UUID when the event predates operators. */
   operatorId?: string | undefined;
+  /** Hour 0-23 of the branch's local day; undefined when the zone or time is unknown. */
+  localHour?: number | undefined;
   businessDate: string;
   currency: string;
   subtotalMinor: number;
@@ -130,6 +133,26 @@ async function lock(q: Q, tenantId: string, exclusive: boolean): Promise<void> {
 }
 
 /** Quantities have up to 4 decimals: sum them as integers in 1/10000, so no float drift reaches a rollup. */
+/** The hour (0-23) of an instant in a time zone, or undefined when either is unusable. */
+export function localHour(
+  iso: string | undefined,
+  zone: string | null | undefined,
+): number | undefined {
+  if (iso === undefined || zone === null || zone === undefined) return undefined;
+  const t = Date.parse(iso);
+  if (Number.isNaN(t)) return undefined;
+  try {
+    const h = new Intl.DateTimeFormat("en-GB", {
+      timeZone: zone,
+      hour: "2-digit",
+      hourCycle: "h23",
+    }).format(new Date(t));
+    return Number(h) % 24;
+  } catch {
+    return undefined; // an unknown zone name
+  }
+}
+
 const NIL_UUID = "00000000-0000-0000-0000-000000000000";
 const SCALE = 10_000;
 const scaled = (qty: string): number => Math.round(Number(qty) * SCALE);
@@ -264,6 +287,24 @@ async function applySale(q: Q, f: SaleFact, sign: 1 | -1): Promise<void> {
       voided ? f.payableMinor : 0,
     ],
   );
+  if (f.localHour !== undefined) {
+    await q.query(
+      `insert into reporting.rollup_hour (tenant_id, business_date, branch_id, hour, currency, sales_count, payable_minor)
+       values ($1, $2, $3, $4, $5, $6, $7)
+       on conflict (tenant_id, business_date, branch_id, hour, currency) do update set
+         sales_count = reporting.rollup_hour.sales_count + excluded.sales_count,
+         payable_minor = reporting.rollup_hour.payable_minor + excluded.payable_minor`,
+      [
+        f.tenantId,
+        f.businessDate,
+        f.branchId,
+        f.localHour,
+        f.currency,
+        sign,
+        sign * f.payableMinor,
+      ],
+    );
+  }
   const kinds = byKind(f.tenders, sign);
   if (kinds.length > 0)
     await q.query(
@@ -341,15 +382,20 @@ export async function onShiftOpened(q: Q, payload: unknown): Promise<void> {
 }
 
 /** Returns true when the sale was new (the rollups moved). */
-export async function onSaleCompleted(q: Q, payload: unknown): Promise<boolean> {
+export async function onSaleCompleted(
+  q: Q,
+  payload: unknown,
+  zone?: string | null,
+): Promise<boolean> {
   const e = SaleCompleted.parse(payload);
   await lock(q, e.tenantId, false);
   const d = e.data;
+  const hour = localHour(d.completedAt, zone);
   const r = await q.query(
     `insert into reporting.sale_facts
        (tenant_id, sale_id, branch_id, terminal_id, business_date, currency, subtotal_minor, discount_minor,
-        fee_minor, tax_minor, payable_minor, lines, tenders, operator_id)
-     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb, $13::jsonb, $14)
+        fee_minor, tax_minor, payable_minor, lines, tenders, operator_id, completed_at, local_hour)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb, $13::jsonb, $14, $15, $16)
      on conflict do nothing`,
     [
       e.tenantId,
@@ -366,10 +412,12 @@ export async function onSaleCompleted(q: Q, payload: unknown): Promise<boolean> 
       JSON.stringify(d.lines),
       JSON.stringify(d.tenders),
       d.operatorId ?? null,
+      d.completedAt ?? null,
+      hour ?? null,
     ],
   );
   if (r.rowCount !== 1) return false;
-  await applySale(q, { tenantId: e.tenantId, ...d }, 1);
+  await applySale(q, { tenantId: e.tenantId, ...d, localHour: hour }, 1);
   return true;
 }
 
@@ -441,7 +489,7 @@ export async function onReturnCompleted(q: Q, payload: unknown): Promise<boolean
 async function loadSale(q: Q, tenantId: string, saleId: string): Promise<SaleFact> {
   const r = await q.query(
     `select branch_id, terminal_id, business_date::text as business_date, currency, subtotal_minor, discount_minor,
-            fee_minor, tax_minor, payable_minor, lines, tenders, operator_id
+            fee_minor, tax_minor, payable_minor, lines, tenders, operator_id, local_hour
        from reporting.sale_facts where tenant_id = $1 and sale_id = $2`,
     [tenantId, saleId],
   );
@@ -453,6 +501,7 @@ const toSale = (tenantId: string, saleId: string, r: Record<string, unknown>): S
   branchId: String(r.branch_id),
   terminalId: String(r.terminal_id),
   operatorId: typeof r.operator_id === "string" ? r.operator_id : undefined,
+  localHour: typeof r.local_hour === "number" ? r.local_hour : undefined,
   businessDate: String(r.business_date),
   currency: String(r.currency),
   subtotalMinor: Number(r.subtotal_minor),
@@ -481,6 +530,7 @@ export async function rebuild(
     "rollup_sku_day",
     "rollup_tender_day",
     "rollup_operator_day",
+    "rollup_hour",
   ]) {
     await q.query(
       `delete from reporting.${table} where tenant_id = $1 and business_date between $2 and $3`,
@@ -489,7 +539,7 @@ export async function rebuild(
   }
   const sales = await q.query(
     `select sale_id, status, branch_id, terminal_id, business_date::text as business_date, currency, subtotal_minor,
-            discount_minor, fee_minor, tax_minor, payable_minor, lines, tenders, operator_id
+            discount_minor, fee_minor, tax_minor, payable_minor, lines, tenders, operator_id, local_hour
        from reporting.sale_facts
       where tenant_id = $1 and business_date between $2 and $3 order by business_date, sale_id`,
     [tenantId, from, to],

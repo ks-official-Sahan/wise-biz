@@ -76,6 +76,7 @@ export const reportKeys = {
   products: (t: string, f: ReportFilter) => [t, "reports", "products", f] as const,
   payments: (t: string, f: ReportFilter) => [t, "reports", "payments", f] as const,
   tax: (t: string, f: ReportFilter) => [t, "reports", "tax", f] as const,
+  hours: (t: string, f: ReportFilter) => [t, "reports", "hours", f] as const,
   operators: (t: string, f: ReportFilter) => [t, "reports", "operators", f] as const,
 };
 
@@ -124,6 +125,26 @@ export const usePaymentsReport = (t: string, f: ReportFilter) =>
     staleTime: STALE.list,
     select: (d) => d.rows,
   });
+
+export interface HourRow {
+  readonly hour: number;
+  readonly currency: string;
+  readonly salesCount: number;
+  readonly payableMinor: number;
+}
+
+export const useHoursReport = (t: string, f: ReportFilter) =>
+  useQuery({
+    queryKey: reportKeys.hours(t, f),
+    queryFn: ({ signal }) =>
+      api<{ rows: HourRow[] }>("GET", `/v1/reporting/hours?${reportQuery(f)}`, { signal }),
+    staleTime: STALE.list,
+    select: (d) => d.rows,
+  });
+
+/** "14:00–15:00" for hour 14. */
+export const hourLabel = (h: number): string =>
+  `${String(h).padStart(2, "0")}:00–${String((h + 1) % 24).padStart(2, "0")}:00`;
 
 export const useOperatorsReport = (t: string, f: ReportFilter) =>
   useQuery({

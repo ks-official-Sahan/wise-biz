@@ -6,8 +6,9 @@ import { z } from "zod";
 
 import { rebuild } from "./apply.ts";
 import { mountExportRoutes } from "./http-exports.ts";
-import { operators, payments, products, salesSummary, tax, toCsv } from "./queries.ts";
+import { hours, operators, payments, products, salesSummary, tax, toCsv } from "./queries.ts";
 import {
+  HoursReportSchema,
   OperatorsReportSchema,
   PaymentsReportSchema,
   ProductsQuerySchema,
@@ -83,6 +84,15 @@ const routes = {
     middleware: read,
     request: { query: RangeQuerySchema },
     responses: ok(OperatorsReportSchema),
+  }),
+  hours: createRoute({
+    method: "get",
+    path: "/v1/reporting/hours",
+    tags,
+    summary: "Sales by hour of the local day",
+    middleware: read,
+    request: { query: RangeQuerySchema },
+    responses: ok(HoursReportSchema),
   }),
   tax: createRoute({
     method: "get",
@@ -163,6 +173,10 @@ export function mountRoutes(app: OpenAPIHono<AppEnv>, deps: ModuleDeps, store: O
   app.openapi(routes.operators, async (c) => {
     const range = scoped(c, c.req.valid("query"));
     return c.json({ rows: await reading(c, (tx, t) => operators(tx, t, range)) }, 200);
+  });
+  app.openapi(routes.hours, async (c) => {
+    const range = scoped(c, c.req.valid("query"));
+    return c.json({ rows: await reading(c, (tx, t) => hours(tx, t, range)) }, 200);
   });
   app.openapi(routes.tax, async (c) => {
     const range = scoped(c, c.req.valid("query"));

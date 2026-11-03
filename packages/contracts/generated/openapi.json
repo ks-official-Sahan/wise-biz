@@ -1278,6 +1278,35 @@
         "required": ["status", "serverTime"],
         "type": "object"
       },
+      "HoursReport": {
+        "properties": {
+          "rows": {
+            "items": {
+              "properties": {
+                "currency": {
+                  "type": "string"
+                },
+                "hour": {
+                  "maximum": 23,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "payableMinor": {
+                  "type": "integer"
+                },
+                "salesCount": {
+                  "type": "integer"
+                }
+              },
+              "required": ["hour", "currency", "salesCount", "payableMinor"],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": ["rows"],
+        "type": "object"
+      },
       "Import": {
         "properties": {
           "createdAt": {
@@ -9360,6 +9389,53 @@
           }
         },
         "summary": "Download a finished export (redirects to a short-lived link)",
+        "tags": ["reporting"]
+      }
+    },
+    "/v1/reporting/hours": {
+      "get": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "from",
+            "required": true,
+            "schema": {
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": true,
+            "schema": {
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "branchId",
+            "required": false,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HoursReport"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Sales by hour of the local day",
         "tags": ["reporting"]
       }
     },

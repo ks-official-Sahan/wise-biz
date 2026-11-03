@@ -152,6 +152,13 @@ async function mockApi(page: Page): Promise<string[]> {
       }
       return json(200, { exports: [exportRow("ready")] });
     }
+    if (path === "/v1/reporting/hours")
+      return json(200, {
+        rows: [
+          { hour: 9, currency: "USD", salesCount: 4, payableMinor: 12000 },
+          { hour: 13, currency: "USD", salesCount: 9, payableMinor: 27000 },
+        ],
+      });
     if (path === "/v1/reporting/operators")
       return json(200, {
         rows: [
@@ -230,6 +237,11 @@ test("switches between products, payments and tax, and changes the period", asyn
   await page.getByRole("tab", { name: "Payments" }).click();
   await expect(page.getByRole("rowheader", { name: "cash" })).toBeVisible();
   await expect(page.getByRole("cell", { name: "$195.00" })).toBeVisible();
+
+  await page.getByRole("tab", { name: "Hours" }).click();
+  await expect(page.getByRole("rowheader", { name: "13:00–14:00" })).toBeVisible();
+  await expect(page.getByRole("rowheader", { name: "09:00–10:00" })).toBeVisible();
+  await a11y(page);
 
   await page.getByRole("tab", { name: "Staff" }).click();
   await expect(page.getByRole("rowheader", { name: "Staff …00abcd" })).toBeVisible();

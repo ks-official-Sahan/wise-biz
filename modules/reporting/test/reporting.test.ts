@@ -12,6 +12,7 @@ import { testDatabase } from "@wise-biz/testing/containers";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import {
+  localHour,
   onReturnCompleted,
   onSaleCompleted,
   onSaleVoided,
@@ -22,7 +23,7 @@ import { createReportingConsumer } from "../src/consumer.ts";
 import { runDailyDigests } from "../src/digest-job.ts";
 import { expireOld, runExports } from "../src/export-job.ts";
 import { createReportingModule } from "../src/index.ts";
-import { csvCell, operators, salesSummary } from "../src/queries.ts";
+import { csvCell, hours, operators, salesSummary } from "../src/queries.ts";
 
 import type { Q } from "../src/apply.ts";
 import type { AppEnv, IdempotencyCache, ModuleDeps } from "@wise-biz/module-kit";
@@ -1024,5 +1025,85 @@ describe("report speed", () => {
     }
     times.sort((a, b) => a - b);
     expect(times[Math.floor(times.length * 0.95) - 1] ?? 0).toBeLessThan(200);
+  });
+});
+
+describe("hourly rollup", () => {
+  it("localHour reads the branch's local hour, and gives up on bad input", () => {
+    expect(localHour("2026-11-01T18:45:00Z", "Asia/Colombo")).toBe(0); // +05:30 crosses midnight
+    expect(localHour("2026-11-01T10:00:00Z", "UTC")).toBe(10);
+    expect(localHour("2026-11-01T00:10:00Z", "UTC")).toBe(0);
+    expect(localHour("2026-11-01T10:00:00Z", "Not/AZone")).toBeUndefined();
+    expect(localHour("nonsense", "UTC")).toBeUndefined();
+    expect(localHour(undefined, "UTC")).toBeUndefined();
+    expect(localHour("2026-11-01T10:00:00Z", null)).toBeUndefined();
+  });
+
+  it("matches an independent count, drops voids exactly, and a rebuild reproduces it", async () => {
+    const tenantId = uuidv7();
+    const g = generate(9);
+    for (const [i, s] of g.sales.entries()) {
+      const utcHour = i % 24;
+      const env = saleEnvelope(tenantId, s);
+      await asWorker(tenantId, (q) =>
+        onSaleCompleted(
+          q,
+          {
+            ...env,
+            data: {
+              ...env.data,
+              completedAt: `${s.businessDate}T${String(utcHour).padStart(2, "0")}:30:00Z`,
+            },
+          },
+          "Asia/Colombo",
+        ),
+      );
+      if (s.voided)
+        await asWorker(tenantId, (q) => onSaleVoided(q, { tenantId, data: { saleId: s.saleId } }));
+    }
+    const want = new Map<string, number>();
+    for (const [i, s] of g.sales.entries()) {
+      if (s.voided) continue;
+      const local = Math.floor(((i % 24) * 60 + 30 + 330) / 60) % 24; // +05:30, worked by hand
+      const payable = s.lines.reduce((n, l) => n + l.totalMinor, 0);
+      want.set(
+        `${s.businessDate}|${s.branchId}|${String(local)}`,
+        (want.get(`${s.businessDate}|${s.branchId}|${String(local)}`) ?? 0) + payable,
+      );
+    }
+    const read = async () => {
+      const res = await asApp(tenantId, (q) =>
+        q.query(
+          "select business_date::text as d, branch_id::text as b, hour, payable_minor from reporting.rollup_hour where sales_count > 0 or payable_minor <> 0",
+        ),
+      );
+      return new Map<string, number>(
+        res.rows.map((r) => [
+          `${String(r.d)}|${String(r.b)}|${String(r.hour)}`,
+          Number(r.payable_minor),
+        ]),
+      );
+    };
+    expect(await read()).toEqual(want);
+    await asWorker(tenantId, (q) => rebuild(q, tenantId, "2026-11-01", "2026-11-03"));
+    expect(await read()).toEqual(want);
+    const rows = await asApp(tenantId, (q) =>
+      hours(q, tenantId, { from: "2026-11-01", to: "2026-11-03" }),
+    );
+    expect(rows.reduce((n, r) => n + r.payableMinor, 0)).toBe(
+      [...want.values()].reduce((a, b) => a + b, 0),
+    );
+  });
+
+  it("without a zone the sale still counts in the day but not in any hour", async () => {
+    const tenantId = uuidv7();
+    const g = generate(2);
+    const s = g.sales.find((x) => !x.voided);
+    if (s === undefined) throw new Error("generator made no sale");
+    await asWorker(tenantId, (q) => onSaleCompleted(q, saleEnvelope(tenantId, s)));
+    const res = await asApp(tenantId, (q) =>
+      q.query("select count(*)::int as n from reporting.rollup_hour"),
+    );
+    expect(res.rows[0]?.n).toBe(0);
   });
 });
