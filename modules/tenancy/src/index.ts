@@ -14,6 +14,7 @@ import type { PolicyRow } from "@wise-biz/policy";
 import type pg from "pg";
 
 export { drizzleTenancyRepository } from "./adapters/db/tenancy-repository.ts";
+export { permissionHolders } from "./holders.ts";
 export { DEFAULT_ROLE_GRANTS, newBusiness } from "./domain/business.ts";
 export {
   TENANCY_EVENTS,

@@ -2,6 +2,7 @@ import { createAuditModule } from "@wise-biz/module-audit";
 import { createCatalogModule } from "@wise-biz/module-catalog";
 import { createDevicesModule } from "@wise-biz/module-devices";
 import { batchSalePrices, createInventoryModule } from "@wise-biz/module-inventory";
+import { notificationsModule } from "@wise-biz/module-notifications";
 import { createPricingModule } from "@wise-biz/module-pricing";
 import { reportingModule } from "@wise-biz/module-reporting";
 import { createSalesModule } from "@wise-biz/module-sales";
@@ -65,6 +66,7 @@ export function createModules(
     themingModule,
     // MIS reports read the rollups the worker maintains (P1-14).
     reportingModule,
+    notificationsModule,
     templateModule,
   ];
 }

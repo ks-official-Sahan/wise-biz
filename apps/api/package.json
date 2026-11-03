@@ -37,6 +37,7 @@
     "@wise-biz/module-inventory": "workspace:*",
     "@wise-biz/module-kit": "workspace:*",
     "@wise-biz/module-pricing": "workspace:*",
+    "@wise-biz/module-notifications": "workspace:*",
     "@wise-biz/module-reporting": "workspace:*",
     "@wise-biz/module-sales": "workspace:*",
     "@wise-biz/module-search": "workspace:*",

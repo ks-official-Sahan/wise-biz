@@ -83,6 +83,7 @@ describe("registry + migrations", () => {
       "search",
       "theming",
       "reporting",
+      "notifications",
       "template",
     ]);
     expect(globals).toEqual(["identity"]);

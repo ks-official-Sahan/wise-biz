@@ -1,12 +1,13 @@
 import { uuidv7 } from "@wise-biz/ids";
 import { createImportConsumer } from "@wise-biz/module-catalog";
 import { createInventoryFactsConsumer, createLowStockConsumer } from "@wise-biz/module-inventory";
+import { createNotificationsConsumer } from "@wise-biz/module-notifications";
 import { createPricingFactsConsumer } from "@wise-biz/module-pricing";
 import { createReportingConsumer } from "@wise-biz/module-reporting";
 import { createSearchProjectionConsumer } from "@wise-biz/module-search";
 import { createReceiptLinkConsumer } from "@wise-biz/module-shortlinks";
 import { createSyncChangesConsumer } from "@wise-biz/module-sync";
-import { createInviteEmailConsumer } from "@wise-biz/module-tenancy";
+import { createInviteEmailConsumer, permissionHolders } from "@wise-biz/module-tenancy";
 
 import type { ConsumerDefinition } from "@wise-biz/events";
 import type { ImportJobDeps } from "@wise-biz/module-catalog";
@@ -42,6 +43,7 @@ export function createConsumers(deps: ConsumerDeps): readonly ConsumerDefinition
     createSyncChangesConsumer(deps.notify),
     createReceiptLinkConsumer(),
     createReportingConsumer(),
+    createNotificationsConsumer({ holders: permissionHolders }),
     createLowStockConsumer({ pool: deps.imports.pool, ids: { uuidv7 }, now: () => new Date() }),
     createImportConsumer(
       {

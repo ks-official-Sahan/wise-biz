@@ -8,6 +8,7 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 import { Button, ErrorState, SkeletonRows, cx } from "@/components/ui.tsx";
 import { api } from "@/lib/api.ts";
 import { NAV } from "@/lib/nav.ts";
+import { badgeText, unreadLabel, useUnreadCount } from "@/lib/notifications.ts";
 import { keys, useMyTenants } from "@/lib/queries.ts";
 import { useSession, useSignOut } from "@/lib/session.ts";
 import { TenantProvider } from "@/lib/tenant.tsx";
@@ -142,6 +143,7 @@ export default function AppLayout({ children }: { readonly children: ReactNode }
           <span className={cx(s.kbd, s.hideSmall)} aria-hidden>
             Ctrl K
           </span>
+          <Bell tenantId={active.tenantId} />
           <Button
             variant="ghost"
             onClick={() => {
@@ -171,5 +173,29 @@ export default function AppLayout({ children }: { readonly children: ReactNode }
         <CommandPalette />
       </div>
     </TenantProvider>
+  );
+}
+
+/** The bell: a link to the notifications page with an unread badge that the screen reader hears as part of the name. */
+function Bell({ tenantId }: { readonly tenantId: string }) {
+  const unread = useUnreadCount(tenantId).data ?? 0;
+  return (
+    <Link href="/notifications" className={s.bell} aria-label={unreadLabel(unread)}>
+      <svg
+        aria-hidden
+        viewBox="0 0 24 24"
+        width="20"
+        height="20"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+        <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+      </svg>
+      {unread > 0 ? <span className={s.badge}>{badgeText(unread)}</span> : null}
+    </Link>
   );
 }

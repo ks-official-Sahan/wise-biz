@@ -7911,6 +7911,388 @@
         "tags": ["inventory"]
       }
     },
+    "/v1/notifications": {
+      "get": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "unread",
+            "required": false,
+            "schema": {
+              "enum": ["true", "false"],
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 30,
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "after",
+            "required": false,
+            "schema": {
+              "maxLength": 60,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "next": {
+                      "type": ["string", "null"]
+                    },
+                    "notifications": {
+                      "items": {
+                        "properties": {
+                          "body": {
+                            "type": "string"
+                          },
+                          "createdAt": {
+                            "type": "string"
+                          },
+                          "id": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "type": "string"
+                          },
+                          "link": {
+                            "type": ["string", "null"]
+                          },
+                          "readAt": {
+                            "type": ["string", "null"]
+                          },
+                          "title": {
+                            "type": "string"
+                          }
+                        },
+                        "required": ["id", "kind", "title", "body", "link", "createdAt", "readAt"],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": ["notifications", "next"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "My notifications, newest first",
+        "tags": ["notifications"]
+      }
+    },
+    "/v1/notifications/preferences": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "preferences": {
+                      "items": {
+                        "properties": {
+                          "email": {
+                            "type": "boolean"
+                          },
+                          "inApp": {
+                            "type": "boolean"
+                          },
+                          "kind": {
+                            "enum": [
+                              "low_stock",
+                              "expiring",
+                              "export_ready",
+                              "device_offline",
+                              "daily_summary"
+                            ],
+                            "type": "string"
+                          },
+                          "label": {
+                            "type": "string"
+                          }
+                        },
+                        "required": ["kind", "inApp", "email", "label"],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": ["preferences"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "What I want to be told about",
+        "tags": ["notifications"]
+      },
+      "put": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "preferences": {
+                    "items": {
+                      "properties": {
+                        "email": {
+                          "type": "boolean"
+                        },
+                        "inApp": {
+                          "type": "boolean"
+                        },
+                        "kind": {
+                          "enum": [
+                            "low_stock",
+                            "expiring",
+                            "export_ready",
+                            "device_offline",
+                            "daily_summary"
+                          ],
+                          "type": "string"
+                        }
+                      },
+                      "required": ["kind", "inApp", "email"],
+                      "type": "object"
+                    },
+                    "maxItems": 5,
+                    "minItems": 1,
+                    "type": "array"
+                  }
+                },
+                "required": ["preferences"],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "preferences": {
+                      "items": {
+                        "properties": {
+                          "email": {
+                            "type": "boolean"
+                          },
+                          "inApp": {
+                            "type": "boolean"
+                          },
+                          "kind": {
+                            "enum": [
+                              "low_stock",
+                              "expiring",
+                              "export_ready",
+                              "device_offline",
+                              "daily_summary"
+                            ],
+                            "type": "string"
+                          },
+                          "label": {
+                            "type": "string"
+                          }
+                        },
+                        "required": ["kind", "inApp", "email", "label"],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": ["preferences"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Change what I want to be told about",
+        "tags": ["notifications"]
+      }
+    },
+    "/v1/notifications/push-tokens": {
+      "delete": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "token": {
+                    "maxLength": 200,
+                    "minLength": 10,
+                    "type": "string"
+                  }
+                },
+                "required": ["token"],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "ok": {
+                      "enum": [true],
+                      "type": "boolean"
+                    }
+                  },
+                  "required": ["ok"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Stop push to this phone",
+        "tags": ["notifications"]
+      },
+      "put": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "platform": {
+                    "enum": ["ios", "android"],
+                    "type": "string"
+                  },
+                  "token": {
+                    "maxLength": 200,
+                    "minLength": 10,
+                    "type": "string"
+                  }
+                },
+                "required": ["token", "platform"],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "ok": {
+                      "enum": [true],
+                      "type": "boolean"
+                    }
+                  },
+                  "required": ["ok"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Register this phone for push",
+        "tags": ["notifications"]
+      }
+    },
+    "/v1/notifications/read": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "all": {
+                    "enum": [true],
+                    "type": "boolean"
+                  },
+                  "ids": {
+                    "items": {
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                      "type": "string"
+                    },
+                    "maxItems": 100,
+                    "minItems": 1,
+                    "type": "array"
+                  }
+                },
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "marked": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": ["marked"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Mark some (ids) or all of my notifications read",
+        "tags": ["notifications"]
+      }
+    },
+    "/v1/notifications/unread-count": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "unread": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": ["unread"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "How many of my notifications are unread",
+        "tags": ["notifications"]
+      }
+    },
     "/v1/pricing/fees": {
       "get": {
         "responses": {
