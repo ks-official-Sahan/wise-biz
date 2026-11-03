@@ -113,6 +113,19 @@ export interface ReturnFact {
   tenders: Tender[];
 }
 
+/**
+ * A rebuild deletes a range and re-reads the facts; a consumer adding a fact in between would be counted twice. Events
+ * take the tenant's reporting lock shared (they never block each other), a rebuild takes it exclusive.
+ */
+async function lock(q: Q, tenantId: string, exclusive: boolean): Promise<void> {
+  await q.query(
+    exclusive
+      ? "select pg_advisory_xact_lock(hashtextextended($1, 0))"
+      : "select pg_advisory_xact_lock_shared(hashtextextended($1, 0))",
+    [`reporting:${tenantId}`],
+  );
+}
+
 /** Quantities have up to 4 decimals: sum them as integers in 1/10000, so no float drift reaches a rollup. */
 const SCALE = 10_000;
 const scaled = (qty: string): number => Math.round(Number(qty) * SCALE);
@@ -148,7 +161,10 @@ function bySku(lines: readonly Line[], sign: 1 | -1): SkuAgg[] {
     a.cost += sign * (l.unitCostMinor === null ? 0 : Math.round((l.unitCostMinor * q) / SCALE));
     m.set(l.variantId, a);
   }
-  return [...m.values()];
+  // Rows are locked in this order by the upsert: sorting keeps two sales that share products from deadlocking.
+  return [...m.values()].sort((a, b) =>
+    a.variantId < b.variantId ? -1 : a.variantId > b.variantId ? 1 : 0,
+  );
 }
 function byKind(
   tenders: readonly Tender[],
@@ -161,7 +177,7 @@ function byKind(
     a.minor += sign * t.amountMinor;
     m.set(t.kind, a);
   }
-  return [...m.values()];
+  return [...m.values()].sort((a, b) => (a.kind < b.kind ? -1 : a.kind > b.kind ? 1 : 0));
 }
 
 /** Adds (+1) or removes (-1) one completed sale from every rollup. A void is the removal plus a void count. */
@@ -253,7 +269,9 @@ async function applyReturn(q: Q, f: ReturnFact): Promise<void> {
     a.refund += l.refundMinor;
     m.set(l.variantId, a);
   }
-  const skus = [...m.values()].map((a) => ({ ...a, qty: unscaled(a.qty) }));
+  const skus = [...m.values()]
+    .sort((a, b) => (a.variant_id < b.variant_id ? -1 : a.variant_id > b.variant_id ? 1 : 0))
+    .map((a) => ({ ...a, qty: unscaled(a.qty) }));
   if (skus.length > 0)
     await q.query(
       `insert into reporting.rollup_sku_day
@@ -281,6 +299,7 @@ async function applyReturn(q: Q, f: ReturnFact): Promise<void> {
 
 export async function onShiftOpened(q: Q, payload: unknown): Promise<void> {
   const e = ShiftOpened.parse(payload);
+  await lock(q, e.tenantId, false);
   await q.query(
     `insert into reporting.shift_facts (tenant_id, shift_id, branch_id, terminal_id, business_date, currency)
      values ($1, $2, $3, $4, $5, $6) on conflict do nothing`,
@@ -298,6 +317,7 @@ export async function onShiftOpened(q: Q, payload: unknown): Promise<void> {
 /** Returns true when the sale was new (the rollups moved). */
 export async function onSaleCompleted(q: Q, payload: unknown): Promise<boolean> {
   const e = SaleCompleted.parse(payload);
+  await lock(q, e.tenantId, false);
   const d = e.data;
   const r = await q.query(
     `insert into reporting.sale_facts
@@ -329,6 +349,7 @@ export async function onSaleCompleted(q: Q, payload: unknown): Promise<boolean> 
 /** Returns true when the void moved the rollups. A void for a sale not seen yet throws, so the bus retries it. */
 export async function onSaleVoided(q: Q, payload: unknown): Promise<boolean> {
   const e = SaleVoided.parse(payload);
+  await lock(q, e.tenantId, false);
   const r = await q.query(
     `update reporting.sale_facts set status = 'voided'
       where tenant_id = $1 and sale_id = $2 and status = 'completed'
@@ -350,6 +371,7 @@ export async function onSaleVoided(q: Q, payload: unknown): Promise<boolean> {
 
 export async function onReturnCompleted(q: Q, payload: unknown): Promise<boolean> {
   const e = ReturnCompleted.parse(payload);
+  await lock(q, e.tenantId, false);
   const d = e.data;
   const shift = await q.query(
     "select branch_id, terminal_id from reporting.shift_facts where tenant_id = $1 and shift_id = $2",
@@ -425,6 +447,7 @@ export async function rebuild(
   from: string,
   to: string,
 ): Promise<{ sales: number; returns: number }> {
+  await lock(q, tenantId, true);
   for (const table of ["rollup_day", "rollup_sku_day", "rollup_tender_day"]) {
     await q.query(
       `delete from reporting.${table} where tenant_id = $1 and business_date between $2 and $3`,

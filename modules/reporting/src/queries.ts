@@ -47,7 +47,10 @@ export async function salesSummary(q: Q, tenantId: string, r: Range, by: GroupBy
   }));
 }
 
-/** Best sellers by revenue: the money columns are totals including tax, so the report also shows the net of tax. */
+/**
+ * Best sellers by revenue. Money columns are what was sold (tax included) before returns; the net of tax and the
+ * profit are likewise before returns, and the refunded amount is shown beside them.
+ */
 export async function products(q: Q, tenantId: string, r: Range, limit: number) {
   const res = await q.query(
     `select variant_id::text as variant_id, max(sku) as sku, currency, sum(qty) as qty,
