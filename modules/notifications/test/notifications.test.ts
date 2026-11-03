@@ -53,7 +53,7 @@ const deliver = (
 ) => {
   const consumer = createNotificationsConsumer({ holders: () => Promise.resolve(people) });
   return withTenantTx(worker, ctx(tenantId, people[0] ?? uuidv7()), (tx) =>
-    consumer.handle({ id, tenantId, type, payload }, { client: tx as never }),
+    consumer.handle({ id, tenantId, type, payload: { data: payload } }, { client: tx as never }),
   );
 };
 
@@ -174,6 +174,37 @@ describe("fan-out", () => {
     const l = (await (await appFor(t, loud).request("/v1/notifications")).json()) as Listed;
     expect(q.notifications).toHaveLength(0);
     expect(l.notifications).toHaveLength(1);
+  });
+
+  it("tells about a silent terminal, scoped to its branch, and links to the terminals page", async () => {
+    const t = uuidv7();
+    const u = uuidv7();
+    const branchId = uuidv7();
+    const seen: unknown[] = [];
+    const consumer = createNotificationsConsumer({
+      holders: (_c, _t, permission, scope) => {
+        seen.push([permission, scope]);
+        return Promise.resolve([u]);
+      },
+    });
+    await withTenantTx(worker, ctx(t, u), (tx) =>
+      consumer.handle(
+        {
+          id: uuidv7(),
+          tenantId: t,
+          type: "devices.heartbeat.missed",
+          payload: { data: { branchId, name: "Till 2", silentMinutes: 12 } },
+        },
+        { client: tx as never },
+      ),
+    );
+    expect(seen).toEqual([["devices:read", { branchIds: [branchId] }]]);
+    const body = (await (await appFor(t, u).request("/v1/notifications")).json()) as Listed;
+    expect(body.notifications[0]).toMatchObject({
+      kind: "device_offline",
+      title: "Till 2 went offline",
+      link: "/devices",
+    });
   });
 
   it("rejects a malformed payload so the bus retries or dead-letters it", async () => {

@@ -13,7 +13,9 @@ export { deviceAuth, ENROLL_PATH } from "./device-auth.ts";
 export type { DeviceAuthDeps } from "./device-auth.ts";
 export { devicePublicKey, quarantineDevice } from "./application/devices.ts";
 export type { BranchExists, QuarantineInput } from "./application/devices.ts";
-export { DeviceQuarantinedV1 } from "./events.ts";
+export { DeviceHeartbeatMissedV1, DeviceQuarantinedV1 } from "./events.ts";
+export { runMissedHeartbeats } from "./jobs.ts";
+export type { DeviceJobDeps } from "./jobs.ts";
 export type { IsActiveMember, PinDeps } from "./application/pins.ts";
 export type { DevicesHttpOptions } from "./http.ts";
 

@@ -25,9 +25,13 @@ afterAll(async () => {
   await drop();
 });
 
-const holders = (tenantId: string, permission: string, locations: string[] = []) =>
+const holders = (
+  tenantId: string,
+  permission: string,
+  scope: { locationIds?: string[]; branchIds?: string[] } = {},
+) =>
   withTenantTx(migrator, { tenantId, userId: uuidv7(), requestId: "test" }, (tx) =>
-    permissionHolders(tx as never, tenantId, permission, locations),
+    permissionHolders(tx as never, tenantId, permission, scope),
   );
 
 describe("permissionHolders", () => {
@@ -59,13 +63,21 @@ describe("permissionHolders", () => {
     expect(all).not.toContain(unrelated.userId);
 
     // A location in the member's branch: still included.
-    expect((await holders(tenantId, "tenancy:read", [location])).sort()).toEqual(
+    expect((await holders(tenantId, "tenancy:read", { locationIds: [location] })).sort()).toEqual(
       [owner, everywhere.userId, here.userId].sort(),
     );
 
     // A location of some other branch: the branch-limited member is left out.
-    const elsewhere = await holders(tenantId, "tenancy:read", [uuidv7()]);
+    const elsewhere = await holders(tenantId, "tenancy:read", { locationIds: [uuidv7()] });
     expect(elsewhere.sort()).toEqual([owner, everywhere.userId].sort());
+
+    // The same by branch (terminal alerts carry a branch, not a location).
+    expect((await holders(tenantId, "tenancy:read", { branchIds: [store] })).sort()).toEqual(
+      [owner, everywhere.userId, here.userId].sort(),
+    );
+    expect((await holders(tenantId, "tenancy:read", { branchIds: [uuidv7()] })).sort()).toEqual(
+      [owner, everywhere.userId].sort(),
+    );
   });
 
   it("leaves out suspended members and other businesses", async () => {

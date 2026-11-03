@@ -715,6 +715,9 @@ importers:
       '@wise-biz/module-catalog':
         specifier: workspace:*
         version: link:../../modules/catalog
+      '@wise-biz/module-devices':
+        specifier: workspace:*
+        version: link:../../modules/devices
       '@wise-biz/module-inventory':
         specifier: workspace:*
         version: link:../../modules/inventory

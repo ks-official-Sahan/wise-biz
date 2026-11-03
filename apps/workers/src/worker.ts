@@ -25,6 +25,7 @@ import {
   createPartitionJob,
   createPeriodic,
 } from "@wise-biz/module-audit";
+import { runMissedHeartbeats } from "@wise-biz/module-devices";
 import {
   ensureInventoryPartitions,
   exclusive,
@@ -178,6 +179,9 @@ export function startWorker(
       runExpiringBatches(inventoryDeps, env.INVENTORY_EXPIRY_HORIZON_DAYS),
     ),
     inventoryJob("inventory-drift", 24 * HOUR_MS, () => runDriftCheck(inventoryDeps)),
+    inventoryJob("devices-missed-heartbeats", 5 * 60_000, () =>
+      runMissedHeartbeats(inventoryDeps, env.DEVICE_SILENT_MINUTES),
+    ),
   ];
   const loops = [chainer, anchorJob, partitionJob, pruneJob, ...inventoryLoops];
   for (const l of loops) l.start();
