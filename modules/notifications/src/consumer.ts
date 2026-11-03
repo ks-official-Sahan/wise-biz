@@ -1,9 +1,11 @@
 import { z } from "zod";
 
 import { notify, sendPendingEmails } from "./notify.ts";
+import { sendPendingPushes } from "./push.ts";
 
 import type { Kind } from "./kinds.ts";
 import type { MailPort } from "./notify.ts";
+import type { PushPort } from "./push.ts";
 import type { PoolClient } from "pg";
 
 export const NOTIFICATIONS_CONSUMER = "notifications.fanout";
@@ -19,6 +21,8 @@ const EVENTS = [
 export interface NotificationsDeps {
   /** Omit to keep notifications in the app only (tests, and deployments without a mailer). */
   readonly mail?: MailPort;
+  /** Omit to skip phone push (tests, and deployments without one). */
+  readonly push?: PushPort;
   /** Active people who hold a permission (the owner always counts). Built from tenancy at the composition root. */
   readonly holders: (
     client: PoolClient,
@@ -86,6 +90,12 @@ const Expiring = z.object({
  * screen, never to a URL outside the app.
  */
 export function createNotificationsConsumer(deps: NotificationsDeps): NotificationsConsumer {
+  /** Email and phone push for the notifications this event stored; each remembers what it already sent. */
+  const deliver = async (client: PoolClient, tenantId: string, eventId: string): Promise<void> => {
+    if (deps.mail !== undefined) await sendPendingEmails(client, deps.mail, tenantId, eventId);
+    if (deps.push !== undefined) await sendPendingPushes(client, deps.push, tenantId, eventId);
+  };
+
   const tell = async (
     client: PoolClient,
     tenantId: string,
@@ -105,7 +115,7 @@ export function createNotificationsConsumer(deps: NotificationsDeps): Notificati
       link,
       dedupeKey: eventId,
     });
-    if (deps.mail !== undefined) await sendPendingEmails(client, deps.mail, tenantId, eventId);
+    await deliver(client, tenantId, eventId);
   };
 
   return {
@@ -148,8 +158,7 @@ export function createNotificationsConsumer(deps: NotificationsDeps): Notificati
           link: "/reports",
           dedupeKey: event.id,
         });
-        if (deps.mail !== undefined)
-          await sendPendingEmails(ctx.client, deps.mail, event.tenantId, event.id);
+        await deliver(ctx.client, event.tenantId, event.id);
       } else if (event.type === "reporting.digest.ready") {
         const p = envelope(Digest).parse(event.payload).data;
         const lines = p.totals.map(

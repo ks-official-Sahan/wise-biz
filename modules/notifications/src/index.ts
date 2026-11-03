@@ -9,6 +9,8 @@ export { createNotificationsConsumer, NOTIFICATIONS_CONSUMER } from "./consumer.
 export type { NotificationsConsumer, NotificationsDeps } from "./consumer.ts";
 export { notify, sendPendingEmails } from "./notify.ts";
 export type { MailPort, Message } from "./notify.ts";
+export { createExpoPush, sendPendingPushes } from "./push.ts";
+export type { PushMessage, PushPort, PushResult } from "./push.ts";
 export { KINDS } from "./kinds.ts";
 
 /**

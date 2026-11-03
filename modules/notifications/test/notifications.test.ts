@@ -12,8 +12,10 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createNotificationsConsumer } from "../src/consumer.ts";
 import { notificationsModule } from "../src/index.ts";
 import { notify } from "../src/notify.ts";
+import { createExpoPush } from "../src/push.ts";
 
 import type { MailPort } from "../src/notify.ts";
+import type { PushMessage, PushPort, PushResult } from "../src/push.ts";
 import type { AppEnv, IdempotencyCache, ModuleDeps } from "@wise-biz/module-kit";
 import type { TestDatabase } from "@wise-biz/testing/containers";
 import type pg from "pg";
@@ -52,10 +54,12 @@ const deliver = (
   payload: unknown,
   id = uuidv7(),
   mail?: MailPort,
+  push?: PushPort,
 ) => {
   const consumer = createNotificationsConsumer({
     holders: () => Promise.resolve(people),
     ...(mail === undefined ? {} : { mail }),
+    ...(push === undefined ? {} : { push }),
   });
   return withTenantTx(worker, ctx(tenantId, people[0] ?? uuidv7()), (tx) =>
     consumer.handle({ id, tenantId, type, payload: { data: payload } }, { client: tx as never }),
@@ -449,6 +453,115 @@ describe("email", () => {
       tx.query("SELECT email, email_to FROM notifications.preferences WHERE kind = 'low_stock'"),
     );
     expect(row.rows).toEqual([{ email: false, email_to: null }]);
+  });
+});
+
+describe("phone push", () => {
+  const token = (u: string, t: string, value: string) =>
+    appFor(t, u).request(
+      ...argsOf(put("/v1/notifications/push-tokens", { token: value, platform: "android" })),
+    );
+  const fakePush = (answer: (m: PushMessage, i: number) => PushResult = () => ({ ok: true })) => {
+    const calls: PushMessage[][] = [];
+    const port: PushPort = {
+      send: (messages) => {
+        calls.push([...messages]);
+        return Promise.resolve(messages.map(answer));
+      },
+    };
+    return { port, calls };
+  };
+
+  it("pushes to every phone of the people told, once, with the in-app link", async () => {
+    const t = uuidv7();
+    const [a, b, none] = [uuidv7(), uuidv7(), uuidv7()];
+    await token(a, t, "ExponentPushToken[aaaaaaaaaaaaaaa1]");
+    await token(a, t, "ExponentPushToken[aaaaaaaaaaaaaaa2]");
+    await token(b, t, "ExponentPushToken[bbbbbbbbbbbbbbb1]");
+    const { port, calls } = fakePush();
+    const id = uuidv7();
+    await deliver(t, [a, b, none], "inventory.balance.low", LOW, id, undefined, port);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.map((m) => m.to)).toHaveLength(3);
+    expect(calls[0]?.[0]).toMatchObject({ title: "Stock is running low", link: "/stock" });
+    // The same event again pushes nothing: every notification is marked.
+    await deliver(t, [a, b, none], "inventory.balance.low", LOW, id, undefined, port);
+    expect(calls).toHaveLength(1);
+  });
+
+  it("forgets a phone the push service says is gone, and keeps the others", async () => {
+    const t = uuidv7();
+    const u = uuidv7();
+    await token(u, t, "ExponentPushToken[gone0000000000]");
+    await token(u, t, "ExponentPushToken[live0000000000]");
+    const { port } = fakePush((m) =>
+      m.to.includes("gone") ? { ok: false, unregistered: true } : { ok: true },
+    );
+    await deliver(t, [u], "inventory.balance.low", LOW, uuidv7(), undefined, port);
+    const left = await withTenantTx(admin, ctx(t, u), (tx) =>
+      tx.query("SELECT token FROM notifications.push_tokens ORDER BY token"),
+    );
+    expect(left.rows).toEqual([{ token: "ExponentPushToken[live0000000000]" }]);
+  });
+
+  it("retries the whole event when the push service is down, then pushes once", async () => {
+    const t = uuidv7();
+    const u = uuidv7();
+    await token(u, t, "ExponentPushToken[retry000000000]");
+    const id = uuidv7();
+    const down: PushPort = { send: () => Promise.reject(new Error("push service answered 503")) };
+    await expect(
+      deliver(t, [u], "inventory.balance.low", LOW, id, undefined, down),
+    ).rejects.toThrow("503");
+    const { port, calls } = fakePush();
+    await deliver(t, [u], "inventory.balance.low", LOW, id, undefined, port);
+    expect(calls).toHaveLength(1);
+  });
+
+  it("talks to the Expo service in its documented shape, in batches of 100", async () => {
+    const seen: { url: string; body: unknown[] }[] = [];
+    const okFetch = ((url: string, init: RequestInit) => {
+      const body = JSON.parse(init.body as string) as unknown[];
+      seen.push({ url, body });
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({
+            data: body.map((_, i) =>
+              i === 0
+                ? { status: "error", details: { error: "DeviceNotRegistered" } }
+                : { status: "ok" },
+            ),
+          }),
+          { status: 200 },
+        ),
+      );
+    }) as unknown as typeof fetch;
+    const push = createExpoPush({ fetch: okFetch, accessToken: "t0ken" });
+    const msgs = Array.from({ length: 150 }, (_, i) => ({
+      to: `ExponentPushToken[${String(i).padStart(16, "0")}]`,
+      title: "x",
+      body: "y",
+      link: i === 0 ? "/stock" : null,
+    }));
+    const results = await push.send(msgs);
+    expect(seen.map((s) => s.body.length)).toEqual([100, 50]);
+    expect(seen[0]?.url).toBe("https://exp.host/--/api/v2/push/send");
+    expect(seen[0]?.body[0]).toMatchObject({ title: "x", data: { link: "/stock" } });
+    expect(results[0]).toEqual({ ok: false, unregistered: true });
+    expect(results[1]).toEqual({ ok: true });
+    expect(results).toHaveLength(150);
+
+    const failing = createExpoPush({
+      fetch: (() => Promise.resolve(new Response("", { status: 500 }))) as unknown as typeof fetch,
+    });
+    await expect(failing.send(msgs.slice(0, 1))).rejects.toThrow("500");
+    const short = createExpoPush({
+      fetch: (() =>
+        Promise.resolve(
+          new Response(JSON.stringify({ data: [] }), { status: 200 }),
+        )) as unknown as typeof fetch,
+    });
+    await expect(short.send(msgs.slice(0, 1))).rejects.toThrow("wrong count");
   });
 });
 
