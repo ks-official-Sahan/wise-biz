@@ -110,20 +110,24 @@ export async function setPreferences(
   tenantId: string,
   userId: string,
   items: readonly { kind: Kind; inApp: boolean; email: boolean }[],
+  /** The caller's verified address, kept beside every kind they turned email on for. */
+  emailTo: string | null,
 ): Promise<void> {
   // Last one wins when a kind repeats; sorted so concurrent saves lock rows in the same order.
   const byKind = new Map(items.map((i) => [i.kind, i]));
   const sorted = [...byKind.values()].sort((a, b) => a.kind.localeCompare(b.kind));
   await q.query(
-    `INSERT INTO notifications.preferences (tenant_id, user_id, kind, in_app, email)
-     SELECT $1, $2, x.kind, x.in_app, x.email
+    `INSERT INTO notifications.preferences (tenant_id, user_id, kind, in_app, email, email_to)
+     SELECT $1, $2, x.kind, x.in_app, x.email, CASE WHEN x.email THEN $4 END
        FROM jsonb_to_recordset($3::jsonb) AS x(kind text, in_app boolean, email boolean)
      ON CONFLICT (tenant_id, user_id, kind)
-       DO UPDATE SET in_app = EXCLUDED.in_app, email = EXCLUDED.email, updated_at = now()`,
+       DO UPDATE SET in_app = EXCLUDED.in_app, email = EXCLUDED.email, email_to = EXCLUDED.email_to,
+                     updated_at = now()`,
     [
       tenantId,
       userId,
       JSON.stringify(sorted.map((i) => ({ kind: i.kind, in_app: i.inApp, email: i.email }))),
+      emailTo,
     ],
   );
 }

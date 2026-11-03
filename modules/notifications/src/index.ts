@@ -7,8 +7,8 @@ import { mountRoutes } from "./http.ts";
 
 export { createNotificationsConsumer, NOTIFICATIONS_CONSUMER } from "./consumer.ts";
 export type { NotificationsConsumer, NotificationsDeps } from "./consumer.ts";
-export { notify } from "./notify.ts";
-export type { Message } from "./notify.ts";
+export { notify, sendPendingEmails } from "./notify.ts";
+export type { MailPort, Message } from "./notify.ts";
 export { KINDS } from "./kinds.ts";
 
 /**

@@ -13,6 +13,7 @@ import { createNotificationsConsumer } from "../src/consumer.ts";
 import { notificationsModule } from "../src/index.ts";
 import { notify } from "../src/notify.ts";
 
+import type { MailPort } from "../src/notify.ts";
 import type { AppEnv, IdempotencyCache, ModuleDeps } from "@wise-biz/module-kit";
 import type { TestDatabase } from "@wise-biz/testing/containers";
 import type pg from "pg";
@@ -50,8 +51,12 @@ const deliver = (
   type: string,
   payload: unknown,
   id = uuidv7(),
+  mail?: MailPort,
 ) => {
-  const consumer = createNotificationsConsumer({ holders: () => Promise.resolve(people) });
+  const consumer = createNotificationsConsumer({
+    holders: () => Promise.resolve(people),
+    ...(mail === undefined ? {} : { mail }),
+  });
   return withTenantTx(worker, ctx(tenantId, people[0] ?? uuidv7()), (tx) =>
     consumer.handle({ id, tenantId, type, payload: { data: payload } }, { client: tx as never }),
   );
@@ -64,7 +69,14 @@ const idempotencyCache: IdempotencyCache = {
   get: () => Promise.resolve(null),
   set: () => Promise.resolve(),
 };
-function appFor(tenantId: string, userId: string) {
+function appFor(
+  tenantId: string,
+  userId: string,
+  account: { email?: string; emailVerified?: boolean } = {
+    email: "person@example.test",
+    emailVerified: true,
+  },
+) {
   const deps: ModuleDeps = {
     pool: app,
     clock: { now: () => Date.now() },
@@ -86,6 +98,7 @@ function appFor(tenantId: string, userId: string) {
       roles: ["clerk"],
       branchScope: "all",
       permissionsVersion: 1,
+      ...account,
     });
     await next();
   });
@@ -342,6 +355,78 @@ describe("my notifications", () => {
       return c.json(p, p.status as 401);
     });
     expect((await a.request("/v1/notifications")).status).toBe(401);
+  });
+});
+
+describe("email", () => {
+  const prefs = (a: ReturnType<typeof appFor>, email: boolean) =>
+    a.request(
+      ...argsOf(
+        put("/v1/notifications/preferences", {
+          preferences: [{ kind: "low_stock", inApp: true, email }],
+        }),
+      ),
+    );
+  const sent: { to: string; subject: string; text: string }[] = [];
+  const mail = (fail = false): MailPort => ({
+    consoleUrl: "https://console.example.test",
+    send: (m) => {
+      if (fail) return Promise.reject(new Error("smtp down"));
+      sent.push(m);
+      return Promise.resolve();
+    },
+  });
+
+  it("mails only people who turned it on, to their verified address, with a link into the console", async () => {
+    sent.length = 0;
+    const t = uuidv7();
+    const [on, off] = [uuidv7(), uuidv7()];
+    expect(
+      (
+        await prefs(
+          appFor(t, on, { email: "Wants@Example.test".toLowerCase(), emailVerified: true }),
+          true,
+        )
+      ).status,
+    ).toBe(200);
+    await deliver(t, [on, off], "inventory.balance.low", LOW, uuidv7(), mail());
+    expect(sent).toHaveLength(1);
+    expect(sent[0]).toMatchObject({ to: "wants@example.test", subject: "Stock is running low" });
+    expect(sent[0]?.text).toContain("https://console.example.test/stock");
+  });
+
+  it("does not mail twice when the event is delivered again, and finishes the unsent after a failure", async () => {
+    sent.length = 0;
+    const t = uuidv7();
+    const u = uuidv7();
+    await prefs(appFor(t, u), true);
+    const id = uuidv7();
+    await expect(deliver(t, [u], "inventory.balance.low", LOW, id, mail(true))).rejects.toThrow(
+      "smtp down",
+    );
+    expect(sent).toHaveLength(0);
+    // The retry stores nothing new (the failed attempt rolled back with it) and now sends.
+    await deliver(t, [u], "inventory.balance.low", LOW, id, mail());
+    await deliver(t, [u], "inventory.balance.low", LOW, id, mail());
+    expect(sent).toHaveLength(1);
+    const body = (await (await appFor(t, u).request("/v1/notifications")).json()) as Listed;
+    expect(body.notifications).toHaveLength(1);
+  });
+
+  it("refuses to turn email on without a verified address, and forgets the address when turned off", async () => {
+    const t = uuidv7();
+    const u = uuidv7();
+    expect(
+      (await prefs(appFor(t, u, { email: "a@example.test", emailVerified: false }), true)).status,
+    ).toBe(422);
+    expect((await prefs(appFor(t, u, {}), true)).status).toBe(422);
+    expect((await prefs(appFor(t, u, {}), false)).status).toBe(200);
+    await prefs(appFor(t, u), true);
+    await prefs(appFor(t, u), false);
+    const row = await withTenantTx(admin, ctx(t, u), (tx) =>
+      tx.query("SELECT email, email_to FROM notifications.preferences WHERE kind = 'low_stock'"),
+    );
+    expect(row.rows).toEqual([{ email: false, email_to: null }]);
   });
 });
 

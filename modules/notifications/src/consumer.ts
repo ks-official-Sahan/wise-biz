@@ -1,8 +1,9 @@
 import { z } from "zod";
 
-import { notify } from "./notify.ts";
+import { notify, sendPendingEmails } from "./notify.ts";
 
 import type { Kind } from "./kinds.ts";
+import type { MailPort } from "./notify.ts";
 import type { PoolClient } from "pg";
 
 export const NOTIFICATIONS_CONSUMER = "notifications.fanout";
@@ -15,6 +16,8 @@ const EVENTS = [
 ] as const;
 
 export interface NotificationsDeps {
+  /** Omit to keep notifications in the app only (tests, and deployments without a mailer). */
+  readonly mail?: MailPort;
   /** Active people who hold a permission (the owner always counts). Built from tenancy at the composition root. */
   readonly holders: (
     client: PoolClient,
@@ -82,6 +85,7 @@ export function createNotificationsConsumer(deps: NotificationsDeps): Notificati
       link,
       dedupeKey: eventId,
     });
+    if (deps.mail !== undefined) await sendPendingEmails(client, deps.mail, tenantId, eventId);
   };
 
   return {
@@ -124,6 +128,8 @@ export function createNotificationsConsumer(deps: NotificationsDeps): Notificati
           link: "/reports",
           dedupeKey: event.id,
         });
+        if (deps.mail !== undefined)
+          await sendPendingEmails(ctx.client, deps.mail, event.tenantId, event.id);
       } else if (event.type === "devices.heartbeat.missed") {
         const p = envelope(Missed).parse(event.payload).data;
         await tell(

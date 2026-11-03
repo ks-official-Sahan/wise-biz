@@ -32,3 +32,51 @@ export async function notify(
   );
   return res.rowCount ?? 0;
 }
+
+/** Where emails go out and what the link in them points at (the console origin). */
+export interface MailPort {
+  readonly send: (msg: { to: string; subject: string; text: string }) => Promise<void>;
+  readonly consoleUrl: string;
+}
+
+/**
+ * Emails the people who turned email on for this notification's kind, once. The notification row says whether it was
+ * sent (`emailed_at`), so when the event is retried after a mail failure only the unsent ones go out again. A failed
+ * send throws, which makes the bus retry the whole event; the in-app notifications are already stored and are not
+ * duplicated.
+ */
+export async function sendPendingEmails(
+  client: Q,
+  mail: MailPort,
+  tenantId: string,
+  dedupeKey: string,
+): Promise<number> {
+  const pending = await client.query<{
+    id: string;
+    title: string;
+    body: string;
+    link: string | null;
+    email_to: string;
+  }>(
+    `SELECT n.id, n.title, n.body, n.link, p.email_to
+       FROM notifications.notifications n
+       JOIN notifications.preferences p
+         ON p.tenant_id = n.tenant_id AND p.user_id = n.user_id AND p.kind = n.kind
+      WHERE n.tenant_id = $1 AND n.dedupe_key = $2 AND n.emailed_at IS NULL AND p.email AND p.email_to IS NOT NULL
+      ORDER BY n.id`,
+    [tenantId, dedupeKey],
+  );
+  for (const n of pending.rows) {
+    const where = n.link === null ? "" : `\n\nOpen it: ${mail.consoleUrl}${n.link}`;
+    await mail.send({
+      to: n.email_to,
+      subject: n.title,
+      text: `${n.body}${where}\n\nChange what you are emailed about in the console under Notifications.`,
+    });
+    await client.query(
+      `UPDATE notifications.notifications SET emailed_at = now() WHERE tenant_id = $1 AND id = $2`,
+      [tenantId, n.id],
+    );
+  }
+  return pending.rows.length;
+}

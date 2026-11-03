@@ -15,6 +15,7 @@ import {
   Stack,
   styles,
 } from "@/components/ui.tsx";
+import { ApiError } from "@/lib/api.ts";
 import {
   ago,
   safeLink,
@@ -157,7 +158,13 @@ function Preferences({ tenantId }: { readonly tenantId: string }) {
           }}
         />
       ) : null}
-      {save.isError ? <Alert tone="danger">Could not save that. Try again.</Alert> : null}
+      {save.isError ? (
+        <Alert tone="danger">
+          {save.error instanceof ApiError && save.error.status === 422
+            ? "Verify your email address first, then turn email on."
+            : "Could not save that. Try again."}
+        </Alert>
+      ) : null}
       {prefs.isSuccess ? (
         <div className={styles.tableWrap}>
           <table className={styles.table}>
@@ -204,7 +211,7 @@ function Preferences({ tenantId }: { readonly tenantId: string }) {
         </div>
       ) : null}
       <p className={styles.muted}>
-        Email is saved now and starts when email delivery is switched on.
+        Email goes to the address you signed in with, once it is verified.
       </p>
     </Card>
   );

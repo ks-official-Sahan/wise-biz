@@ -43,7 +43,10 @@ export function createConsumers(deps: ConsumerDeps): readonly ConsumerDefinition
     createSyncChangesConsumer(deps.notify),
     createReceiptLinkConsumer(),
     createReportingConsumer(),
-    createNotificationsConsumer({ holders: permissionHolders }),
+    createNotificationsConsumer({
+      holders: permissionHolders,
+      mail: { send: (m) => deps.mailer.send(m), consoleUrl: deps.consoleUrl },
+    }),
     createLowStockConsumer({ pool: deps.imports.pool, ids: { uuidv7 }, now: () => new Date() }),
     createImportConsumer(
       {

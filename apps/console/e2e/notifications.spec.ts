@@ -13,6 +13,8 @@ interface Sent {
   prefs: unknown[];
 }
 
+let refuseEmail = false;
+
 async function mockApi(page: Page): Promise<Sent> {
   const sent: Sent = { reads: [], prefs: [] };
   let unread = 2;
@@ -66,6 +68,8 @@ async function mockApi(page: Page): Promise<Sent> {
     }
     if (path === "/v1/notifications/preferences") {
       if (req.method() === "PUT") {
+        if (refuseEmail && JSON.stringify(req.postDataJSON()).includes('"email":true'))
+          return json(422, { status: 422, title: "Validation failed" });
         const body = req.postDataJSON() as {
           preferences: { kind: string; inApp: boolean; email: boolean }[];
         };
@@ -123,4 +127,16 @@ test("saves a preference when it is toggled", async ({ page }) => {
     preferences: [{ kind: "expiring", inApp: true, email: true }],
   });
   await a11y(page);
+});
+
+test("explains when email cannot be turned on yet", async ({ page }) => {
+  refuseEmail = true;
+  try {
+    await mockApi(page);
+    await page.goto("/notifications");
+    await page.getByRole("checkbox", { name: "Low stock: by email" }).check();
+    await expect(page.getByText("Verify your email address first")).toBeVisible();
+  } finally {
+    refuseEmail = false;
+  }
 });

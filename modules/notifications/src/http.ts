@@ -1,5 +1,6 @@
 import { createRoute } from "@hono/zod-openapi";
 import { withTenantTx } from "@wise-biz/db";
+import { DomainError } from "@wise-biz/errors";
 import { requireTenant, requireUser } from "@wise-biz/module-kit";
 
 import {
@@ -124,8 +125,18 @@ export function mountRoutes(app: OpenAPIHono<AppEnv>, deps: ModuleDeps): void {
   );
   app.openapi(routes.setPrefs, async (c) => {
     const b = c.req.valid("json");
+    const auth = c.get("auth");
+    const verified =
+      auth.kind === "user" && auth.emailVerified === true ? (auth.email ?? null) : null;
+    // Email goes only to an address the person has verified; asking for it without one is a clear error, not a silent skip.
+    if (b.preferences.some((p) => p.email) && verified === null) {
+      throw new DomainError(
+        "VALIDATION_FAILED",
+        "Verify your email address before turning on email notifications",
+      );
+    }
     const all = await mine(c, async (tx, t, u) => {
-      await setPreferences(tx, t, u, b.preferences);
+      await setPreferences(tx, t, u, b.preferences, verified);
       return preferences(tx, t, u);
     });
     return c.json({ preferences: all }, 200);
