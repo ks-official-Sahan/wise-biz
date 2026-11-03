@@ -1,5 +1,6 @@
 import { createRoute } from "@hono/zod-openapi";
 import { withTenantTx } from "@wise-biz/db";
+import { DomainError } from "@wise-biz/errors";
 import { authorize, requireTenant, runCommand } from "@wise-biz/module-kit";
 import { z } from "zod";
 
@@ -18,6 +19,7 @@ import {
   TaxReportSchema,
 } from "./schemas.ts";
 
+import type { Range } from "./queries.ts";
 import type { OpenAPIHono } from "@hono/zod-openapi";
 import type { AppEnv, ModuleDeps } from "@wise-biz/module-kit";
 import type { MiddlewareHandler } from "hono";
@@ -29,7 +31,16 @@ const needs =
     authorize(c, permission);
     await next();
   };
-const read = needs("reporting:read");
+/**
+ * Reads: a caller with every branch is authorized here. A caller limited to some branches is authorized per branch in
+ * `scoped` below (the policy fails closed without a branch), so the middleware only checks they are signed in.
+ */
+const read: MiddlewareHandler<AppEnv> = async (c, next) => {
+  const auth = c.get("auth");
+  if (auth.kind === "user" && auth.branchScope !== "all") requireTenant(c);
+  else authorize(c, "reporting:read");
+  await next();
+};
 const json = <T>(schema: T) => ({ content: { "application/json": { schema } } });
 const ok = <T>(schema: T) => ({ 200: { description: "OK", ...json(schema) } });
 const tags = ["reporting"];
@@ -100,6 +111,26 @@ const routes = {
   }),
 };
 
+/**
+ * The branches a report may cover. Everyone-scope callers get what they asked for (all branches when no filter). A
+ * branch-limited caller must hold the permission for each branch: a filter outside their scope is a 404, and with no
+ * filter the report covers exactly their own branches.
+ */
+function scoped(
+  c: Parameters<typeof requireTenant>[0],
+  q: { from: string; to: string; branchId?: string | undefined },
+): Range {
+  const auth = c.get("auth");
+  const { branchId, ...range } = q;
+  if (auth.kind !== "user" || auth.branchScope === "all") {
+    return branchId === undefined ? range : { ...range, branchIds: [branchId] };
+  }
+  const wanted = branchId === undefined ? [...auth.branchScope] : [branchId];
+  if (wanted.length === 0) throw new DomainError("NOT_FOUND", "Not found");
+  for (const b of wanted) authorize(c, "reporting:read", { branchId: b });
+  return { ...range, branchIds: wanted };
+}
+
 export function mountRoutes(app: OpenAPIHono<AppEnv>, deps: ModuleDeps): void {
   const reading = <T>(
     c: Parameters<typeof requireTenant>[0],
@@ -110,30 +141,33 @@ export function mountRoutes(app: OpenAPIHono<AppEnv>, deps: ModuleDeps): void {
   };
 
   app.openapi(routes.sales, async (c) => {
-    const { groupBy, ...range } = c.req.valid("query");
+    const { groupBy, ...q } = c.req.valid("query");
+    const range = scoped(c, q);
     return c.json(
       { groupBy, rows: await reading(c, (tx, t) => salesSummary(tx, t, range, groupBy)) },
       200,
     );
   });
   app.openapi(routes.products, async (c) => {
-    const { limit, ...range } = c.req.valid("query");
+    const { limit, ...q } = c.req.valid("query");
+    const range = scoped(c, q);
     return c.json({ rows: await reading(c, (tx, t) => products(tx, t, range, limit)) }, 200);
   });
   app.openapi(routes.payments, async (c) => {
-    const range = c.req.valid("query");
+    const range = scoped(c, c.req.valid("query"));
     return c.json({ rows: await reading(c, (tx, t) => payments(tx, t, range)) }, 200);
   });
   app.openapi(routes.operators, async (c) => {
-    const range = c.req.valid("query");
+    const range = scoped(c, c.req.valid("query"));
     return c.json({ rows: await reading(c, (tx, t) => operators(tx, t, range)) }, 200);
   });
   app.openapi(routes.tax, async (c) => {
-    const range = c.req.valid("query");
+    const range = scoped(c, c.req.valid("query"));
     return c.json({ rows: await reading(c, (tx, t) => tax(tx, t, range)) }, 200);
   });
   app.openapi(routes.salesCsv, async (c) => {
-    const { groupBy, ...range } = c.req.valid("query");
+    const { groupBy, ...q } = c.req.valid("query");
+    const range = scoped(c, q);
     const rows = await reading(c, (tx, t) => salesSummary(tx, t, range, groupBy));
     const body = toCsv(
       [

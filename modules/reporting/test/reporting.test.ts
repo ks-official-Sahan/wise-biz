@@ -174,7 +174,7 @@ function generate(seed: number) {
       tenders: [{ kind: "cash", amountMinor: refund }],
     });
   }
-  return { shifts, sales, returns };
+  return { shifts, sales, returns, branches };
 }
 
 const saleEnvelope = (tenantId: string, s: GenSale) => {
@@ -577,7 +577,7 @@ const idempotencyCache: IdempotencyCache = {
     return Promise.resolve();
   },
 };
-function appFor(tenantId: string, role: string) {
+function appFor(tenantId: string, role: string, branchScope: "all" | string[] = "all") {
   const deps: ModuleDeps = {
     pool: app,
     clock: { now: () => Date.UTC(2026, 10, 4) },
@@ -597,7 +597,7 @@ function appFor(tenantId: string, role: string) {
       sessionId: "01900000-0000-7000-8000-0000000000aa",
       tenantId,
       roles: [role],
-      branchScope: "all",
+      branchScope,
       permissionsVersion: 1,
     });
     await next();
@@ -688,6 +688,42 @@ describe("reports API", () => {
     };
     expect(tx.rows.map((r) => r.day)).toEqual(["2026-11-01", "2026-11-02", "2026-11-03"]);
     for (const r of tx.rows) expect(r.netOfTaxMinor).toBe(r.payableMinor - r.taxMinor);
+  });
+
+  it("limits a branch-scoped reader to their own branches", async () => {
+    const [mine, other] = [g.branches[0] ?? "", g.branches[1] ?? ""];
+    const a = appFor(tenantId, "analyst", [mine]);
+    const total = async (url: string) => {
+      const res = await a.request(url);
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { rows: { salesCount: number }[] };
+      return body.rows.reduce((n, r) => n + r.salesCount, 0);
+    };
+    const mineSales = g.sales.filter((x) => x.branchId === mine && !x.voided).length;
+    // No filter: exactly their branch, not the whole business.
+    expect(await total(`/v1/reporting/sales?${Q_RANGE}&groupBy=day`)).toBe(mineSales);
+    expect(await total(`/v1/reporting/sales?${Q_RANGE}&groupBy=day&branchId=${mine}`)).toBe(
+      mineSales,
+    );
+    // Other reports and the CSV are scoped the same way.
+    expect((await a.request(`/v1/reporting/operators?${Q_RANGE}`)).status).toBe(200);
+    expect((await a.request(`/v1/reporting/sales.csv?${Q_RANGE}&groupBy=branch`)).status).toBe(200);
+    // Another branch is a 404, as is a scope with no branches at all.
+    expect(
+      (await a.request(`/v1/reporting/sales?${Q_RANGE}&groupBy=day&branchId=${other}`)).status,
+    ).toBe(404);
+    expect(
+      (await appFor(tenantId, "analyst", []).request(`/v1/reporting/sales?${Q_RANGE}&groupBy=day`))
+        .status,
+    ).toBe(404);
+    // A scoped role without the permission still gets nothing.
+    expect(
+      (
+        await appFor(tenantId, "nobody", [mine]).request(
+          `/v1/reporting/sales?${Q_RANGE}&groupBy=day`,
+        )
+      ).status,
+    ).toBe(404);
   });
 
   it("reports sales per operator, for readers only", async () => {
