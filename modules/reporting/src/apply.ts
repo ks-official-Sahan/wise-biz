@@ -35,6 +35,7 @@ export const SaleCompleted = z.object({
     saleId: uuid,
     branchId: uuid,
     terminalId: uuid,
+    operatorId: uuid.optional(),
     businessDate: date,
     currency,
     subtotalMinor: int,
@@ -91,6 +92,8 @@ export interface SaleFact {
   saleId: string;
   branchId: string;
   terminalId: string;
+  /** The nil UUID when the event predates operators. */
+  operatorId?: string | undefined;
   businessDate: string;
   currency: string;
   subtotalMinor: number;
@@ -127,6 +130,7 @@ async function lock(q: Q, tenantId: string, exclusive: boolean): Promise<void> {
 }
 
 /** Quantities have up to 4 decimals: sum them as integers in 1/10000, so no float drift reaches a rollup. */
+const NIL_UUID = "00000000-0000-0000-0000-000000000000";
 const SCALE = 10_000;
 const scaled = (qty: string): number => Math.round(Number(qty) * SCALE);
 const unscaled = (n: number): string => (n / SCALE).toFixed(4);
@@ -236,6 +240,30 @@ async function applySale(q: Q, f: SaleFact, sign: 1 | -1): Promise<void> {
          cost_minor = reporting.rollup_sku_day.cost_minor + excluded.cost_minor`,
       [f.tenantId, f.businessDate, f.branchId, f.currency, JSON.stringify(skus)],
     );
+  await q.query(
+    `insert into reporting.rollup_operator_day
+       (tenant_id, business_date, branch_id, operator_id, currency, sales_count, discount_minor, payable_minor,
+        voids_count, voids_payable_minor)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+     on conflict (tenant_id, business_date, branch_id, operator_id, currency) do update set
+       sales_count = reporting.rollup_operator_day.sales_count + excluded.sales_count,
+       discount_minor = reporting.rollup_operator_day.discount_minor + excluded.discount_minor,
+       payable_minor = reporting.rollup_operator_day.payable_minor + excluded.payable_minor,
+       voids_count = reporting.rollup_operator_day.voids_count + excluded.voids_count,
+       voids_payable_minor = reporting.rollup_operator_day.voids_payable_minor + excluded.voids_payable_minor`,
+    [
+      f.tenantId,
+      f.businessDate,
+      f.branchId,
+      f.operatorId ?? NIL_UUID,
+      f.currency,
+      sign,
+      sign * f.discountMinor,
+      sign * f.payableMinor,
+      voided ? 1 : 0,
+      voided ? f.payableMinor : 0,
+    ],
+  );
   const kinds = byKind(f.tenders, sign);
   if (kinds.length > 0)
     await q.query(
@@ -320,8 +348,8 @@ export async function onSaleCompleted(q: Q, payload: unknown): Promise<boolean> 
   const r = await q.query(
     `insert into reporting.sale_facts
        (tenant_id, sale_id, branch_id, terminal_id, business_date, currency, subtotal_minor, discount_minor,
-        fee_minor, tax_minor, payable_minor, lines, tenders)
-     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb, $13::jsonb)
+        fee_minor, tax_minor, payable_minor, lines, tenders, operator_id)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb, $13::jsonb, $14)
      on conflict do nothing`,
     [
       e.tenantId,
@@ -337,6 +365,7 @@ export async function onSaleCompleted(q: Q, payload: unknown): Promise<boolean> 
       d.payableMinor,
       JSON.stringify(d.lines),
       JSON.stringify(d.tenders),
+      d.operatorId ?? null,
     ],
   );
   if (r.rowCount !== 1) return false;
@@ -412,7 +441,7 @@ export async function onReturnCompleted(q: Q, payload: unknown): Promise<boolean
 async function loadSale(q: Q, tenantId: string, saleId: string): Promise<SaleFact> {
   const r = await q.query(
     `select branch_id, terminal_id, business_date::text as business_date, currency, subtotal_minor, discount_minor,
-            fee_minor, tax_minor, payable_minor, lines, tenders
+            fee_minor, tax_minor, payable_minor, lines, tenders, operator_id
        from reporting.sale_facts where tenant_id = $1 and sale_id = $2`,
     [tenantId, saleId],
   );
@@ -423,6 +452,7 @@ const toSale = (tenantId: string, saleId: string, r: Record<string, unknown>): S
   saleId,
   branchId: String(r.branch_id),
   terminalId: String(r.terminal_id),
+  operatorId: typeof r.operator_id === "string" ? r.operator_id : undefined,
   businessDate: String(r.business_date),
   currency: String(r.currency),
   subtotalMinor: Number(r.subtotal_minor),
@@ -446,7 +476,12 @@ export async function rebuild(
   to: string,
 ): Promise<{ sales: number; returns: number }> {
   await lock(q, tenantId, true);
-  for (const table of ["rollup_day", "rollup_sku_day", "rollup_tender_day"]) {
+  for (const table of [
+    "rollup_day",
+    "rollup_sku_day",
+    "rollup_tender_day",
+    "rollup_operator_day",
+  ]) {
     await q.query(
       `delete from reporting.${table} where tenant_id = $1 and business_date between $2 and $3`,
       [tenantId, from, to],
@@ -454,7 +489,7 @@ export async function rebuild(
   }
   const sales = await q.query(
     `select sale_id, status, branch_id, terminal_id, business_date::text as business_date, currency, subtotal_minor,
-            discount_minor, fee_minor, tax_minor, payable_minor, lines, tenders
+            discount_minor, fee_minor, tax_minor, payable_minor, lines, tenders, operator_id
        from reporting.sale_facts
       where tenant_id = $1 and business_date between $2 and $3 order by business_date, sale_id`,
     [tenantId, from, to],

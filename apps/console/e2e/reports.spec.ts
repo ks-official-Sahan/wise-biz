@@ -130,6 +130,31 @@ async function mockApi(page: Page): Promise<string[]> {
           },
         ],
       });
+    if (path === "/v1/reporting/operators")
+      return json(200, {
+        rows: [
+          {
+            operatorId: "0190a000-0000-7000-8000-00000000abcd",
+            currency: "USD",
+            salesCount: 12,
+            payableMinor: 36000,
+            averageMinor: 3000,
+            discountMinor: 500,
+            voidsCount: 1,
+            voidsPayableMinor: 2000,
+          },
+          {
+            operatorId: "00000000-0000-0000-0000-000000000000",
+            currency: "USD",
+            salesCount: 3,
+            payableMinor: 9000,
+            averageMinor: 3000,
+            discountMinor: 0,
+            voidsCount: 0,
+            voidsPayableMinor: 0,
+          },
+        ],
+      });
     if (path === "/v1/reporting/tax")
       return json(200, {
         rows: [
@@ -183,6 +208,12 @@ test("switches between products, payments and tax, and changes the period", asyn
   await page.getByRole("tab", { name: "Payments" }).click();
   await expect(page.getByRole("rowheader", { name: "cash" })).toBeVisible();
   await expect(page.getByRole("cell", { name: "$195.00" })).toBeVisible();
+
+  await page.getByRole("tab", { name: "Staff" }).click();
+  await expect(page.getByRole("rowheader", { name: "Staff …00abcd" })).toBeVisible();
+  await expect(page.getByRole("rowheader", { name: "Before staff were recorded" })).toBeVisible();
+  await expect(page.getByRole("cell", { name: "$360.00" })).toBeVisible();
+  await a11y(page);
 
   await page.getByRole("tab", { name: "Tax" }).click();
   await expect(page.getByText("$9.60").first()).toBeVisible();

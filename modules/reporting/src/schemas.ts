@@ -81,6 +81,23 @@ export const ProductsReportSchema = z
   .object({ rows: z.array(ProductRowSchema) })
   .meta({ id: "ProductsReport" });
 
+export const OperatorsReportSchema = z
+  .object({
+    rows: z.array(
+      z.object({
+        operatorId: z.string(),
+        currency: z.string(),
+        salesCount: z.number().int(),
+        payableMinor: money,
+        averageMinor: money,
+        discountMinor: money,
+        voidsCount: z.number().int(),
+        voidsPayableMinor: money,
+      }),
+    ),
+  })
+  .meta({ id: "OperatorsReport" });
+
 export const PaymentsReportSchema = z
   .object({
     rows: z.array(

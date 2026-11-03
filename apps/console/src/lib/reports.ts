@@ -52,6 +52,17 @@ export interface TaxRow {
   readonly netOfTaxMinor: number;
 }
 
+export interface OperatorRow {
+  readonly operatorId: string;
+  readonly currency: string;
+  readonly salesCount: number;
+  readonly payableMinor: number;
+  readonly averageMinor: number;
+  readonly discountMinor: number;
+  readonly voidsCount: number;
+  readonly voidsPayableMinor: number;
+}
+
 export type GroupBy = "day" | "branch" | "terminal";
 export interface ReportFilter {
   readonly from: string;
@@ -65,6 +76,7 @@ export const reportKeys = {
   products: (t: string, f: ReportFilter) => [t, "reports", "products", f] as const,
   payments: (t: string, f: ReportFilter) => [t, "reports", "payments", f] as const,
   tax: (t: string, f: ReportFilter) => [t, "reports", "tax", f] as const,
+  operators: (t: string, f: ReportFilter) => [t, "reports", "operators", f] as const,
 };
 
 /** Query string for a report: the filter's empty fields are left out. */
@@ -112,6 +124,21 @@ export const usePaymentsReport = (t: string, f: ReportFilter) =>
     staleTime: STALE.list,
     select: (d) => d.rows,
   });
+
+export const useOperatorsReport = (t: string, f: ReportFilter) =>
+  useQuery({
+    queryKey: reportKeys.operators(t, f),
+    queryFn: ({ signal }) =>
+      api<{ rows: OperatorRow[] }>("GET", `/v1/reporting/operators?${reportQuery(f)}`, { signal }),
+    staleTime: STALE.list,
+    select: (d) => d.rows,
+  });
+
+const NIL_OPERATOR = "00000000-0000-0000-0000-000000000000";
+
+/** Operators are users and the console has no name directory yet, so show the end of the id; nil means "not recorded". */
+export const operatorLabel = (id: string): string =>
+  id === NIL_OPERATOR ? "Before staff were recorded" : `Staff …${id.slice(-6)}`;
 
 export const useTaxReport = (t: string, f: ReportFilter) =>
   useQuery({

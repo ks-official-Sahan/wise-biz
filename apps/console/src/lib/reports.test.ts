@@ -7,6 +7,7 @@ import {
   describeDelta,
   eachDay,
   isoDay,
+  operatorLabel,
   presetRange,
   reportQuery,
   shiftDays,
@@ -62,6 +63,15 @@ describe("dates", () => {
     expect(
       reportQuery({ from: "2026-11-01", to: "2026-11-03", branchId: "b" }, { groupBy: "branch" }),
     ).toBe("from=2026-11-01&to=2026-11-03&groupBy=branch&branchId=b");
+  });
+});
+
+describe("staff labels", () => {
+  it("shows the end of the id, and says so for sales from before staff were recorded", () => {
+    expect(operatorLabel("0190a000-0000-7000-8000-00000000abcd")).toBe("Staff …00abcd");
+    expect(operatorLabel("00000000-0000-0000-0000-000000000000")).toBe(
+      "Before staff were recorded",
+    );
   });
 });
 

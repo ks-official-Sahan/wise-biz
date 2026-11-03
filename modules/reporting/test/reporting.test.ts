@@ -18,7 +18,7 @@ import {
 } from "../src/apply.ts";
 import { createReportingConsumer } from "../src/consumer.ts";
 import { reportingModule } from "../src/index.ts";
-import { csvCell, salesSummary } from "../src/queries.ts";
+import { csvCell, operators, salesSummary } from "../src/queries.ts";
 
 import type { Q } from "../src/apply.ts";
 import type { AppEnv, IdempotencyCache, ModuleDeps } from "@wise-biz/module-kit";
@@ -76,6 +76,7 @@ function rng(seed: number): () => number {
 
 interface GenSale {
   saleId: string;
+  operatorId?: string;
   branchId: string;
   terminalId: string;
   shiftId: string;
@@ -110,6 +111,7 @@ const first = <T>(xs: readonly T[]): T => {
 function generate(seed: number) {
   const r = rng(seed);
   const pick = <T>(xs: readonly T[]): T => xs[Math.floor(r() * xs.length)] as T;
+  const operators = [uuidv7(), uuidv7(), uuidv7()];
   const branches = [uuidv7(), uuidv7()];
   const terminals = branches.flatMap((b) => [uuidv7(), uuidv7()].map((t) => ({ b, t })));
   const variants = Array.from({ length: 6 }, (_, i) => ({
@@ -142,6 +144,7 @@ function generate(seed: number) {
     const split = Math.floor(payable / 3);
     sales.push({
       saleId: uuidv7(),
+      operatorId: pick(operators),
       branchId: sh.branchId,
       terminalId: sh.terminalId,
       shiftId: sh.shiftId,
@@ -182,6 +185,7 @@ const saleEnvelope = (tenantId: string, s: GenSale) => {
       saleId: s.saleId,
       branchId: s.branchId,
       terminalId: s.terminalId,
+      ...(s.operatorId === undefined ? {} : { operatorId: s.operatorId }),
       businessDate: s.businessDate,
       currency: "USD",
       subtotalMinor: subtotal,
@@ -368,6 +372,42 @@ describe("rollups equal an independent aggregation of random data", () => {
       expect(tenderTotals).toEqual(want.tender);
     });
   }
+
+  it("per-operator sales equal an independent count, and a rebuild reproduces them", async () => {
+    const tenantId = uuidv7();
+    const g = generate(5);
+    await feed(tenantId, g);
+    const want = new Map<
+      string,
+      { sales: number; payable: number; voids: number; voidValue: number }
+    >();
+    for (const sale of g.sales) {
+      const a = want.get(sale.operatorId ?? "") ?? { sales: 0, payable: 0, voids: 0, voidValue: 0 };
+      const payable = sale.lines.reduce((n, l) => n + l.totalMinor, 0);
+      if (sale.voided) {
+        a.voids += 1;
+        a.voidValue += payable;
+      } else {
+        a.sales += 1;
+        a.payable += payable;
+      }
+      want.set(sale.operatorId ?? "", a);
+    }
+    const read = async () =>
+      (
+        await asApp(tenantId, (q) =>
+          operators(q, tenantId, { from: "2026-11-01", to: "2026-11-03" }),
+        )
+      )
+        .map((r) => [r.operatorId, r.salesCount, r.payableMinor, r.voidsCount, r.voidsPayableMinor])
+        .sort();
+    const before = await read();
+    expect(before).toEqual(
+      [...want.entries()].map(([id, a]) => [id, a.sales, a.payable, a.voids, a.voidValue]).sort(),
+    );
+    await asWorker(tenantId, (q) => rebuild(q, tenantId, "2026-11-01", "2026-11-03"));
+    expect(await read()).toEqual(before);
+  });
 
   it("applying every event again changes nothing (redelivery is safe)", async () => {
     const tenantId = uuidv7();
@@ -648,6 +688,22 @@ describe("reports API", () => {
     };
     expect(tx.rows.map((r) => r.day)).toEqual(["2026-11-01", "2026-11-02", "2026-11-03"]);
     for (const r of tx.rows) expect(r.netOfTaxMinor).toBe(r.payableMinor - r.taxMinor);
+  });
+
+  it("reports sales per operator, for readers only", async () => {
+    const res = await appFor(tenantId, "analyst").request(`/v1/reporting/operators?${Q_RANGE}`);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      rows: { operatorId: string; salesCount: number; averageMinor: number }[];
+    };
+    expect(body.rows.length).toBe(new Set(g.sales.map((x) => x.operatorId)).size);
+    expect(body.rows.reduce((n, r) => n + r.salesCount, 0)).toBe(
+      g.sales.filter((x) => !x.voided).length,
+    );
+    expect(body.rows.every((r) => r.averageMinor >= 0)).toBe(true);
+    expect(
+      (await appFor(tenantId, "nobody").request(`/v1/reporting/operators?${Q_RANGE}`)).status,
+    ).toBe(404);
   });
 
   it("exports CSV with a download name, and defuses spreadsheet formulas", async () => {

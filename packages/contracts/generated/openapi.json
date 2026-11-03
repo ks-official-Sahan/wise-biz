@@ -1388,6 +1388,54 @@
         "required": ["sessionId", "userId", "expiresAt"],
         "type": "object"
       },
+      "OperatorsReport": {
+        "properties": {
+          "rows": {
+            "items": {
+              "properties": {
+                "averageMinor": {
+                  "type": "integer"
+                },
+                "currency": {
+                  "type": "string"
+                },
+                "discountMinor": {
+                  "type": "integer"
+                },
+                "operatorId": {
+                  "type": "string"
+                },
+                "payableMinor": {
+                  "type": "integer"
+                },
+                "salesCount": {
+                  "type": "integer"
+                },
+                "voidsCount": {
+                  "type": "integer"
+                },
+                "voidsPayableMinor": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "operatorId",
+                "currency",
+                "salesCount",
+                "payableMinor",
+                "averageMinor",
+                "discountMinor",
+                "voidsCount",
+                "voidsPayableMinor"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": ["rows"],
+        "type": "object"
+      },
       "PaymentsReport": {
         "properties": {
           "rows": {
@@ -9077,6 +9125,53 @@
         },
         "summary": "Replace a region's settings and rule set (optimistic lock on version)",
         "tags": ["pricing"]
+      }
+    },
+    "/v1/reporting/operators": {
+      "get": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "from",
+            "required": true,
+            "schema": {
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": true,
+            "schema": {
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "branchId",
+            "required": false,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorsReport"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Sales per operator (staff report)",
+        "tags": ["reporting"]
       }
     },
     "/v1/reporting/payments": {

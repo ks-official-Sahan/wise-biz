@@ -23,6 +23,8 @@ import {
   presetRange,
   salesCsvUrl,
   totals,
+  operatorLabel,
+  useOperatorsReport,
   usePaymentsReport,
   useProductsReport,
   useSalesReport,
@@ -38,6 +40,7 @@ const TABS = [
   { id: "sales", label: "Sales" },
   { id: "products", label: "Products" },
   { id: "payments", label: "Payments" },
+  { id: "staff", label: "Staff" },
   { id: "tax", label: "Tax" },
 ] as const;
 type TabId = (typeof TABS)[number]["id"];
@@ -149,6 +152,8 @@ export default function ReportsPage() {
           <ProductsTab filter={filter} currency={currency} />
         ) : tab === "payments" ? (
           <PaymentsTab filter={filter} currency={currency} />
+        ) : tab === "staff" ? (
+          <StaffTab filter={filter} currency={currency} />
         ) : (
           <TaxTab filter={filter} currency={currency} />
         )}
@@ -376,6 +381,63 @@ function PaymentsTab({ filter, currency }: { filter: ReportFilter; currency: str
               <td className={s.num}>{m(r.salesMinor)}</td>
               <td className={s.num}>{m(r.refundsMinor)}</td>
               <td className={s.num}>{m(r.netMinor)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function StaffTab({ filter, currency }: { filter: ReportFilter; currency: string }) {
+  const { tenant } = useTenant();
+  const report = useOperatorsReport(tenant.tenantId, filter);
+  const m = (minor: number) => formatPrice(minor, currency);
+  if (report.isPending) return <SkeletonRows label="Loading staff sales" />;
+  if (report.isError)
+    return (
+      <ErrorState
+        error={report.error}
+        onRetry={() => {
+          void report.refetch();
+        }}
+      />
+    );
+  const rows = report.data.filter((r) => r.currency === currency);
+  if (rows.length === 0) return <Empty title="No sales in this period" />;
+  return (
+    <div className={styles.tableWrap}>
+      <table className={styles.table}>
+        <caption className="sr-only">Sales by staff member</caption>
+        <thead>
+          <tr>
+            <th scope="col">Staff</th>
+            <th scope="col" className={s.num}>
+              Sales
+            </th>
+            <th scope="col" className={s.num}>
+              Taken
+            </th>
+            <th scope="col" className={s.num}>
+              Average
+            </th>
+            <th scope="col" className={s.num}>
+              Discounts
+            </th>
+            <th scope="col" className={s.num}>
+              Voids
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.operatorId}>
+              <th scope="row">{operatorLabel(r.operatorId)}</th>
+              <td className={s.num}>{r.salesCount}</td>
+              <td className={s.num}>{m(r.payableMinor)}</td>
+              <td className={s.num}>{m(r.averageMinor)}</td>
+              <td className={s.num}>{m(r.discountMinor)}</td>
+              <td className={s.num}>{`${String(r.voidsCount)} (${m(r.voidsPayableMinor)})`}</td>
             </tr>
           ))}
         </tbody>

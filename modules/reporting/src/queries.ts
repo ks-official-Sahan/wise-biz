@@ -101,6 +101,33 @@ export async function payments(q: Q, tenantId: string, r: Range) {
   }));
 }
 
+/** Sales per operator over a range (staff report). The nil UUID is "unknown": sales before operators were recorded. */
+export async function operators(q: Q, tenantId: string, r: Range) {
+  const res = await q.query(
+    `select operator_id, currency, sum(sales_count) as sales_count, sum(payable_minor) as payable_minor,
+            sum(discount_minor) as discount_minor, sum(voids_count) as voids_count,
+            sum(voids_payable_minor) as voids_payable_minor
+       from reporting.rollup_operator_day
+      where tenant_id = $1 and business_date between $2 and $3 and ($4::uuid is null or branch_id = $4)
+      group by operator_id, currency order by sum(payable_minor) desc, operator_id`,
+    [tenantId, r.from, r.to, r.branchId ?? null],
+  );
+  return res.rows.map((x) => {
+    const count = n(x.sales_count);
+    const payable = n(x.payable_minor);
+    return {
+      operatorId: String(x.operator_id),
+      currency: String(x.currency),
+      salesCount: count,
+      payableMinor: payable,
+      averageMinor: count === 0 ? 0 : Math.round(payable / count),
+      discountMinor: n(x.discount_minor),
+      voidsCount: n(x.voids_count),
+      voidsPayableMinor: n(x.voids_payable_minor),
+    };
+  });
+}
+
 /** Tax collected per day (rollup_day carries the sale-level tax; per-rate lines are a later rollup). */
 export async function tax(q: Q, tenantId: string, r: Range) {
   const res = await q.query(

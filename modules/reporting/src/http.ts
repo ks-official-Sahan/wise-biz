@@ -4,8 +4,9 @@ import { authorize, requireTenant, runCommand } from "@wise-biz/module-kit";
 import { z } from "zod";
 
 import { rebuild } from "./apply.ts";
-import { payments, products, salesSummary, tax, toCsv } from "./queries.ts";
+import { operators, payments, products, salesSummary, tax, toCsv } from "./queries.ts";
 import {
+  OperatorsReportSchema,
   PaymentsReportSchema,
   ProductsQuerySchema,
   ProductsReportSchema,
@@ -61,6 +62,15 @@ const routes = {
     request: { query: RangeQuerySchema },
     responses: ok(PaymentsReportSchema),
   }),
+  operators: createRoute({
+    method: "get",
+    path: "/v1/reporting/operators",
+    tags,
+    summary: "Sales per operator (staff report)",
+    middleware: read,
+    request: { query: RangeQuerySchema },
+    responses: ok(OperatorsReportSchema),
+  }),
   tax: createRoute({
     method: "get",
     path: "/v1/reporting/tax",
@@ -113,6 +123,10 @@ export function mountRoutes(app: OpenAPIHono<AppEnv>, deps: ModuleDeps): void {
   app.openapi(routes.payments, async (c) => {
     const range = c.req.valid("query");
     return c.json({ rows: await reading(c, (tx, t) => payments(tx, t, range)) }, 200);
+  });
+  app.openapi(routes.operators, async (c) => {
+    const range = c.req.valid("query");
+    return c.json({ rows: await reading(c, (tx, t) => operators(tx, t, range)) }, 200);
   });
   app.openapi(routes.tax, async (c) => {
     const range = c.req.valid("query");
