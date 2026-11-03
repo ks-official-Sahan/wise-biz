@@ -1,0 +1,127 @@
+name: wise-biz-prod
+
+# Self-hosted production: nginx terminates TLS in front of the console, API and realtime services. Postgres and the object
+# store are EXTERNAL (managed Postgres 18 with pgvector, S3/R2): point the DATABASE_* and STORAGE_* variables in
+# `.env.prod` at them. Secrets come from that file, never from this one.
+#
+#   docker compose -f infra/docker/compose.prod.yaml --env-file .env.prod build
+#   docker compose -f infra/docker/compose.prod.yaml --env-file .env.prod up -d
+#
+# Order on every release: `migrate` runs to completion first (expand-only migrations), then the services roll.
+
+x-service: &service
+  restart: unless-stopped
+  read_only: true
+  tmpfs: [/tmp]
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  env_file: [../../.env.prod]
+  logging:
+    driver: json-file
+    options: { max-size: "20m", max-file: "5" }
+
+services:
+  migrate:
+    <<: *service
+    build: { context: ../.., dockerfile: infra/docker/service.Dockerfile, args: { APP: api } }
+    image: wise-biz/api:${WB_VERSION:-local}
+    restart: "no"
+    working_dir: /repo
+    command: ["node", "packages/db/scripts/migrate.mts"]
+
+  api:
+    <<: *service
+    build:
+      {
+        context: ../..,
+        dockerfile: infra/docker/service.Dockerfile,
+        args: { APP: api, PORT: "3001" },
+      }
+    image: wise-biz/api:${WB_VERSION:-local}
+    environment: { PORT: "3001" }
+    depends_on:
+      {
+        migrate: { condition: service_completed_successfully },
+        redis: { condition: service_healthy },
+      }
+    deploy: { resources: { limits: { cpus: "2", memory: 1g } } }
+
+  workers:
+    <<: *service
+    build:
+      {
+        context: ../..,
+        dockerfile: infra/docker/service.Dockerfile,
+        args: { APP: workers, PORT: "" },
+      }
+    image: wise-biz/workers:${WB_VERSION:-local}
+    depends_on: { migrate: { condition: service_completed_successfully } }
+    stop_grace_period: 30s
+    deploy: { resources: { limits: { cpus: "2", memory: 1g } } }
+
+  realtime:
+    <<: *service
+    build:
+      {
+        context: ../..,
+        dockerfile: infra/docker/service.Dockerfile,
+        args: { APP: realtime, PORT: "3002" },
+      }
+    image: wise-biz/realtime:${WB_VERSION:-local}
+    environment: { REALTIME_PORT: "3002" }
+    depends_on: { redis: { condition: service_healthy } }
+    deploy: { resources: { limits: { cpus: "1", memory: 512m } } }
+
+  console:
+    <<: *service
+    build:
+      {
+        context: ../..,
+        dockerfile: infra/docker/console.Dockerfile,
+        args: { API_ORIGIN: "http://api:3001" },
+      }
+    image: wise-biz/console:${WB_VERSION:-local}
+    tmpfs: [/tmp, /repo/apps/console/.next/cache]
+    depends_on: [api]
+    deploy: { resources: { limits: { cpus: "1", memory: 768m } } }
+
+  redis:
+    image: redis:8.10.2-alpine
+    restart: unless-stopped
+    command:
+      [
+        "redis-server",
+        "--appendonly",
+        "yes",
+        "--save",
+        "",
+        "--requirepass",
+        "${REDIS_PASSWORD:?set REDIS_PASSWORD}",
+      ]
+    volumes: [redisdata:/data]
+    healthcheck:
+      test: ["CMD-SHELL", 'redis-cli -a "$$REDIS_PASSWORD" ping | grep -q PONG']
+      interval: 5s
+      retries: 20
+    environment: { REDIS_PASSWORD: "${REDIS_PASSWORD}" }
+
+  nginx:
+    image: nginx:1.29-alpine
+    restart: unless-stopped
+    read_only: true
+    tmpfs: [/tmp, /var/cache/nginx, /var/run]
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE, CHOWN, SETUID, SETGID]
+    security_opt: ["no-new-privileges:true"]
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ../nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ${TLS_DIR:-./tls}:/etc/nginx/tls:ro
+    depends_on: [api, console, realtime]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8081/nginx-health | grep -q ok"]
+      interval: 10s
+      retries: 5
+
+volumes:
+  redisdata:

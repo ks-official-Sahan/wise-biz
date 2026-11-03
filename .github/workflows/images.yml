@@ -1,0 +1,79 @@
+name: Images
+
+# Builds the four service images from a release tag, scans them (HIGH/CRITICAL fails the run) and pushes them to GHCR.
+# Rolling them out is the deploy runbook (docs/runbooks/deploy.md); an automatic rollout job is added once the hosting
+# platform is chosen (P1-15 gate).
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  TRIVY_IMAGE: aquasec/trivy:0.58.1
+
+jobs:
+  image:
+    name: Build, scan and push (${{ matrix.app }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - app: api
+            dockerfile: infra/docker/service.Dockerfile
+            args: --build-arg APP=api --build-arg PORT=3001
+          - app: workers
+            dockerfile: infra/docker/service.Dockerfile
+            args: --build-arg APP=workers --build-arg PORT=
+          - app: realtime
+            dockerfile: infra/docker/service.Dockerfile
+            args: --build-arg APP=realtime --build-arg PORT=3002
+          - app: console
+            dockerfile: infra/docker/console.Dockerfile
+            args: --build-arg API_ORIGIN=http://api:3001
+    env:
+      IMAGE: ghcr.io/${{ github.repository }}/${{ matrix.app }}
+      VERSION: ${{ github.ref_name }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Build
+        env:
+          DOCKERFILE: ${{ matrix.dockerfile }}
+          BUILD_ARGS: ${{ matrix.args }}
+        run: |
+          # BUILD_ARGS holds flags we wrote in this file (never user input), so word splitting is intended.
+          # shellcheck disable=SC2086
+          docker build -f "$DOCKERFILE" $BUILD_ARGS -t "$IMAGE:$VERSION" .
+
+      - name: Scan (HIGH and CRITICAL fail the run)
+        run: |
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock "$TRIVY_IMAGE" \
+            image --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 "$IMAGE:$VERSION"
+
+      - name: Check the container runs as non-root
+        run: |
+          user="$(docker run --rm --entrypoint id "$IMAGE:$VERSION" -u)"
+          test "$user" != "0" || { echo "image runs as root" >&2; exit 1; }
+
+      - name: Push
+        env:
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REGISTRY_USER: ${{ github.actor }}
+        run: |
+          echo "$REGISTRY_TOKEN" | docker login ghcr.io -u "$REGISTRY_USER" --password-stdin
+          docker push "$IMAGE:$VERSION"
