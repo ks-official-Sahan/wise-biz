@@ -13,6 +13,7 @@
     "sync",
     "search",
     "theming",
+    "reporting",
     "_template"
   ],
   "global": ["identity"]

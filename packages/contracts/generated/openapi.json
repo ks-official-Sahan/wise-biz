@@ -1388,6 +1388,39 @@
         "required": ["sessionId", "userId", "expiresAt"],
         "type": "object"
       },
+      "PaymentsReport": {
+        "properties": {
+          "rows": {
+            "items": {
+              "properties": {
+                "count": {
+                  "type": "integer"
+                },
+                "currency": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string"
+                },
+                "netMinor": {
+                  "type": "integer"
+                },
+                "refundsMinor": {
+                  "type": "integer"
+                },
+                "salesMinor": {
+                  "type": "integer"
+                }
+              },
+              "required": ["kind", "currency", "count", "salesMinor", "refundsMinor", "netMinor"],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": ["rows"],
+        "type": "object"
+      },
       "PinLogin": {
         "additionalProperties": false,
         "properties": {
@@ -1617,6 +1650,70 @@
           }
         },
         "required": ["products", "next"],
+        "type": "object"
+      },
+      "ProductsReport": {
+        "properties": {
+          "rows": {
+            "items": {
+              "properties": {
+                "costMinor": {
+                  "type": "integer"
+                },
+                "currency": {
+                  "type": "string"
+                },
+                "discountMinor": {
+                  "type": "integer"
+                },
+                "netMinor": {
+                  "type": "integer"
+                },
+                "profitMinor": {
+                  "type": "integer"
+                },
+                "qty": {
+                  "type": "string"
+                },
+                "refundMinor": {
+                  "type": "integer"
+                },
+                "returnedQty": {
+                  "type": "string"
+                },
+                "revenueMinor": {
+                  "type": "integer"
+                },
+                "sku": {
+                  "type": "string"
+                },
+                "taxMinor": {
+                  "type": "integer"
+                },
+                "variantId": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "variantId",
+                "sku",
+                "currency",
+                "qty",
+                "revenueMinor",
+                "taxMinor",
+                "discountMinor",
+                "costMinor",
+                "netMinor",
+                "profitMinor",
+                "returnedQty",
+                "refundMinor"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": ["rows"],
         "type": "object"
       },
       "Promotion": {
@@ -2117,6 +2214,18 @@
           }
         },
         "required": ["priceListId", "lines"],
+        "type": "object"
+      },
+      "RebuildResult": {
+        "properties": {
+          "returns": {
+            "type": "integer"
+          },
+          "sales": {
+            "type": "integer"
+          }
+        },
+        "required": ["sales", "returns"],
         "type": "object"
       },
       "Receipt": {
@@ -2659,6 +2768,78 @@
           }
         },
         "required": ["items", "nextCursor"],
+        "type": "object"
+      },
+      "SalesReport": {
+        "properties": {
+          "groupBy": {
+            "enum": ["day", "branch", "terminal"],
+            "type": "string"
+          },
+          "rows": {
+            "items": {
+              "properties": {
+                "currency": {
+                  "type": "string"
+                },
+                "discountMinor": {
+                  "type": "integer"
+                },
+                "feeMinor": {
+                  "type": "integer"
+                },
+                "key": {
+                  "type": "string"
+                },
+                "netMinor": {
+                  "type": "integer"
+                },
+                "payableMinor": {
+                  "type": "integer"
+                },
+                "returnsCount": {
+                  "type": "integer"
+                },
+                "returnsMinor": {
+                  "type": "integer"
+                },
+                "salesCount": {
+                  "type": "integer"
+                },
+                "subtotalMinor": {
+                  "type": "integer"
+                },
+                "taxMinor": {
+                  "type": "integer"
+                },
+                "voidsCount": {
+                  "type": "integer"
+                },
+                "voidsPayableMinor": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "key",
+                "currency",
+                "salesCount",
+                "subtotalMinor",
+                "discountMinor",
+                "feeMinor",
+                "taxMinor",
+                "payableMinor",
+                "voidsCount",
+                "voidsPayableMinor",
+                "returnsCount",
+                "returnsMinor",
+                "netMinor"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": ["groupBy", "rows"],
         "type": "object"
       },
       "SaveReceiptTemplate": {
@@ -3867,6 +4048,36 @@
           "version",
           "rules"
         ],
+        "type": "object"
+      },
+      "TaxReport": {
+        "properties": {
+          "rows": {
+            "items": {
+              "properties": {
+                "currency": {
+                  "type": "string"
+                },
+                "day": {
+                  "type": "string"
+                },
+                "netOfTaxMinor": {
+                  "type": "integer"
+                },
+                "payableMinor": {
+                  "type": "integer"
+                },
+                "taxMinor": {
+                  "type": "integer"
+                }
+              },
+              "required": ["day", "currency", "taxMinor", "payableMinor", "netOfTaxMinor"],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": ["rows"],
         "type": "object"
       },
       "TemplateChild": {
@@ -8484,6 +8695,311 @@
         },
         "summary": "Replace a region's settings and rule set (optimistic lock on version)",
         "tags": ["pricing"]
+      }
+    },
+    "/v1/reporting/payments": {
+      "get": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "from",
+            "required": true,
+            "schema": {
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": true,
+            "schema": {
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "branchId",
+            "required": false,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentsReport"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Payments by tender kind",
+        "tags": ["reporting"]
+      }
+    },
+    "/v1/reporting/products": {
+      "get": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "from",
+            "required": true,
+            "schema": {
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": true,
+            "schema": {
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "branchId",
+            "required": false,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductsReport"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Best-selling products by revenue, with cost and profit",
+        "tags": ["reporting"]
+      }
+    },
+    "/v1/reporting/rebuild": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "from": {
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                    "type": "string"
+                  },
+                  "to": {
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                    "type": "string"
+                  }
+                },
+                "required": ["from", "to"],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RebuildResult"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Recompute the rollups of a date range from the stored facts (idempotent)",
+        "tags": ["reporting"]
+      }
+    },
+    "/v1/reporting/sales": {
+      "get": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "from",
+            "required": true,
+            "schema": {
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": true,
+            "schema": {
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "branchId",
+            "required": false,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "groupBy",
+            "required": false,
+            "schema": {
+              "default": "day",
+              "enum": ["day", "branch", "terminal"],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesReport"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Sales by day, branch or terminal (net of voids; voids and returns beside them)",
+        "tags": ["reporting"]
+      }
+    },
+    "/v1/reporting/sales.csv": {
+      "get": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "from",
+            "required": true,
+            "schema": {
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": true,
+            "schema": {
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "branchId",
+            "required": false,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "groupBy",
+            "required": false,
+            "schema": {
+              "default": "day",
+              "enum": ["day", "branch", "terminal"],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "CSV"
+          }
+        },
+        "summary": "The sales report as CSV (formula-safe)",
+        "tags": ["reporting"]
+      }
+    },
+    "/v1/reporting/tax": {
+      "get": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "from",
+            "required": true,
+            "schema": {
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": true,
+            "schema": {
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "branchId",
+            "required": false,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaxReport"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Tax collected per day",
+        "tags": ["reporting"]
       }
     },
     "/v1/sales/sales": {

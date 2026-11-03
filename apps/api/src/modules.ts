@@ -3,6 +3,7 @@ import { createCatalogModule } from "@wise-biz/module-catalog";
 import { createDevicesModule } from "@wise-biz/module-devices";
 import { batchSalePrices, createInventoryModule } from "@wise-biz/module-inventory";
 import { createPricingModule } from "@wise-biz/module-pricing";
+import { reportingModule } from "@wise-biz/module-reporting";
 import { createSalesModule } from "@wise-biz/module-sales";
 import { createSearchModule } from "@wise-biz/module-search";
 import { shortlinksModule } from "@wise-biz/module-shortlinks";
@@ -62,6 +63,8 @@ export function createModules(
     shortlinksModule,
     // The store's look: versioned themes and receipt templates (P1-13c).
     themingModule,
+    // MIS reports read the rollups the worker maintains (P1-14).
+    reportingModule,
     templateModule,
   ];
 }

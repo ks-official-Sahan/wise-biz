@@ -29,6 +29,8 @@ export const DEFAULT_ROLE_GRANTS: Readonly<Record<SystemRole, readonly Permissio
     "pricing:write",
     "theming:read",
     "theming:write",
+    "reporting:read",
+    "reporting:manage",
     "inventory:read",
     "inventory:receive",
     "inventory:adjust",
@@ -86,7 +88,14 @@ export const DEFAULT_ROLE_GRANTS: Readonly<Record<SystemRole, readonly Permissio
     "inventory:adjust",
     "inventory:write",
   ],
-  accountant: ["tenancy:read", "catalog:read", "pricing:read", "inventory:read", "sales:read"],
+  accountant: [
+    "tenancy:read",
+    "catalog:read",
+    "pricing:read",
+    "inventory:read",
+    "sales:read",
+    "reporting:read",
+  ],
 };
 
 export interface NewBusinessInput {
