@@ -50,7 +50,8 @@ Tracked in `docs/prompts/P2/README.md` order; add rows here when P2 starts.
 
 ## Resume here
 
-- Next step: P0-09 (`docs/prompts/README.md` order). Branch `feat/p0-08-identity-tenancy` holds P0-08a+b, not yet pushed/PR'd.
+- State (2026-11-03): branch `step/p0-10` carries P0 through P1-14 in good part; nothing is pushed or tagged. Next: the P1-15 hosting choice (ask the owner), then the P1-13b/13c/14 leftovers listed in their rows, then P1-16 (gate).
+- Last verification: `turbo run check` per group, one task at a time (modules 51/51, packages 78/78, apps and services 22/23, then the api suite's three load-sensitive files re-run alone and green). A single all-at-once `pnpm check` was not completed on this machine (memory).
 - After pulling P0-08: `pnpm infra:reset` (new DB role `wb_identity`), then `pnpm db:migrate`. `.env` needs `DATABASE_IDENTITY_URL`, `TRUST_PROXY_HOPS`, `INVITE_SECRET`, `CONSOLE_URL`, `AUTH_RP_ID`, `MAIL_*` (see `.env.example`); `API_DEV_AUTH` is gone. Demo data: `DEMO_PASSWORD=... pnpm db:seed`. Root/package scripts load the repo `.env` via `node --env-file-if-exists` (shell env wins); `infra:reset` is a Node script (the old `sh -c` one-liner silently did nothing under cmd.exe).
 - Run tests with `REDIS_URL` unset in the shell (the env test assumes it is absent; containers provide Redis).
 - P0-01–P0-07 merged via PR #3; all CI checks green (check, actionlint, audit, gitleaks, licenses, CodeQL, dependency review).
@@ -59,6 +60,8 @@ Tracked in `docs/prompts/P2/README.md` order; add rows here when P2 starts.
 - Commit scopes are restricted by commitlint (`commitlint.config.*`); subjects lowercase.
 
 ## Follow-ups
+
+- [ ] (verification) Four DB-heavy tests fail only when the machine is loaded: api `/ready` with a stopped Postgres, api `sync-burst` and `wiring` hooks (60 s container start), workers `relay` expired-lease. They pass alone. Make them independent of container start time (shared container per package, longer hooks, or fake clocks) — owner: P1-16
 
 <!-- - [ ] (P0-04) example: add GS1 exponent edge cases — owner: next step that touches money -->
 - [ ] (P0-01) `prepare: lefthook install` fails without `.git` (Docker/CI): set `LEFTHOOK=0` or guard it — owner: P0-02/P0-03
