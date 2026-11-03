@@ -82,6 +82,31 @@ describe("network printer", () => {
   });
 });
 
+describe("network printer, sockets without end()", () => {
+  it("finishes right after the flush and honours a custom port", async () => {
+    const written: Uint8Array[] = [];
+    const handlers: Record<string, () => void> = {};
+    const socket: TcpSocketLike = {
+      write: (bytes, done) => {
+        written.push(bytes);
+        done(null);
+      },
+      destroy: () => undefined,
+      on: (event, handler) => {
+        handlers[event] = handler;
+        if (event === "connect")
+          queueMicrotask(() => {
+            handler();
+          });
+      },
+    };
+    const connect = vi.fn(() => socket);
+    await createNetworkPrinter({ connect, host: "h", port: 9101 }).write(Uint8Array.of(7));
+    expect(connect).toHaveBeenCalledWith("h", 9101);
+    expect(written).toEqual([Uint8Array.of(7)]);
+  });
+});
+
 describe("memory devices and drawer", () => {
   it("records jobs, can fail on demand and kicks the drawer through the printer", async () => {
     const printer = createMemoryPrinter();

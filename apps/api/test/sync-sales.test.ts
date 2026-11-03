@@ -95,12 +95,7 @@ afterAll(async () => {
 });
 
 function signed(type: string, body: Record<string, unknown>): RawCommand {
-  const hash = commandHash(
-    type,
-    seq,
-    body as RawCommand["body"],
-    new Uint8Array(Buffer.from(last, "base64")),
-  );
+  const hash = commandHash(type, seq, body, new Uint8Array(Buffer.from(last, "base64")));
   const meta = {
     deviceSeq: seq,
     prevHash: last,
