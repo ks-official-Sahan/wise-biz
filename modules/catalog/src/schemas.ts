@@ -223,5 +223,5 @@ export const LookupVariantsQuerySchema = z.object({
     .openapi({ description: "Comma list of up to 100 variant ids" }),
 });
 export const VariantLookupSchema = z
-  .object({ variants: z.array(VariantSchema.extend({ productName: z.string() })) })
+  .object({ variants: z.array(z.object({ ...VariantSchema.shape, productName: z.string() })) })
   .openapi("VariantLookup");

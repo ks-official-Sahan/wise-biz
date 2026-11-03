@@ -77,8 +77,10 @@ describe("migrations and lint", () => {
       "pricing",
       "inventory",
       "sales",
+      "shortlinks",
       "sync",
       "search",
+      "theming",
       "template",
     ]);
     expect(globals).toEqual(["identity"]);

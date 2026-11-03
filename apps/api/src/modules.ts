@@ -9,6 +9,7 @@ import { shortlinksModule } from "@wise-biz/module-shortlinks";
 import { createSyncModule } from "@wise-biz/module-sync";
 import { templateModule } from "@wise-biz/module-template";
 import { createTenancyModule } from "@wise-biz/module-tenancy";
+import { themingModule } from "@wise-biz/module-theming";
 import { createMemoryStore } from "@wise-biz/storage";
 
 import { createSyncPorts } from "./sync-ports.ts";
@@ -59,6 +60,8 @@ export function createModules(
     createSearchModule(),
     // Public digital receipts (/r/:code); the sale-to-link consumer runs in apps/workers.
     shortlinksModule,
+    // The store's look: versioned themes and receipt templates (P1-13c).
+    themingModule,
     templateModule,
   ];
 }

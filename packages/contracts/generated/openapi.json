@@ -1835,6 +1835,10 @@
         ],
         "type": "object"
       },
+      "PublishTheme": {
+        "properties": {},
+        "type": "object"
+      },
       "Quote": {
         "properties": {
           "cashRoundingMinor": {
@@ -2181,6 +2185,87 @@
         "required": ["id", "locationId", "currency", "receivedAt", "lines", "balances"],
         "type": "object"
       },
+      "ReceiptTemplate": {
+        "properties": {
+          "blocks": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "align": {
+                  "enum": ["left", "center", "right"],
+                  "type": "string"
+                },
+                "text": {
+                  "maxLength": 200,
+                  "type": "string"
+                },
+                "type": {
+                  "enum": [
+                    "logo",
+                    "business",
+                    "sale-info",
+                    "lines",
+                    "totals",
+                    "payments",
+                    "text",
+                    "qr",
+                    "barcode"
+                  ],
+                  "type": "string"
+                }
+              },
+              "required": ["type"],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "branchId": {
+            "type": ["string", "null"]
+          },
+          "footerText": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "invoicePrefix": {
+            "type": "string"
+          },
+          "paper": {
+            "enum": ["58", "80"],
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "branchId",
+          "version",
+          "paper",
+          "invoicePrefix",
+          "footerText",
+          "blocks",
+          "updatedAt"
+        ],
+        "type": "object"
+      },
+      "ReceiptTemplates": {
+        "properties": {
+          "templates": {
+            "items": {
+              "$ref": "#/components/schemas/ReceiptTemplate"
+            },
+            "type": "array"
+          }
+        },
+        "required": ["templates"],
+        "type": "object"
+      },
       "Receive": {
         "properties": {
           "currency": {
@@ -2251,6 +2336,16 @@
           }
         },
         "required": ["locationId", "currency", "lines"],
+        "type": "object"
+      },
+      "RestoreThemeVersion": {
+        "properties": {
+          "version": {
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": ["version"],
         "type": "object"
       },
       "Sale": {
@@ -2564,6 +2659,601 @@
           }
         },
         "required": ["items", "nextCursor"],
+        "type": "object"
+      },
+      "SaveReceiptTemplate": {
+        "properties": {
+          "blocks": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "align": {
+                  "enum": ["left", "center", "right"],
+                  "type": "string"
+                },
+                "text": {
+                  "maxLength": 200,
+                  "type": "string"
+                },
+                "type": {
+                  "enum": [
+                    "logo",
+                    "business",
+                    "sale-info",
+                    "lines",
+                    "totals",
+                    "payments",
+                    "text",
+                    "qr",
+                    "barcode"
+                  ],
+                  "type": "string"
+                }
+              },
+              "required": ["type"],
+              "type": "object"
+            },
+            "maxItems": 30,
+            "minItems": 1,
+            "type": "array"
+          },
+          "branchId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": ["string", "null"]
+          },
+          "footerText": {
+            "maxLength": 200,
+            "type": "string"
+          },
+          "invoicePrefix": {
+            "pattern": "^[A-Z0-9-]{0,8}$",
+            "type": "string"
+          },
+          "paper": {
+            "enum": ["58", "80"],
+            "type": "string"
+          },
+          "version": {
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": ["paper", "invoicePrefix", "footerText", "blocks"],
+        "type": "object"
+      },
+      "SaveThemeDraft": {
+        "properties": {
+          "input": {
+            "additionalProperties": false,
+            "properties": {
+              "brand": {
+                "additionalProperties": false,
+                "properties": {
+                  "seed": {
+                    "anyOf": [
+                      {
+                        "pattern": "^#[0-9a-f]{6}$/i",
+                        "type": "string"
+                      },
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "alpha": {
+                            "enum": [1],
+                            "type": "number"
+                          },
+                          "colorSpace": {
+                            "enum": ["srgb"],
+                            "type": "string"
+                          },
+                          "components": {
+                            "prefixItems": [
+                              {
+                                "maximum": 1,
+                                "minimum": 0,
+                                "type": "number"
+                              },
+                              {
+                                "maximum": 1,
+                                "minimum": 0,
+                                "type": "number"
+                              },
+                              {
+                                "maximum": 1,
+                                "minimum": 0,
+                                "type": "number"
+                              }
+                            ],
+                            "type": "array"
+                          },
+                          "hex": {
+                            "pattern": "^#[0-9a-f]{6}$/i",
+                            "type": "string"
+                          }
+                        },
+                        "required": ["colorSpace", "components"],
+                        "type": "object"
+                      }
+                    ]
+                  }
+                },
+                "required": ["seed"],
+                "type": "object"
+              },
+              "density": {
+                "enum": ["compact", "comfortable"],
+                "type": "string"
+              },
+              "font": {
+                "additionalProperties": false,
+                "properties": {
+                  "body": {
+                    "enum": ["geist", "inter", "ibm-plex-sans", "noto-sans"],
+                    "type": "string"
+                  },
+                  "numeric": {
+                    "enum": ["geist-mono", "ibm-plex-mono", "jetbrains-mono"],
+                    "type": "string"
+                  }
+                },
+                "required": ["body", "numeric"],
+                "type": "object"
+              },
+              "modes": {
+                "additionalProperties": false,
+                "properties": {
+                  "available": {
+                    "anyOf": [
+                      {
+                        "prefixItems": [
+                          {
+                            "enum": ["light"],
+                            "type": "string"
+                          }
+                        ],
+                        "type": "array"
+                      },
+                      {
+                        "prefixItems": [
+                          {
+                            "enum": ["dark"],
+                            "type": "string"
+                          }
+                        ],
+                        "type": "array"
+                      },
+                      {
+                        "prefixItems": [
+                          {
+                            "enum": ["light"],
+                            "type": "string"
+                          },
+                          {
+                            "enum": ["dark"],
+                            "type": "string"
+                          }
+                        ],
+                        "type": "array"
+                      }
+                    ]
+                  },
+                  "default": {
+                    "enum": ["light", "dark"],
+                    "type": "string"
+                  }
+                },
+                "required": ["available", "default"],
+                "type": "object"
+              },
+              "name": {
+                "maxLength": 60,
+                "minLength": 1,
+                "type": "string"
+              },
+              "overrides": {
+                "additionalProperties": false,
+                "properties": {
+                  "dark": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "accent": {
+                        "anyOf": [
+                          {
+                            "pattern": "^#[0-9a-f]{6}$/i",
+                            "type": "string"
+                          },
+                          {
+                            "additionalProperties": false,
+                            "properties": {
+                              "alpha": {
+                                "enum": [1],
+                                "type": "number"
+                              },
+                              "colorSpace": {
+                                "enum": ["srgb"],
+                                "type": "string"
+                              },
+                              "components": {
+                                "prefixItems": [
+                                  {
+                                    "maximum": 1,
+                                    "minimum": 0,
+                                    "type": "number"
+                                  },
+                                  {
+                                    "maximum": 1,
+                                    "minimum": 0,
+                                    "type": "number"
+                                  },
+                                  {
+                                    "maximum": 1,
+                                    "minimum": 0,
+                                    "type": "number"
+                                  }
+                                ],
+                                "type": "array"
+                              },
+                              "hex": {
+                                "pattern": "^#[0-9a-f]{6}$/i",
+                                "type": "string"
+                              }
+                            },
+                            "required": ["colorSpace", "components"],
+                            "type": "object"
+                          }
+                        ]
+                      },
+                      "canvas": {
+                        "anyOf": [
+                          {
+                            "pattern": "^#[0-9a-f]{6}$/i",
+                            "type": "string"
+                          },
+                          {
+                            "additionalProperties": false,
+                            "properties": {
+                              "alpha": {
+                                "enum": [1],
+                                "type": "number"
+                              },
+                              "colorSpace": {
+                                "enum": ["srgb"],
+                                "type": "string"
+                              },
+                              "components": {
+                                "prefixItems": [
+                                  {
+                                    "maximum": 1,
+                                    "minimum": 0,
+                                    "type": "number"
+                                  },
+                                  {
+                                    "maximum": 1,
+                                    "minimum": 0,
+                                    "type": "number"
+                                  },
+                                  {
+                                    "maximum": 1,
+                                    "minimum": 0,
+                                    "type": "number"
+                                  }
+                                ],
+                                "type": "array"
+                              },
+                              "hex": {
+                                "pattern": "^#[0-9a-f]{6}$/i",
+                                "type": "string"
+                              }
+                            },
+                            "required": ["colorSpace", "components"],
+                            "type": "object"
+                          }
+                        ]
+                      },
+                      "seed": {
+                        "anyOf": [
+                          {
+                            "pattern": "^#[0-9a-f]{6}$/i",
+                            "type": "string"
+                          },
+                          {
+                            "additionalProperties": false,
+                            "properties": {
+                              "alpha": {
+                                "enum": [1],
+                                "type": "number"
+                              },
+                              "colorSpace": {
+                                "enum": ["srgb"],
+                                "type": "string"
+                              },
+                              "components": {
+                                "prefixItems": [
+                                  {
+                                    "maximum": 1,
+                                    "minimum": 0,
+                                    "type": "number"
+                                  },
+                                  {
+                                    "maximum": 1,
+                                    "minimum": 0,
+                                    "type": "number"
+                                  },
+                                  {
+                                    "maximum": 1,
+                                    "minimum": 0,
+                                    "type": "number"
+                                  }
+                                ],
+                                "type": "array"
+                              },
+                              "hex": {
+                                "pattern": "^#[0-9a-f]{6}$/i",
+                                "type": "string"
+                              }
+                            },
+                            "required": ["colorSpace", "components"],
+                            "type": "object"
+                          }
+                        ]
+                      },
+                      "surface": {
+                        "anyOf": [
+                          {
+                            "pattern": "^#[0-9a-f]{6}$/i",
+                            "type": "string"
+                          },
+                          {
+                            "additionalProperties": false,
+                            "properties": {
+                              "alpha": {
+                                "enum": [1],
+                                "type": "number"
+                              },
+                              "colorSpace": {
+                                "enum": ["srgb"],
+                                "type": "string"
+                              },
+                              "components": {
+                                "prefixItems": [
+                                  {
+                                    "maximum": 1,
+                                    "minimum": 0,
+                                    "type": "number"
+                                  },
+                                  {
+                                    "maximum": 1,
+                                    "minimum": 0,
+                                    "type": "number"
+                                  },
+                                  {
+                                    "maximum": 1,
+                                    "minimum": 0,
+                                    "type": "number"
+                                  }
+                                ],
+                                "type": "array"
+                              },
+                              "hex": {
+                                "pattern": "^#[0-9a-f]{6}$/i",
+                                "type": "string"
+                              }
+                            },
+                            "required": ["colorSpace", "components"],
+                            "type": "object"
+                          }
+                        ]
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "light": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "accent": {
+                        "anyOf": [
+                          {
+                            "pattern": "^#[0-9a-f]{6}$/i",
+                            "type": "string"
+                          },
+                          {
+                            "additionalProperties": false,
+                            "properties": {
+                              "alpha": {
+                                "enum": [1],
+                                "type": "number"
+                              },
+                              "colorSpace": {
+                                "enum": ["srgb"],
+                                "type": "string"
+                              },
+                              "components": {
+                                "prefixItems": [
+                                  {
+                                    "maximum": 1,
+                                    "minimum": 0,
+                                    "type": "number"
+                                  },
+                                  {
+                                    "maximum": 1,
+                                    "minimum": 0,
+                                    "type": "number"
+                                  },
+                                  {
+                                    "maximum": 1,
+                                    "minimum": 0,
+                                    "type": "number"
+                                  }
+                                ],
+                                "type": "array"
+                              },
+                              "hex": {
+                                "pattern": "^#[0-9a-f]{6}$/i",
+                                "type": "string"
+                              }
+                            },
+                            "required": ["colorSpace", "components"],
+                            "type": "object"
+                          }
+                        ]
+                      },
+                      "canvas": {
+                        "anyOf": [
+                          {
+                            "pattern": "^#[0-9a-f]{6}$/i",
+                            "type": "string"
+                          },
+                          {
+                            "additionalProperties": false,
+                            "properties": {
+                              "alpha": {
+                                "enum": [1],
+                                "type": "number"
+                              },
+                              "colorSpace": {
+                                "enum": ["srgb"],
+                                "type": "string"
+                              },
+                              "components": {
+                                "prefixItems": [
+                                  {
+                                    "maximum": 1,
+                                    "minimum": 0,
+                                    "type": "number"
+                                  },
+                                  {
+                                    "maximum": 1,
+                                    "minimum": 0,
+                                    "type": "number"
+                                  },
+                                  {
+                                    "maximum": 1,
+                                    "minimum": 0,
+                                    "type": "number"
+                                  }
+                                ],
+                                "type": "array"
+                              },
+                              "hex": {
+                                "pattern": "^#[0-9a-f]{6}$/i",
+                                "type": "string"
+                              }
+                            },
+                            "required": ["colorSpace", "components"],
+                            "type": "object"
+                          }
+                        ]
+                      },
+                      "seed": {
+                        "anyOf": [
+                          {
+                            "pattern": "^#[0-9a-f]{6}$/i",
+                            "type": "string"
+                          },
+                          {
+                            "additionalProperties": false,
+                            "properties": {
+                              "alpha": {
+                                "enum": [1],
+                                "type": "number"
+                              },
+                              "colorSpace": {
+                                "enum": ["srgb"],
+                                "type": "string"
+                              },
+                              "components": {
+                                "prefixItems": [
+                                  {
+                                    "maximum": 1,
+                                    "minimum": 0,
+                                    "type": "number"
+                                  },
+                                  {
+                                    "maximum": 1,
+                                    "minimum": 0,
+                                    "type": "number"
+                                  },
+                                  {
+                                    "maximum": 1,
+                                    "minimum": 0,
+                                    "type": "number"
+                                  }
+                                ],
+                                "type": "array"
+                              },
+                              "hex": {
+                                "pattern": "^#[0-9a-f]{6}$/i",
+                                "type": "string"
+                              }
+                            },
+                            "required": ["colorSpace", "components"],
+                            "type": "object"
+                          }
+                        ]
+                      },
+                      "surface": {
+                        "anyOf": [
+                          {
+                            "pattern": "^#[0-9a-f]{6}$/i",
+                            "type": "string"
+                          },
+                          {
+                            "additionalProperties": false,
+                            "properties": {
+                              "alpha": {
+                                "enum": [1],
+                                "type": "number"
+                              },
+                              "colorSpace": {
+                                "enum": ["srgb"],
+                                "type": "string"
+                              },
+                              "components": {
+                                "prefixItems": [
+                                  {
+                                    "maximum": 1,
+                                    "minimum": 0,
+                                    "type": "number"
+                                  },
+                                  {
+                                    "maximum": 1,
+                                    "minimum": 0,
+                                    "type": "number"
+                                  },
+                                  {
+                                    "maximum": 1,
+                                    "minimum": 0,
+                                    "type": "number"
+                                  }
+                                ],
+                                "type": "array"
+                              },
+                              "hex": {
+                                "pattern": "^#[0-9a-f]{6}$/i",
+                                "type": "string"
+                              }
+                            },
+                            "required": ["colorSpace", "components"],
+                            "type": "object"
+                          }
+                        ]
+                      }
+                    },
+                    "type": "object"
+                  }
+                },
+                "type": "object"
+              },
+              "version": {
+                "enum": [1],
+                "type": "number"
+              }
+            },
+            "required": ["version", "name", "modes", "brand", "font", "density"],
+            "type": "object"
+          }
+        },
+        "required": ["input"],
         "type": "object"
       },
       "SearchHit": {
@@ -3970,6 +4660,584 @@
         "required": ["tenantId", "name", "branchId", "locationId"],
         "type": "object"
       },
+      "ThemeState": {
+        "properties": {
+          "draft": {
+            "$ref": "#/components/schemas/ThemeVersion"
+          },
+          "published": {
+            "$ref": "#/components/schemas/ThemeVersion"
+          }
+        },
+        "required": ["published", "draft"],
+        "type": "object"
+      },
+      "ThemeVersion": {
+        "properties": {
+          "createdAt": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "input": {
+            "additionalProperties": false,
+            "properties": {
+              "brand": {
+                "additionalProperties": false,
+                "properties": {
+                  "seed": {
+                    "anyOf": [
+                      {
+                        "pattern": "^#[0-9a-f]{6}$/i",
+                        "type": "string"
+                      },
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "alpha": {
+                            "enum": [1],
+                            "type": "number"
+                          },
+                          "colorSpace": {
+                            "enum": ["srgb"],
+                            "type": "string"
+                          },
+                          "components": {
+                            "prefixItems": [
+                              {
+                                "maximum": 1,
+                                "minimum": 0,
+                                "type": "number"
+                              },
+                              {
+                                "maximum": 1,
+                                "minimum": 0,
+                                "type": "number"
+                              },
+                              {
+                                "maximum": 1,
+                                "minimum": 0,
+                                "type": "number"
+                              }
+                            ],
+                            "type": "array"
+                          },
+                          "hex": {
+                            "pattern": "^#[0-9a-f]{6}$/i",
+                            "type": "string"
+                          }
+                        },
+                        "required": ["colorSpace", "components"],
+                        "type": "object"
+                      }
+                    ]
+                  }
+                },
+                "required": ["seed"],
+                "type": "object"
+              },
+              "density": {
+                "enum": ["compact", "comfortable"],
+                "type": "string"
+              },
+              "font": {
+                "additionalProperties": false,
+                "properties": {
+                  "body": {
+                    "enum": ["geist", "inter", "ibm-plex-sans", "noto-sans"],
+                    "type": "string"
+                  },
+                  "numeric": {
+                    "enum": ["geist-mono", "ibm-plex-mono", "jetbrains-mono"],
+                    "type": "string"
+                  }
+                },
+                "required": ["body", "numeric"],
+                "type": "object"
+              },
+              "modes": {
+                "additionalProperties": false,
+                "properties": {
+                  "available": {
+                    "anyOf": [
+                      {
+                        "prefixItems": [
+                          {
+                            "enum": ["light"],
+                            "type": "string"
+                          }
+                        ],
+                        "type": "array"
+                      },
+                      {
+                        "prefixItems": [
+                          {
+                            "enum": ["dark"],
+                            "type": "string"
+                          }
+                        ],
+                        "type": "array"
+                      },
+                      {
+                        "prefixItems": [
+                          {
+                            "enum": ["light"],
+                            "type": "string"
+                          },
+                          {
+                            "enum": ["dark"],
+                            "type": "string"
+                          }
+                        ],
+                        "type": "array"
+                      }
+                    ]
+                  },
+                  "default": {
+                    "enum": ["light", "dark"],
+                    "type": "string"
+                  }
+                },
+                "required": ["available", "default"],
+                "type": "object"
+              },
+              "name": {
+                "maxLength": 60,
+                "minLength": 1,
+                "type": "string"
+              },
+              "overrides": {
+                "additionalProperties": false,
+                "properties": {
+                  "dark": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "accent": {
+                        "anyOf": [
+                          {
+                            "pattern": "^#[0-9a-f]{6}$/i",
+                            "type": "string"
+                          },
+                          {
+                            "additionalProperties": false,
+                            "properties": {
+                              "alpha": {
+                                "enum": [1],
+                                "type": "number"
+                              },
+                              "colorSpace": {
+                                "enum": ["srgb"],
+                                "type": "string"
+                              },
+                              "components": {
+                                "prefixItems": [
+                                  {
+                                    "maximum": 1,
+                                    "minimum": 0,
+                                    "type": "number"
+                                  },
+                                  {
+                                    "maximum": 1,
+                                    "minimum": 0,
+                                    "type": "number"
+                                  },
+                                  {
+                                    "maximum": 1,
+                                    "minimum": 0,
+                                    "type": "number"
+                                  }
+                                ],
+                                "type": "array"
+                              },
+                              "hex": {
+                                "pattern": "^#[0-9a-f]{6}$/i",
+                                "type": "string"
+                              }
+                            },
+                            "required": ["colorSpace", "components"],
+                            "type": "object"
+                          }
+                        ]
+                      },
+                      "canvas": {
+                        "anyOf": [
+                          {
+                            "pattern": "^#[0-9a-f]{6}$/i",
+                            "type": "string"
+                          },
+                          {
+                            "additionalProperties": false,
+                            "properties": {
+                              "alpha": {
+                                "enum": [1],
+                                "type": "number"
+                              },
+                              "colorSpace": {
+                                "enum": ["srgb"],
+                                "type": "string"
+                              },
+                              "components": {
+                                "prefixItems": [
+                                  {
+                                    "maximum": 1,
+                                    "minimum": 0,
+                                    "type": "number"
+                                  },
+                                  {
+                                    "maximum": 1,
+                                    "minimum": 0,
+                                    "type": "number"
+                                  },
+                                  {
+                                    "maximum": 1,
+                                    "minimum": 0,
+                                    "type": "number"
+                                  }
+                                ],
+                                "type": "array"
+                              },
+                              "hex": {
+                                "pattern": "^#[0-9a-f]{6}$/i",
+                                "type": "string"
+                              }
+                            },
+                            "required": ["colorSpace", "components"],
+                            "type": "object"
+                          }
+                        ]
+                      },
+                      "seed": {
+                        "anyOf": [
+                          {
+                            "pattern": "^#[0-9a-f]{6}$/i",
+                            "type": "string"
+                          },
+                          {
+                            "additionalProperties": false,
+                            "properties": {
+                              "alpha": {
+                                "enum": [1],
+                                "type": "number"
+                              },
+                              "colorSpace": {
+                                "enum": ["srgb"],
+                                "type": "string"
+                              },
+                              "components": {
+                                "prefixItems": [
+                                  {
+                                    "maximum": 1,
+                                    "minimum": 0,
+                                    "type": "number"
+                                  },
+                                  {
+                                    "maximum": 1,
+                                    "minimum": 0,
+                                    "type": "number"
+                                  },
+                                  {
+                                    "maximum": 1,
+                                    "minimum": 0,
+                                    "type": "number"
+                                  }
+                                ],
+                                "type": "array"
+                              },
+                              "hex": {
+                                "pattern": "^#[0-9a-f]{6}$/i",
+                                "type": "string"
+                              }
+                            },
+                            "required": ["colorSpace", "components"],
+                            "type": "object"
+                          }
+                        ]
+                      },
+                      "surface": {
+                        "anyOf": [
+                          {
+                            "pattern": "^#[0-9a-f]{6}$/i",
+                            "type": "string"
+                          },
+                          {
+                            "additionalProperties": false,
+                            "properties": {
+                              "alpha": {
+                                "enum": [1],
+                                "type": "number"
+                              },
+                              "colorSpace": {
+                                "enum": ["srgb"],
+                                "type": "string"
+                              },
+                              "components": {
+                                "prefixItems": [
+                                  {
+                                    "maximum": 1,
+                                    "minimum": 0,
+                                    "type": "number"
+                                  },
+                                  {
+                                    "maximum": 1,
+                                    "minimum": 0,
+                                    "type": "number"
+                                  },
+                                  {
+                                    "maximum": 1,
+                                    "minimum": 0,
+                                    "type": "number"
+                                  }
+                                ],
+                                "type": "array"
+                              },
+                              "hex": {
+                                "pattern": "^#[0-9a-f]{6}$/i",
+                                "type": "string"
+                              }
+                            },
+                            "required": ["colorSpace", "components"],
+                            "type": "object"
+                          }
+                        ]
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "light": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "accent": {
+                        "anyOf": [
+                          {
+                            "pattern": "^#[0-9a-f]{6}$/i",
+                            "type": "string"
+                          },
+                          {
+                            "additionalProperties": false,
+                            "properties": {
+                              "alpha": {
+                                "enum": [1],
+                                "type": "number"
+                              },
+                              "colorSpace": {
+                                "enum": ["srgb"],
+                                "type": "string"
+                              },
+                              "components": {
+                                "prefixItems": [
+                                  {
+                                    "maximum": 1,
+                                    "minimum": 0,
+                                    "type": "number"
+                                  },
+                                  {
+                                    "maximum": 1,
+                                    "minimum": 0,
+                                    "type": "number"
+                                  },
+                                  {
+                                    "maximum": 1,
+                                    "minimum": 0,
+                                    "type": "number"
+                                  }
+                                ],
+                                "type": "array"
+                              },
+                              "hex": {
+                                "pattern": "^#[0-9a-f]{6}$/i",
+                                "type": "string"
+                              }
+                            },
+                            "required": ["colorSpace", "components"],
+                            "type": "object"
+                          }
+                        ]
+                      },
+                      "canvas": {
+                        "anyOf": [
+                          {
+                            "pattern": "^#[0-9a-f]{6}$/i",
+                            "type": "string"
+                          },
+                          {
+                            "additionalProperties": false,
+                            "properties": {
+                              "alpha": {
+                                "enum": [1],
+                                "type": "number"
+                              },
+                              "colorSpace": {
+                                "enum": ["srgb"],
+                                "type": "string"
+                              },
+                              "components": {
+                                "prefixItems": [
+                                  {
+                                    "maximum": 1,
+                                    "minimum": 0,
+                                    "type": "number"
+                                  },
+                                  {
+                                    "maximum": 1,
+                                    "minimum": 0,
+                                    "type": "number"
+                                  },
+                                  {
+                                    "maximum": 1,
+                                    "minimum": 0,
+                                    "type": "number"
+                                  }
+                                ],
+                                "type": "array"
+                              },
+                              "hex": {
+                                "pattern": "^#[0-9a-f]{6}$/i",
+                                "type": "string"
+                              }
+                            },
+                            "required": ["colorSpace", "components"],
+                            "type": "object"
+                          }
+                        ]
+                      },
+                      "seed": {
+                        "anyOf": [
+                          {
+                            "pattern": "^#[0-9a-f]{6}$/i",
+                            "type": "string"
+                          },
+                          {
+                            "additionalProperties": false,
+                            "properties": {
+                              "alpha": {
+                                "enum": [1],
+                                "type": "number"
+                              },
+                              "colorSpace": {
+                                "enum": ["srgb"],
+                                "type": "string"
+                              },
+                              "components": {
+                                "prefixItems": [
+                                  {
+                                    "maximum": 1,
+                                    "minimum": 0,
+                                    "type": "number"
+                                  },
+                                  {
+                                    "maximum": 1,
+                                    "minimum": 0,
+                                    "type": "number"
+                                  },
+                                  {
+                                    "maximum": 1,
+                                    "minimum": 0,
+                                    "type": "number"
+                                  }
+                                ],
+                                "type": "array"
+                              },
+                              "hex": {
+                                "pattern": "^#[0-9a-f]{6}$/i",
+                                "type": "string"
+                              }
+                            },
+                            "required": ["colorSpace", "components"],
+                            "type": "object"
+                          }
+                        ]
+                      },
+                      "surface": {
+                        "anyOf": [
+                          {
+                            "pattern": "^#[0-9a-f]{6}$/i",
+                            "type": "string"
+                          },
+                          {
+                            "additionalProperties": false,
+                            "properties": {
+                              "alpha": {
+                                "enum": [1],
+                                "type": "number"
+                              },
+                              "colorSpace": {
+                                "enum": ["srgb"],
+                                "type": "string"
+                              },
+                              "components": {
+                                "prefixItems": [
+                                  {
+                                    "maximum": 1,
+                                    "minimum": 0,
+                                    "type": "number"
+                                  },
+                                  {
+                                    "maximum": 1,
+                                    "minimum": 0,
+                                    "type": "number"
+                                  },
+                                  {
+                                    "maximum": 1,
+                                    "minimum": 0,
+                                    "type": "number"
+                                  }
+                                ],
+                                "type": "array"
+                              },
+                              "hex": {
+                                "pattern": "^#[0-9a-f]{6}$/i",
+                                "type": "string"
+                              }
+                            },
+                            "required": ["colorSpace", "components"],
+                            "type": "object"
+                          }
+                        ]
+                      }
+                    },
+                    "type": "object"
+                  }
+                },
+                "type": "object"
+              },
+              "version": {
+                "enum": [1],
+                "type": "number"
+              }
+            },
+            "required": ["version", "name", "modes", "brand", "font", "density"],
+            "type": "object"
+          },
+          "name": {
+            "type": "string"
+          },
+          "publishedAt": {
+            "type": ["string", "null"]
+          },
+          "status": {
+            "enum": ["draft", "published", "archived"],
+            "type": "string"
+          },
+          "version": {
+            "type": ["integer", "null"]
+          }
+        },
+        "required": ["id", "version", "status", "name", "input", "createdAt", "publishedAt"],
+        "type": ["object", "null"]
+      },
+      "ThemeVersions": {
+        "properties": {
+          "versions": {
+            "items": {
+              "$ref": "#/components/schemas/ThemeVersion"
+            },
+            "type": "array"
+          }
+        },
+        "required": ["versions"],
+        "type": "object"
+      },
       "Threshold": {
         "properties": {
           "locationId": {
@@ -4632,21 +5900,66 @@
         "properties": {
           "variants": {
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/Variant"
+              "properties": {
+                "archived": {
+                  "type": "boolean"
                 },
-                {
-                  "default": undefined,
-                  "properties": {
-                    "productName": {
-                      "type": "string"
-                    }
-                  },
-                  "required": ["productName"],
+                "attributes": {
+                  "additionalProperties": {},
                   "type": "object"
+                },
+                "barcodes": {
+                  "items": {
+                    "$ref": "#/components/schemas/Barcode"
+                  },
+                  "type": "array"
+                },
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "productId": {
+                  "type": "string"
+                },
+                "productName": {
+                  "type": "string"
+                },
+                "sku": {
+                  "type": "string"
+                },
+                "taxCategory": {
+                  "type": "string"
+                },
+                "tracksBatches": {
+                  "type": "boolean"
+                },
+                "unitId": {
+                  "type": ["string", "null"]
+                },
+                "updatedAt": {
+                  "type": "string"
+                },
+                "version": {
+                  "type": "number"
                 }
-              ]
+              },
+              "required": [
+                "id",
+                "productId",
+                "sku",
+                "name",
+                "unitId",
+                "tracksBatches",
+                "taxCategory",
+                "attributes",
+                "version",
+                "archived",
+                "updatedAt",
+                "productName"
+              ],
+              "type": "object"
             },
             "type": "array"
           }
@@ -8538,6 +9851,181 @@
         },
         "summary": "Create a business (tenant, roles, first branch, owner membership) and make it the active tenant",
         "tags": ["tenancy"]
+      }
+    },
+    "/v1/theming/receipt-templates": {
+      "get": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "branchId",
+            "required": false,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReceiptTemplates"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "The business receipt template and, with branchId, that branch's override",
+        "tags": ["theming"]
+      },
+      "put": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveReceiptTemplate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReceiptTemplate"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Create or replace the template of the business or of one branch (optimistic version)",
+        "tags": ["theming"]
+      }
+    },
+    "/v1/theming/theme": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThemeState"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "The published theme and the draft being edited",
+        "tags": ["theming"]
+      }
+    },
+    "/v1/theming/theme/draft": {
+      "put": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveThemeDraft"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThemeVersion"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Save the draft (any theme the schema accepts; contrast is checked on publish)",
+        "tags": ["theming"]
+      }
+    },
+    "/v1/theming/theme/publish": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublishTheme"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThemeVersion"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Publish the draft as the next version; 422 while a colour pair fails contrast",
+        "tags": ["theming"]
+      }
+    },
+    "/v1/theming/theme/restore": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RestoreThemeVersion"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThemeVersion"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Copy an older version into the draft (publish it to roll back)",
+        "tags": ["theming"]
+      }
+    },
+    "/v1/theming/theme/versions": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThemeVersions"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Published and archived versions, newest first",
+        "tags": ["theming"]
       }
     }
   },

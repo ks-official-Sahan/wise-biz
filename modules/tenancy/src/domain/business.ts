@@ -27,6 +27,8 @@ export const DEFAULT_ROLE_GRANTS: Readonly<Record<SystemRole, readonly Permissio
     "catalog:write",
     "pricing:read",
     "pricing:write",
+    "theming:read",
+    "theming:write",
     "inventory:read",
     "inventory:receive",
     "inventory:adjust",

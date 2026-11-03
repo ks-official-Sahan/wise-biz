@@ -12,6 +12,7 @@
     "shortlinks",
     "sync",
     "search",
+    "theming",
     "_template"
   ],
   "global": ["identity"]
