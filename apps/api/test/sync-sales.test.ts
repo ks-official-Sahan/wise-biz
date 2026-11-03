@@ -211,4 +211,115 @@ describe("sync into sales", () => {
       "replayed",
     ]);
   });
+  it("offline drill: a backlog from a day offline is applied once, in order; a clock running ahead is refused in words", async () => {
+    const shiftId = uuidv7();
+    let tick = 0;
+    // a day offline: sales spread over the last 24 h, oldest first
+    const past = (): string => new Date(Date.now() - 86_400_000 + (tick += 600_000)).toISOString();
+    const skewed = (): string => new Date(Date.now() + 2 * 3_600_000).toISOString(); // clock +2 h
+    const policyVersion = Number(
+      (
+        await admin.query<{ v: number }>(
+          "select permissions_version v from tenancy.tenants where tenant_id = $1",
+          [T],
+        )
+      ).rows[0]?.v,
+    );
+    const cmds: RawCommand[] = [
+      signed("open_shift", {
+        id: shiftId,
+        operatorId: CASHIER,
+        businessDate: TODAY,
+        openedAt: past(),
+        currency: "LKR",
+        openingFloatMinor: 0,
+      }),
+    ];
+    const COUNT = 120;
+    for (let i = 0; i < COUNT; i++) {
+      saleNo += 1;
+      cmds.push(
+        signed("complete_sale", {
+          id: uuidv7(),
+          shiftId,
+          operatorId: CASHIER,
+          saleNo,
+          currency: "LKR",
+          businessDate: TODAY,
+          completedAt: past(),
+          priceListId: LIST,
+          priceListVersion: 1,
+          engineVersion: "1.0.0",
+          policyVersion,
+          promotionIds: [],
+          lines: [
+            {
+              variantId: VARIANT,
+              name: "Tea",
+              sku: "TEA",
+              locationId: LOC,
+              qty: "2",
+              unitPriceMinor: 500,
+              priceSource: "list",
+              discountMinor: 0,
+              taxMinor: 100,
+              totalMinor: 1100,
+            },
+          ],
+          tenders: [{ id: uuidv7(), kind: "cash", amountMinor: 1100 }],
+          subtotalMinor: 1000,
+          discountMinor: 0,
+          feeMinor: 0,
+          taxMinor: 100,
+          totalMinor: 1100,
+          cashRoundingMinor: 0,
+          payableMinor: 1100,
+        }),
+      );
+    }
+    const count = async () =>
+      Number(
+        (
+          await admin.query<{ n: string }>(
+            "select count(*) n from sales.sales where shift_id = $1",
+            [shiftId],
+          )
+        ).rows[0]?.n,
+      );
+    // delivered in uneven chunks, as a flaky link would
+    const acks: string[] = [];
+    for (const [from, to] of [
+      [0, 7],
+      [7, 50],
+      [50, cmds.length],
+    ] as const) {
+      const r = await applyBatch(deps(), ref(), "req-12345678", cmds.slice(from, to));
+      expect(r.stopped).toBeNull();
+      acks.push(...r.acks.map((a) => a.status));
+    }
+    expect([...new Set(acks)]).toEqual(["applied"]);
+    expect(await count()).toBe(COUNT);
+    // the same sale from a clock two hours ahead is refused with a message the cashier can act on, and stores nothing
+    saleNo += 1;
+    const ahead = { ...cmds[1] } as RawCommand;
+    const base = Object.fromEntries(
+      Object.entries(ahead.body as Record<string, unknown>).filter(([k]) => k !== "meta"),
+    );
+    const bodyAhead = { ...base, id: uuidv7(), saleNo, completedAt: skewed() };
+    const refused = await applyBatch(deps(), ref(), "req-12345678", [
+      signed("complete_sale", bodyAhead),
+    ]);
+    expect(refused.acks[0]?.status).toBe("rejected");
+    expect(refused.acks[0]?.error?.message).toMatch(/clock is ahead/);
+    expect(await count()).toBe(COUNT);
+    // a reconnect that resends everything changes nothing
+    const again = await applyBatch(deps(), ref(), "req-12345678", cmds);
+    expect(again.acks.every((a) => a.status === "replayed")).toBe(true);
+    expect(await count()).toBe(COUNT);
+    const numbers = await admin.query<{ invoice_no: string }>(
+      "select invoice_no from sales.sales where shift_id = $1",
+      [shiftId],
+    );
+    expect(new Set(numbers.rows.map((r) => r.invoice_no)).size).toBe(COUNT);
+  });
 });
