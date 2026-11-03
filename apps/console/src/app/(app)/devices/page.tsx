@@ -19,7 +19,16 @@ import {
   styles,
 } from "@/components/ui.tsx";
 import { ApiError, api } from "@/lib/api.ts";
-import { actionsFor, ago, deviceKeys, presence, useDevices } from "@/lib/devices.ts";
+import {
+  actionsFor,
+  ago,
+  batteryText,
+  deviceKeys,
+  presence,
+  unsyncedText,
+  useDevices,
+  useHeartbeats,
+} from "@/lib/devices.ts";
 import { useBranches } from "@/lib/queries.ts";
 import { useTenant } from "@/lib/tenant.tsx";
 
@@ -60,6 +69,7 @@ export default function DevicesPage() {
   const [enrolling, setEnrolling] = useState(false);
   const [acting, setActing] = useState<{ device: Device; action: DeviceAction } | null>(null);
   const [editing, setEditing] = useState<Device | null>(null);
+  const [health, setHealth] = useState<Device | null>(null);
   const branchName = new Map((branches.data ?? []).map((b) => [b.branchId, b.name]));
   const live = (devices.data ?? []).filter(
     (d) => d.status !== "revoked" && d.status !== "blacklisted",
@@ -149,6 +159,14 @@ export default function DevicesPage() {
                         <Button
                           variant="ghost"
                           onClick={() => {
+                            setHealth(d);
+                          }}
+                        >
+                          {`Health of ${d.name}`}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          onClick={() => {
                             setEditing(d);
                           }}
                         >
@@ -196,6 +214,14 @@ export default function DevicesPage() {
           }}
         />
       )}
+      {health === null ? null : (
+        <HealthDialog
+          device={health}
+          onClose={() => {
+            setHealth(null);
+          }}
+        />
+      )}
       {editing === null ? null : (
         <EditDialog
           device={editing}
@@ -205,6 +231,55 @@ export default function DevicesPage() {
         />
       )}
     </Stack>
+  );
+}
+
+function HealthDialog({ device, onClose }: { device: Device; onClose: () => void }) {
+  const { tenant } = useTenant();
+  const beats = useHeartbeats(tenant.tenantId, device.deviceId);
+  const now = useNow(30_000);
+  return (
+    <Dialog open title={`Health of ${device.name}`} onClose={onClose}>
+      {beats.isPending ? <SkeletonRows label="Loading health reports" rows={4} /> : null}
+      {beats.isError ? (
+        <ErrorState
+          error={beats.error}
+          onRetry={() => {
+            void beats.refetch();
+          }}
+        />
+      ) : null}
+      {beats.isSuccess && beats.data.length === 0 ? (
+        <Empty title="No reports yet">This terminal has not reported its health.</Empty>
+      ) : null}
+      {beats.isSuccess && beats.data.length > 0 ? (
+        <div className={styles.tableWrap}>
+          <table className={styles.table}>
+            <caption className="sr-only">Recent health reports</caption>
+            <thead>
+              <tr>
+                <th scope="col">When</th>
+                <th scope="col">App</th>
+                <th scope="col">Battery</th>
+                <th scope="col">Connection</th>
+                <th scope="col">Unsent sales</th>
+              </tr>
+            </thead>
+            <tbody>
+              {beats.data.map((h) => (
+                <tr key={h.at}>
+                  <th scope="row">{ago(h.at, now)}</th>
+                  <td>{`v${h.appVersion}`}</td>
+                  <td>{batteryText(h.batteryPct)}</td>
+                  <td>{h.connection ?? "unknown"}</td>
+                  <td>{unsyncedText(h, now)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+    </Dialog>
   );
 }
 

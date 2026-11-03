@@ -25,7 +25,46 @@ export interface EnrollmentCode {
   readonly name: string;
 }
 
-export const deviceKeys = { all: (t: string) => [t, "devices"] as const };
+export interface HeartbeatEntry {
+  readonly at: string;
+  readonly appVersion: string;
+  readonly batteryPct: number | null;
+  readonly unsyncedCount: number;
+  readonly oldestUnsyncedAt: string | null;
+  readonly operatorId: string | null;
+  readonly connection: string | null;
+}
+
+export const deviceKeys = {
+  all: (t: string) => [t, "devices"] as const,
+  heartbeats: (t: string, id: string) => [t, "devices", id, "heartbeats"] as const,
+};
+
+/** The last 30 health reports of one terminal, newest first (read when its Health dialog is open). */
+export const useHeartbeats = (t: string, deviceId: string) =>
+  useQuery({
+    queryKey: deviceKeys.heartbeats(t, deviceId),
+    queryFn: ({ signal }) =>
+      api<{ heartbeats: HeartbeatEntry[] }>("GET", `/v1/devices/${deviceId}/heartbeats?limit=30`, {
+        signal,
+      }),
+    staleTime: STALE.live,
+    refetchInterval: 30_000,
+    select: (d) => d.heartbeats,
+  });
+
+/** "3 waiting, oldest 2 h ago" or "all sent": a count alone hides how stale the backlog is. */
+export function unsyncedText(
+  h: Pick<HeartbeatEntry, "unsyncedCount" | "oldestUnsyncedAt">,
+  now = Date.now(),
+): string {
+  if (h.unsyncedCount === 0) return "All sent";
+  const oldest = h.oldestUnsyncedAt === null ? "" : `, oldest ${ago(h.oldestUnsyncedAt, now)}`;
+  return `${String(h.unsyncedCount)} waiting${oldest}`;
+}
+
+export const batteryText = (pct: number | null): string =>
+  pct === null ? "n/a" : `${String(pct)}%`;
 
 /** Polled every 30 s so "last seen" stays honest without a socket. */
 export const useDevices = (t: string) =>

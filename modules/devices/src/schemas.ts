@@ -78,6 +78,26 @@ export const HeartbeatReplySchema = z
   .object({ status: z.enum(DEVICE_STATUSES), serverTime: z.string() })
   .openapi("HeartbeatReply");
 
+export const HeartbeatEntrySchema = z
+  .object({
+    at: z.string(),
+    appVersion: z.string(),
+    batteryPct: z.number().int().nullable(),
+    unsyncedCount: z.number().int(),
+    oldestUnsyncedAt: z.string().nullable(),
+    operatorId: z.string().nullable(),
+    connection: z.string().nullable(),
+  })
+  .openapi("HeartbeatEntry");
+
+export const HeartbeatHistoryQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+});
+
+export const HeartbeatHistorySchema = z
+  .object({ heartbeats: z.array(HeartbeatEntrySchema) })
+  .openapi("HeartbeatHistory");
+
 export type DeviceDto = z.infer<typeof DeviceSchema>;
 export type EnrollInput = z.infer<typeof EnrollSchema>;
 export type HeartbeatInput = z.infer<typeof HeartbeatSchema>;

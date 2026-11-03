@@ -273,6 +273,30 @@ describe("signed requests", () => {
     expect((await signed(t, "POST", "/v1/test/sell", {})).status).toBe(200);
   });
 
+  it("shows a terminal's heartbeat history to people who may read devices, newest first", async () => {
+    const t = await enrollTerminal();
+    await withTenantTx(pool, { tenantId: T, requestId: "r" }, async (tx) => {
+      for (const unsynced of [1, 2, 3]) {
+        await tx.query(
+          `insert into devices.device_heartbeats (tenant_id, device_id, at, app_version, unsynced_count)
+           values ($1, $2, $3, '1.0.0', $4)`,
+          [T, t.deviceId, new Date(Date.UTC(2026, 10, 3, 12, unsynced)), unsynced],
+        );
+      }
+    });
+    role = "owner";
+    const res = await app.request(`/v1/devices/${t.deviceId}/heartbeats?limit=2`);
+    expect(res.status).toBe(200);
+    const body = await json<{ heartbeats: { unsyncedCount: number; at: string }[] }>(res);
+    expect(body.heartbeats.map((h) => h.unsyncedCount)).toEqual([3, 2]);
+    // No role at all, or an unknown device, is a 404.
+    role = "nobody";
+    expect((await app.request(`/v1/devices/${t.deviceId}/heartbeats`)).status).toBe(404);
+    role = "owner";
+    expect((await app.request(`/v1/devices/${uuidv7()}/heartbeats`)).status).toBe(404);
+    expect((await app.request(`/v1/devices/${t.deviceId}/heartbeats?limit=500`)).status).toBe(422);
+  });
+
   it("rejects an unknown device, a wrong key and a replay with 401", async () => {
     const t = await enrollTerminal();
     expect(

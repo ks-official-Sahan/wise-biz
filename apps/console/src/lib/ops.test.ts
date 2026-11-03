@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { actionsFor, ago, presence } from "./devices.ts";
+import { actionsFor, ago, batteryText, presence, unsyncedText } from "./devices.ts";
 import { cashWalk, flagLabel, salesQuery, shiftsQuery, tenderLabel, variance } from "./sales.ts";
 
 import type { ZReport } from "./sales.ts";
@@ -93,5 +93,18 @@ describe("terminal helpers", () => {
         .filter((a) => a.danger)
         .map((a) => a.label),
     ).toEqual(["Revoke", "Blacklist"]);
+  });
+});
+
+describe("terminal health", () => {
+  it("says how stale the unsent backlog is, and shows missing battery as n/a", () => {
+    const now = Date.parse("2026-11-03T12:00:00Z");
+    expect(unsyncedText({ unsyncedCount: 0, oldestUnsyncedAt: null }, now)).toBe("All sent");
+    expect(unsyncedText({ unsyncedCount: 3, oldestUnsyncedAt: null }, now)).toBe("3 waiting");
+    expect(unsyncedText({ unsyncedCount: 3, oldestUnsyncedAt: "2026-11-03T10:00:00Z" }, now)).toBe(
+      "3 waiting, oldest 2 h ago",
+    );
+    expect(batteryText(null)).toBe("n/a");
+    expect(batteryText(80)).toBe("80%");
   });
 });

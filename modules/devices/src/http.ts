@@ -1,5 +1,6 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { withTenantTx } from "@wise-biz/db";
+import { DomainError } from "@wise-biz/errors";
 import { authorize, requireDevice, requireTenant, runCommand } from "@wise-biz/module-kit";
 
 import {
@@ -17,6 +18,8 @@ import {
   DeviceSchema,
   EnrollSchema,
   EnrollmentCodeSchema,
+  HeartbeatHistoryQuerySchema,
+  HeartbeatHistorySchema,
   HeartbeatReplySchema,
   HeartbeatSchema,
   UpdateDeviceSchema,
@@ -87,6 +90,16 @@ const updateRoute = createRoute({
   responses: { 200: { description: "Updated", ...json(DeviceSchema) } },
 });
 
+const historyRoute = createRoute({
+  method: "get",
+  path: "/v1/devices/{id}/heartbeats",
+  tags: ["devices"],
+  summary: "A terminal's recent health reports, newest first",
+  middleware: [needs("devices:read")] as const,
+  request: { params: DeviceIdParam, query: HeartbeatHistoryQuerySchema },
+  responses: { 200: { description: "Heartbeats", ...json(HeartbeatHistorySchema) } },
+});
+
 const heartbeatRoute = createRoute({
   method: "post",
   path: "/v1/devices/heartbeat",
@@ -148,6 +161,49 @@ export function mountRoutes(
       handler: (tx, body, ctx) => updateDeviceCommand(tx, ctx, id, body, opts.branchExists),
     });
     return res as never;
+  });
+
+  app.openapi(historyRoute, async (c) => {
+    const tenant = requireTenant(c);
+    const { id } = c.req.valid("param");
+    const { limit } = c.req.valid("query");
+    const rows = await withTenantTx(deps.pool, tenant, async (tx) => {
+      const known = await tx.query(
+        "select 1 from devices.devices where tenant_id = $1 and id = $2",
+        [tenant.tenantId, id],
+      );
+      if (known.rowCount !== 1) return null;
+      return (
+        await tx.query<{
+          at: Date;
+          app_version: string;
+          battery_pct: number | null;
+          unsynced_count: number;
+          oldest_unsynced_at: Date | null;
+          operator_id: string | null;
+          connection: string | null;
+        }>(
+          `select at, app_version, battery_pct, unsynced_count, oldest_unsynced_at, operator_id, connection
+             from devices.device_heartbeats where tenant_id = $1 and device_id = $2 order by at desc limit $3`,
+          [tenant.tenantId, id, limit],
+        )
+      ).rows;
+    });
+    if (rows === null) throw new DomainError("NOT_FOUND", "Not found");
+    return c.json(
+      {
+        heartbeats: rows.map((r) => ({
+          at: r.at.toISOString(),
+          appVersion: r.app_version,
+          batteryPct: r.battery_pct,
+          unsyncedCount: r.unsynced_count,
+          oldestUnsyncedAt: r.oldest_unsynced_at?.toISOString() ?? null,
+          operatorId: r.operator_id,
+          connection: r.connection,
+        })),
+      },
+      200,
+    );
   });
 
   app.openapi(heartbeatRoute, async (c) => {

@@ -194,6 +194,20 @@ async function mockApi(page: Page): Promise<{ calls: Call[]; devices: Record<str
         zReport,
       });
     if (path === "/v1/devices" && req.method() === "GET") return json(200, { devices });
+    if (path === `/v1/devices/${DEV}/heartbeats`)
+      return json(200, {
+        heartbeats: [
+          {
+            at: new Date().toISOString(),
+            appVersion: "1.4.2",
+            batteryPct: 64,
+            unsyncedCount: 3,
+            oldestUnsyncedAt: new Date(Date.now() - 2 * 3_600_000).toISOString(),
+            operatorId: null,
+            connection: "wifi",
+          },
+        ],
+      });
     if (path === "/v1/devices/enrollment-codes")
       return json(201, {
         code: "K7M2Q9XA",
@@ -281,4 +295,15 @@ test("adds a terminal with a one-time code and suspends it after a confirmation"
   await expect.poll(() => calls.filter((c) => c.method === "PATCH").length).toBe(1);
   expect(calls.find((c) => c.method === "PATCH")?.body).toEqual({ status: "suspended" });
   expect(devices[0]?.status).toBe("suspended");
+});
+
+test("shows a terminal's recent health reports", async ({ page }) => {
+  await mockApi(page);
+  await page.goto("/devices");
+  await page.getByRole("button", { name: "Health of Front counter" }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByText("64%")).toBeVisible();
+  await expect(dialog.getByText("3 waiting, oldest 2 h ago")).toBeVisible();
+  await expect(dialog.getByText("wifi")).toBeVisible();
+  await a11y(page);
 });

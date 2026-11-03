@@ -1218,6 +1218,53 @@
         "required": ["appVersion", "unsyncedCount"],
         "type": "object"
       },
+      "HeartbeatEntry": {
+        "properties": {
+          "appVersion": {
+            "type": "string"
+          },
+          "at": {
+            "type": "string"
+          },
+          "batteryPct": {
+            "type": ["integer", "null"]
+          },
+          "connection": {
+            "type": ["string", "null"]
+          },
+          "oldestUnsyncedAt": {
+            "type": ["string", "null"]
+          },
+          "operatorId": {
+            "type": ["string", "null"]
+          },
+          "unsyncedCount": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "at",
+          "appVersion",
+          "batteryPct",
+          "unsyncedCount",
+          "oldestUnsyncedAt",
+          "operatorId",
+          "connection"
+        ],
+        "type": "object"
+      },
+      "HeartbeatHistory": {
+        "properties": {
+          "heartbeats": {
+            "items": {
+              "$ref": "#/components/schemas/HeartbeatEntry"
+            },
+            "type": "array"
+          }
+        },
+        "required": ["heartbeats"],
+        "type": "object"
+      },
       "HeartbeatReply": {
         "properties": {
           "serverTime": {
@@ -7670,6 +7717,46 @@
           }
         },
         "summary": "Rename, move, suspend, reactivate, revoke or blacklist a terminal",
+        "tags": ["devices"]
+      }
+    },
+    "/v1/devices/{id}/heartbeats": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HeartbeatHistory"
+                }
+              }
+            },
+            "description": "Heartbeats"
+          }
+        },
+        "summary": "A terminal's recent health reports, newest first",
         "tags": ["devices"]
       }
     },
