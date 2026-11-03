@@ -54,6 +54,21 @@ export const PERMISSION_GROUPS: readonly { module: string; items: readonly Permi
     ],
   },
   {
+    module: "Reports",
+    items: [
+      {
+        permission: "reporting:read",
+        label: "View reports",
+        allows: "See sales, product, payment and tax reports and download them.",
+      },
+      {
+        permission: "reporting:manage",
+        label: "Rebuild reports",
+        allows: "Recompute report totals for a period from the stored records.",
+      },
+    ],
+  },
+  {
     module: "Terminals",
     items: [
       {

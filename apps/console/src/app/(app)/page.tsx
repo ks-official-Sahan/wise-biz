@@ -1,9 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 
 import { Card, Row, SkeletonRows, Stack, cx, styles } from "@/components/ui.tsx";
+import { formatPrice } from "@/lib/pricing.ts";
 import { useBranches, useInvites, useMembers, useProfile } from "@/lib/queries.ts";
+import { delta, describeDelta, isoDay, shiftDays, totals, useSalesReport } from "@/lib/reports.ts";
 import { useTenant } from "@/lib/tenant.tsx";
 
 export default function HomePage() {
@@ -13,6 +16,21 @@ export default function HomePage() {
   const branches = useBranches(t);
   const members = useMembers(t);
   const invites = useInvites(t);
+  const currency = profile.data?.currency ?? "";
+  // Today against the same weekday last week: one request over the rollups, never the raw sales.
+  const [today] = useState(() => isoDay(new Date()));
+  const lastWeek = shiftDays(today, -7);
+  const sales = useSalesReport(t, { from: lastWeek, to: today }, "day", currency !== "");
+  const mine = (sales.data ?? []).filter((r) => r.key === today || r.key === lastWeek);
+  const nowSum = totals(
+    mine.filter((r) => r.key === today),
+    currency,
+  );
+  const wasSum = totals(
+    mine.filter((r) => r.key === lastWeek),
+    currency,
+  );
+  const netDelta = delta(nowSum.netMinor, wasSum.netMinor);
   const memberCount = members.data?.pages.reduce((n, p) => n + p.members.length, 0);
 
   const tiles = [
@@ -57,6 +75,31 @@ export default function HomePage() {
           </Card>
         ))}
       </div>
+      {currency === "" ? null : (
+        <Card>
+          <Stack>
+            <h2>Today</h2>
+            {sales.isPending ? (
+              <SkeletonRows rows={1} label="Loading today's sales" />
+            ) : sales.isError ? (
+              <p className="muted">Today's sales could not be loaded.</p>
+            ) : (
+              <>
+                <span
+                  className="num"
+                  style={{ fontSize: "var(--wb-font-size-2xl)", fontWeight: 600 }}
+                >
+                  {formatPrice(nowSum.netMinor, currency)}
+                </span>
+                <span className="muted">
+                  {`${String(nowSum.salesCount)} sales. ${describeDelta(netDelta, "Same weekday last week")}`}
+                </span>
+              </>
+            )}
+            <Link href={"/reports"}>Open reports</Link>
+          </Stack>
+        </Card>
+      )}
       <Card>
         <Stack>
           <h2>Next steps</h2>

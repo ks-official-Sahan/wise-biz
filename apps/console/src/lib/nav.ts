@@ -6,6 +6,7 @@ export interface NavItem {
     | "/pricing"
     | "/branding"
     | "/sales"
+    | "/reports"
     | "/shifts"
     | "/devices"
     | "/stock"
@@ -33,6 +34,12 @@ export const NAV: readonly NavItem[] = [
     label: "Sales",
     keywords: ["receipts", "orders", "transactions", "voids", "returns", "refunds"],
     primary: true,
+  },
+  {
+    href: "/reports",
+    label: "Reports",
+    keywords: ["analytics", "revenue", "best sellers", "tax", "payments", "csv", "profit"],
+    primary: false,
   },
   {
     href: "/shifts",
