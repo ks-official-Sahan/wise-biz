@@ -189,6 +189,8 @@ function Editor({
     } catch (e) {
       setError(e instanceof Error ? e.message : "Publishing failed.");
       setPublishing(false);
+      // The save may have gone through (version N to N+1): refresh so the next save does not 409.
+      await refresh();
     } finally {
       setBusy(false);
     }

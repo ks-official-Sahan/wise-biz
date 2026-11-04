@@ -32,7 +32,8 @@ interface Values {
   taxRegion: string;
   branchName: string;
   cutoff: string;
-  invites: { email: string; roleId: string }[];
+  /** `id` is the invite's idempotency key: a retried step re-posts the same id, never a new one. */
+  invites: { id: string; email: string; roleId: string }[];
 }
 
 function initial(
@@ -127,7 +128,13 @@ export default function OnboardingPage() {
       } else if (step === 2) {
         for (const inv of values.invites.filter((i) => i.email.trim() !== "")) {
           await api("POST", "/v1/tenancy/invites", {
-            body: { id: uuidv7(), email: inv.email.trim(), roleIds: [inv.roleId] },
+            idempotencyKey: inv.id,
+            body: { id: inv.id, email: inv.email.trim(), roleIds: [inv.roleId] },
+          });
+          // Drop the row once sent, so a failure midway leaves only the unsent rows to retry.
+          setValues((prev) => {
+            const base = prev ?? values;
+            return { ...base, invites: base.invites.filter((x) => x.id !== inv.id) };
           });
         }
         set("invites", []);
@@ -275,7 +282,7 @@ export default function OnboardingPage() {
                   Optional. Invited people get an email link that works for 72 hours.
                 </p>
                 {values.invites.map((inv, i) => (
-                  <Row key={i}>
+                  <Row key={inv.id}>
                     <TextField
                       label={`Email ${String(i + 1)}`}
                       type="email"
@@ -314,7 +321,7 @@ export default function OnboardingPage() {
                     onClick={() => {
                       set("invites", [
                         ...values.invites,
-                        { email: "", roleId: assignable[0]?.roleId ?? "" },
+                        { id: uuidv7(), email: "", roleId: assignable[0]?.roleId ?? "" },
                       ]);
                     }}
                   >

@@ -114,17 +114,20 @@ export const useMembers = (t: string) =>
     staleTime: STALE.list,
   });
 
+/** Pages are flattened here, so callers still get one Invite[] and can call fetchNextPage/hasNextPage to load more. */
 export const useInvites = (t: string) =>
-  useQuery({
+  useInfiniteQuery({
     queryKey: keys.invites(t),
-    queryFn: ({ signal }) =>
+    queryFn: ({ signal, pageParam }) =>
       api<{ invites: Invite[]; nextCursor: string | null }>(
         "GET",
-        "/v1/tenancy/invites?limit=100",
+        `/v1/tenancy/invites?limit=100${pageParam ? `&cursor=${pageParam}` : ""}`,
         { signal },
       ),
+    initialPageParam: null as string | null,
+    getNextPageParam: (last) => last.nextCursor,
     staleTime: STALE.list,
-    select: (d) => d.invites,
+    select: (d) => d.pages.flatMap((p) => p.invites),
   });
 
 export const useAudit = (t: string, filter: AuditFilter) =>

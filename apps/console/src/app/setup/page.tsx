@@ -3,7 +3,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { uuidv7 } from "@wise-biz/ids";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { Alert, Button, Card, SelectField, Stack, TextField } from "@/components/ui.tsx";
 import { ApiError, api } from "@/lib/api.ts";
@@ -25,8 +25,13 @@ export default function SetupPage() {
   const [country, setCountry] = useState("LK");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // One id per attempt: a retried submit replays instead of creating a second business.
-  const ids = useMemo(() => ({ tenantId: uuidv7(), key: uuidv7() }), []);
+  const tenantId = useMemo(() => uuidv7(), []);
+  // One key per payload: a retry of the same body replays, a corrected body is a new request.
+  const attempt = useRef<{ id: string; sig: string } | null>(null);
+  const keyFor = (sig: string): string => {
+    if (attempt.current?.sig !== sig) attempt.current = { id: uuidv7(), sig };
+    return attempt.current.id;
+  };
 
   useEffect(() => {
     if (!session.isPending && session.data === null) router.replace("/sign-in?next=/setup");
@@ -38,21 +43,20 @@ export default function SetupPage() {
     if (c === undefined) return;
     setBusy(true);
     setError(null);
+    const body = {
+      tenantId,
+      name: name.trim(),
+      branch: {
+        name: branch.trim(),
+        kind: "store",
+        timezone: country === "LK" ? c.timezone : browserTimezone(),
+        currency: c.currency,
+        taxRegion: c.value,
+      },
+    };
+    const key = keyFor(JSON.stringify(body));
     try {
-      await api("POST", "/v1/tenancy/tenants", {
-        idempotencyKey: ids.key,
-        body: {
-          tenantId: ids.tenantId,
-          name: name.trim(),
-          branch: {
-            name: branch.trim(),
-            kind: "store",
-            timezone: country === "LK" ? c.timezone : browserTimezone(),
-            currency: c.currency,
-            taxRegion: c.value,
-          },
-        },
-      });
+      await api("POST", "/v1/tenancy/tenants", { idempotencyKey: key, body });
       // The shell's tenant list is not mounted here, so invalidating would leave its stale empty copy to render
       // first and bounce back to /setup. Drop it so the shell fetches the new business.
       qc.removeQueries({ queryKey: keys.me });

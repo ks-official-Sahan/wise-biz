@@ -101,11 +101,15 @@ const describedBy = (id: string, help?: string, error?: string): string | undefi
 
 export type TextFieldProps = FieldShell & Omit<InputHTMLAttributes<HTMLInputElement>, "id">;
 
-export function TextField({ label, help, error, required, ...input }: TextFieldProps) {
+export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(function TextField(
+  { label, help, error, required, ...input },
+  ref,
+) {
   const id = useId();
   return (
     <Shell id={id} label={required ? `${label} (required)` : label} help={help} error={error}>
       <input
+        ref={ref}
         id={id}
         className={s.input}
         aria-invalid={error !== undefined || undefined}
@@ -115,7 +119,7 @@ export function TextField({ label, help, error, required, ...input }: TextFieldP
       />
     </Shell>
   );
-}
+});
 
 export type SelectFieldProps = FieldShell &
   Omit<SelectHTMLAttributes<HTMLSelectElement>, "id"> & {
@@ -288,8 +292,13 @@ export function Dialog({
       className={side ? s.drawer : s.dialog}
       onClose={onClose}
       onClick={(e) => {
-        // Backdrop click: the event target is the dialog element itself.
-        if (e.target === e.currentTarget) onClose();
+        // Backdrop click: the target is the dialog element and the point is outside its box. The padding ring is
+        // inside the box, so it does not close. Keyboard clicks on children have target !== currentTarget.
+        if (e.target !== e.currentTarget) return;
+        const r = e.currentTarget.getBoundingClientRect();
+        const outside =
+          e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom;
+        if (outside) onClose();
       }}
     >
       <div className={s.stack}>

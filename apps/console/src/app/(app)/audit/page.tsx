@@ -28,6 +28,31 @@ const FIELDS = ["actor", "action", "entity", "from", "to"] as const;
 const toIso = (local: string): string | undefined =>
   local === "" ? undefined : new Date(local).toISOString();
 
+/** ISO instant from the URL to the datetime-local value (local time) the inputs show. */
+const toLocal = (iso: string | null): string => {
+  if (iso === null) return "";
+  const at = new Date(iso);
+  if (Number.isNaN(at.getTime())) return "";
+  return new Date(at.getTime() - at.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+};
+
+interface AuditForm {
+  actor: string;
+  action: string;
+  entity: string;
+  from: string;
+  to: string;
+}
+
+/** The filter inputs for the filters the URL carries (back navigation, command palette, export link). */
+const formFrom = (p: URLSearchParams): AuditForm => ({
+  actor: p.get("actor") ?? "",
+  action: p.get("action") ?? "",
+  entity: p.get("entity") ?? "",
+  from: toLocal(p.get("from")),
+  to: toLocal(p.get("to")),
+});
+
 function Entry({ id, onClose }: { id: string | null; onClose: () => void }) {
   const { tenant } = useTenant();
   const entry = useAuditEntry(tenant.tenantId, id);
@@ -125,7 +150,14 @@ function AuditView() {
   const exportLink = useRef<HTMLAnchorElement>(null);
   const audit = useAudit(tenant.tenantId, filter);
   const [open, setOpen] = useState<string | null>(null);
-  const [form, setForm] = useState({ actor: "", action: "", entity: "", from: "", to: "" });
+  // The inputs follow the URL: reset them during render when the query string changes (not in an effect).
+  const queryKey = params.toString();
+  const [syncedKey, setSyncedKey] = useState(queryKey);
+  const [form, setForm] = useState<AuditForm>(() => formFrom(params));
+  if (queryKey !== syncedKey) {
+    setSyncedKey(queryKey);
+    setForm(formFrom(params));
+  }
   const rows = audit.data?.pages.flatMap((p) => p.entries) ?? [];
 
   // The command palette opens /audit?export=1: download once, then drop the flag so Back does not repeat it.
@@ -266,7 +298,7 @@ function AuditView() {
                       onClick={() => {
                         setOpen(r.id);
                       }}
-                      aria-label={`Open ${r.action} at ${new Date(r.at).toLocaleString()}`}
+                      aria-label={`Details of ${r.action} at ${new Date(r.at).toLocaleString()}`}
                     >
                       Details
                     </Button>

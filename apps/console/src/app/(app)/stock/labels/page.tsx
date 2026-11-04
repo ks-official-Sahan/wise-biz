@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import {
   Alert,
@@ -76,12 +76,20 @@ export default function LabelsPage() {
     setCopied(false);
     setItems((cur) => cur.map((i) => (i.variantId === variantId ? { ...i, ...p } : i)));
   };
-  const zpl = toZpl(items);
-  const totals = sheetCount(items, PER_SHEET);
-  const noCode = items.filter((i) => i.code === null);
-  const sheet = items.flatMap((i) =>
-    Array.from({ length: Math.min(Math.max(i.copies, 0), 200) }, (_, n) => ({ item: i, n })),
-  );
+  // Print output keeps every copy; the on-screen preview stops at one sheet so a 200-copy item cannot stall renders.
+  const zpl = useMemo(() => toZpl(items), [items]);
+  const totals = useMemo(() => sheetCount(items, PER_SHEET), [items]);
+  const noCode = useMemo(() => items.filter((i) => i.code === null), [items]);
+  const preview = useMemo(() => {
+    const out: { item: LabelItem; n: number }[] = [];
+    for (const item of items) {
+      const copies = Math.min(Math.max(item.copies, 0), 200);
+      for (let n = 0; n < copies && out.length < PER_SHEET; n++) out.push({ item, n });
+      if (out.length >= PER_SHEET) break;
+    }
+    return out;
+  }, [items]);
+  const hidden = Math.max(0, totals.labels - preview.length);
 
   async function copyZpl(): Promise<void> {
     try {
@@ -251,18 +259,25 @@ export default function LabelsPage() {
           {zpl}
         </pre>
       ) : (
-        <div className={s.sheet} aria-label="Label preview">
-          {sheet.map(({ item, n }) => (
-            <div key={`${item.variantId}-${String(n)}`} className={s.label}>
-              <span className={s.labelName}>{item.name}</span>
-              {item.code === null ? null : <Bars code={item.code} />}
-              <span className={s.labelMeta}>
-                {item.sku}
-                {item.price === "" ? "" : ` · ${item.price}`}
-              </span>
-            </div>
-          ))}
-        </div>
+        <>
+          <div className={s.sheet} aria-label="Label preview">
+            {preview.map(({ item, n }) => (
+              <div key={`${item.variantId}-${String(n)}`} className={s.label}>
+                <span className={s.labelName}>{item.name}</span>
+                {item.code === null ? null : <Bars code={item.code} />}
+                <span className={s.labelMeta}>
+                  {item.sku}
+                  {item.price === "" ? "" : ` · ${item.price}`}
+                </span>
+              </div>
+            ))}
+          </div>
+          {hidden === 0 ? null : (
+            <p className={styles.muted}>
+              {`and ${String(hidden)} more. The printed sheet includes every label.`}
+            </p>
+          )}
+        </>
       )}
     </Stack>
   );

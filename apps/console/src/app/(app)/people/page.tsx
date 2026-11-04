@@ -153,9 +153,12 @@ function RolesDialog({
     () => new Set(roles.filter((r) => member?.roles.includes(r.name)).map((r) => r.roleId)),
     [member, roles],
   );
+  // Reset whenever the dialog opens for a different member, and when it closes (member null),
+  // so a reopened member never shows the previous unsaved selection or confirm state.
+  const membershipId = member?.membershipId ?? null;
   const [initialised, setInitialised] = useState<string | null>(null);
-  if (member !== null && initialised !== member.membershipId) {
-    setInitialised(member.membershipId);
+  if (initialised !== membershipId) {
+    setInitialised(membershipId);
     setSelected(new Set(current));
     setConfirm(false);
     setError(null);

@@ -3,10 +3,10 @@
 import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { Button, ErrorState, SkeletonRows, cx } from "@/components/ui.tsx";
-import { api } from "@/lib/api.ts";
+import { Alert, Button, ErrorState, SkeletonRows, cx } from "@/components/ui.tsx";
+import { ApiError, api } from "@/lib/api.ts";
 import { NAV } from "@/lib/nav.ts";
 import { badgeText, unreadLabel, useUnreadCount } from "@/lib/notifications.ts";
 import { keys, useMyTenants } from "@/lib/queries.ts";
@@ -35,6 +35,7 @@ export default function AppLayout({ children }: { readonly children: ReactNode }
 
   const qc = useQueryClient();
   const autoSwitching = useRef(false);
+  const [switchError, setSwitchError] = useState<string | null>(null);
   /** Activates a business on the session and drops every cached query of the previous one. */
   const switchTenant = useCallback(
     async (tenantId: string): Promise<void> => {
@@ -128,9 +129,18 @@ export default function AppLayout({ children }: { readonly children: ReactNode }
             className={s.switcher}
             value={active.tenantId}
             onChange={(e) => {
-              void switchTenant(e.target.value).then(() => {
-                router.refresh();
-              });
+              setSwitchError(null);
+              void switchTenant(e.target.value)
+                .then(() => {
+                  router.refresh();
+                })
+                .catch((err: unknown) => {
+                  setSwitchError(
+                    err instanceof ApiError
+                      ? (err.problem.detail ?? err.message)
+                      : "Could not switch business.",
+                  );
+                });
             }}
           >
             {list.map((t) => (
@@ -156,6 +166,7 @@ export default function AppLayout({ children }: { readonly children: ReactNode }
           </Button>
         </header>
         <main id="main" className={s.main}>
+          {switchError === null ? null : <Alert tone="danger">{switchError}</Alert>}
           {children}
         </main>
         <nav className={s.bottom} aria-label="Main (compact)">

@@ -2,7 +2,7 @@
 
 import { uuidv7 } from "@wise-biz/ids";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useMemo, useState } from "react";
+import { Suspense, useMemo, useRef, useState } from "react";
 
 import {
   Alert,
@@ -252,13 +252,19 @@ function Locations({ branch }: { branch: Branch }) {
   const [name, setName] = useState("");
   const [kind, setKind] = useState<LocationKind>("backroom");
   const [error, setError] = useState<string | null>(null);
-  const add = useApiMutation(
-    () =>
-      api("POST", `/v1/tenancy/branches/${branch.branchId}/locations`, {
-        body: { id: uuidv7(), name: name.trim(), kind },
-      }),
-    [keys.locations(t, branch.branchId)],
-  );
+  // One id per add: a retry after a lost response replays the same location instead of adding a second one.
+  // A changed body gets a new id; a successful add clears it so the next add is a new location.
+  const attempt = useRef<{ id: string; sig: string } | null>(null);
+  const add = useApiMutation(() => {
+    const body = { name: name.trim(), kind };
+    const sig = JSON.stringify(body);
+    if (attempt.current?.sig !== sig) attempt.current = { id: uuidv7(), sig };
+    const id = attempt.current.id;
+    return api("POST", `/v1/tenancy/branches/${branch.branchId}/locations`, {
+      idempotencyKey: id,
+      body: { id, ...body },
+    });
+  }, [keys.locations(t, branch.branchId)]);
   const archive = useApiMutation(
     (input: { id: string; archived: boolean }) =>
       api("PATCH", `/v1/tenancy/locations/${input.id}`, { body: { archived: input.archived } }),
@@ -301,6 +307,7 @@ function Locations({ branch }: { branch: Branch }) {
             e.preventDefault();
             add.mutate(undefined, {
               onSuccess: () => {
+                attempt.current = null;
                 setName("");
                 setError(null);
               },

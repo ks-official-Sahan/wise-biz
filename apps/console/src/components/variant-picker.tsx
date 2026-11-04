@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { api } from "@/lib/api.ts";
 import { useTenant } from "@/lib/tenant.tsx";
@@ -40,6 +40,8 @@ export function VariantPicker({
   const t = tenant.tenantId;
   const [query, setQuery] = useState("");
   const q = useDebounced(query.trim(), 250);
+  // After Add the list unmounts; focus returns to the search box so keyboard users keep their place.
+  const inputRef = useRef<HTMLInputElement>(null);
   const search = useQuery({
     queryKey: [t, "catalog", "search", q],
     queryFn: ({ signal }) =>
@@ -52,6 +54,7 @@ export function VariantPicker({
   return (
     <div>
       <TextField
+        ref={inputRef}
         label={label}
         type="search"
         value={query}
@@ -63,6 +66,9 @@ export function VariantPicker({
           setQuery(e.target.value);
         }}
       />
+      <p className={styles.muted} aria-live="polite">
+        {search.isSuccess && q !== "" ? `${String(search.data.hits.length)} result(s).` : ""}
+      </p>
       {q === "" ? null : (
         <ul>
           {(search.data?.hits ?? []).map((h) => (
@@ -74,6 +80,7 @@ export function VariantPicker({
                 onClick={() => {
                   onPick(h);
                   setQuery("");
+                  inputRef.current?.focus();
                 }}
               >
                 Add

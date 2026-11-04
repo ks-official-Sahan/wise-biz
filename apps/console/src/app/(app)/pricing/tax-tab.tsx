@@ -162,8 +162,9 @@ function RegionDialog({ region, onClose }: { region: TaxRegion | null; onClose: 
     const errs = new Map<string, string>();
     const parsed = rules.map((r, order) => {
       const bps = parsePercent(r.rate);
-      if (typeof bps === "string") errs.set(r.id, bps);
-      else if (r.name.trim() === "") errs.set(r.id, "Name the tax.");
+      // Name and rate errors are keyed separately so each shows beside its own input.
+      if (typeof bps === "string") errs.set(`${r.id}.rate`, bps);
+      if (r.name.trim() === "") errs.set(`${r.id}.name`, "Name the tax.");
       return {
         id: r.id,
         name: r.name.trim(),
@@ -285,7 +286,7 @@ function RegionDialog({ region, onClose }: { region: TaxRegion | null; onClose: 
             <TextField
               label="Name"
               value={r.name}
-              error={ruleErrors.get(r.id)}
+              error={ruleErrors.get(`${r.id}.name`)}
               onChange={(e) => {
                 patchRule(r.id, { name: e.target.value });
               }}
@@ -294,6 +295,7 @@ function RegionDialog({ region, onClose }: { region: TaxRegion | null; onClose: 
               label="Rate (%)"
               inputMode="decimal"
               value={r.rate}
+              error={ruleErrors.get(`${r.id}.rate`)}
               onChange={(e) => {
                 patchRule(r.id, { rate: e.target.value });
               }}
