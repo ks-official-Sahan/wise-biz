@@ -42,7 +42,10 @@ export function inviteAcceptLink(
   inviteId: string,
   token: string,
 ): string {
-  const base = consoleUrl.replace(/\/+$/, "");
+  // No regex: /\/+$/ backtracks quadratically on a long run of slashes.
+  let end = consoleUrl.length;
+  while (end > 0 && consoleUrl.charAt(end - 1) === "/") end -= 1;
+  const base = consoleUrl.slice(0, end);
   const query = new URLSearchParams({ t: tenantId, i: inviteId, k: token });
   return `${base}/invite/accept#${query.toString()}`;
 }

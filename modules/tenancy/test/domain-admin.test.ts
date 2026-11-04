@@ -81,6 +81,11 @@ describe("invite token", () => {
     expect(inviteAcceptLink("https://console.example///", T, I, "k")).toBe(
       `https://console.example/invite/accept#t=${T}&i=${I}&k=k`,
     );
+    // a hostile run of slashes costs linear time (no backtracking regex)
+    const long = `https://console.example${"/".repeat(200_000)}x`;
+    const started = performance.now();
+    expect(inviteAcceptLink(long, "a", "b", "c")).toContain("/invite/accept#");
+    expect(performance.now() - started).toBeLessThan(500);
   });
 });
 

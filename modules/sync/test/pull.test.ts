@@ -255,7 +255,13 @@ describe("pull", () => {
         ],
       }),
     );
-    const mine = await pull("stock_branch");
+    // A pull only shows changes older than every open transaction in the database (the xmin horizon), so another test
+    // file holding a transaction open for a moment can delay it: wait for visibility instead of asserting at once.
+    let mine = await pull("stock_branch");
+    for (let i = 0; i < 50 && mine.changes.length === 0; i++) {
+      await new Promise((r) => setTimeout(r, 100));
+      mine = await pull("stock_branch");
+    }
     expect(mine.changes.map((c) => c.entityId)).toEqual([`${LOC}:${v}:-`]);
     branchLocations = [];
     expect((await pull("stock_branch", undefined, 500, OTHER_BRANCH)).changes).toEqual([]);

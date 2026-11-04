@@ -2,7 +2,7 @@
 // Node built-ins only (no new dependency). Usage: node e2e/serve.mjs [port] [host]
 import { readFile, stat } from "node:fs/promises";
 import { createServer } from "node:http";
-import { extname, join, normalize, resolve, sep } from "node:path";
+import { extname, join, resolve, sep } from "node:path";
 import process from "node:process";
 import { URL, fileURLToPath } from "node:url";
 
@@ -27,13 +27,6 @@ const TYPES = {
   ".map": "application/json; charset=utf-8",
 };
 
-/** Resolves a request path inside root. Returns null for anything that escapes it. */
-function safePath(urlPath) {
-  const decoded = decodeURIComponent(urlPath.split("?")[0]);
-  const target = normalize(join(root, decoded));
-  return target === root || target.startsWith(root + sep) ? target : null;
-}
-
 async function isFile(path) {
   try {
     return (await stat(path)).isFile();
@@ -47,8 +40,10 @@ const server = createServer(async (req, res) => {
     res.writeHead(405, { Allow: "GET, HEAD" }).end();
     return;
   }
-  const target = safePath(req.url ?? "/");
-  if (target === null) {
+  // Resolve the request path against the root and refuse anything that lands outside it (checked here, before any file access).
+  const requested = decodeURIComponent((req.url ?? "/").split("?")[0] ?? "/");
+  const target = resolve(root, `.${sep}${requested}`);
+  if (!(target === root || target.startsWith(root + sep))) {
     res.writeHead(403).end();
     return;
   }
