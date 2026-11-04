@@ -385,6 +385,16 @@ describe("operator PIN", () => {
   const login = (t: Terminal, uid: string, pin: string) =>
     signed(t, "POST", "/v1/devices/pin-login", { userId: uid, pin });
 
+  it("leaves no request hash of the PIN behind (it would be reversible in seconds)", async () => {
+    const rows = () =>
+      withTenantTx(pool, { tenantId: T, requestId: "r" }, async (tx) =>
+        Number((await tx.query("select count(*) n from infra.idempotency_keys")).rows[0]?.n),
+      );
+    const before = await rows();
+    expect((await setPin("3947")).status).toBe(200);
+    expect(await rows()).toBe(before);
+  });
+
   it("refuses short, long, repeated and sequential PINs", async () => {
     for (const pin of ["123", "123456789", "1111", "4567", "98765", "12ab"]) {
       expect((await setPin(pin)).status).toBe(422);

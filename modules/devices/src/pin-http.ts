@@ -71,7 +71,9 @@ export function mountPinRoutes(app: OpenAPIHono<AppEnv>, deps: ModuleDeps, pin: 
     const res = await runCommand(c, deps, {
       permission: "devices:pin",
       input: SetPinSchema,
-      // A replay would keep the PIN in infra.idempotency_keys' request hash input only; the body holds no PIN.
+      // No idempotency key: the request hash would be an unsalted SHA-256 of a body that holds the PIN (4-8 digits,
+      // reversible in seconds), stored in infra.idempotency_keys and Redis. Setting the same PIN twice is harmless.
+      idempotency: "off",
       handler: (tx, body, ctx) => setPinCommand(tx, ctx, body.pin, pin),
     });
     return res as never;

@@ -61,6 +61,8 @@ Tracked in `docs/prompts/P2/README.md` order; add rows here when P2 starts.
 
 ## Follow-ups
 
+- [ ] (P1-16 security review, 2026-11-04; reported by a Haiku read-only review, verify each before fixing) (a) no per-device rate limit on `pin-login` (Argon2id costs 19 MiB a call), signed sync push and heartbeat; security.md promises one; add a fail-closed fixed-window limit and cap concurrent Argon2 work; (b) enrollment codes are an unkeyed SHA-256 of a 40-bit value (`modules/devices/src/domain/device.ts`): HMAC with a server secret; (c) device request signatures do not cover `@query`, so the query of signed GETs (`/v1/sync/changes`) is not authenticated: add it to the covered components; (d) latent: `modules/sync/src/pull.ts` caches non-stock snapshots under scope "all" while the key includes the branch: fix before any branch-scoped non-stock dataset. Fixed already: set-PIN no longer stores an idempotency request hash of the PIN (`idempotency: "off"`, regression test).
+
 - [ ] (verification) Four DB-heavy tests fail only when the machine is loaded: api `/ready` with a stopped Postgres, api `sync-burst` and `wiring` hooks (60 s container start), workers `relay` expired-lease. They pass alone. Make them independent of container start time (shared container per package, longer hooks, or fake clocks) — owner: P1-16 Mitigation 2026-11-04: api and workers test and hook timeout raised from 60 s to 120 s (not yet proven under load; keep open until a loaded full run is green).
 
 <!-- - [ ] (P0-04) example: add GS1 exponent edge cases — owner: next step that touches money -->
