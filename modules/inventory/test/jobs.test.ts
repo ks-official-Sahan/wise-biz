@@ -204,7 +204,8 @@ describe("partitions and locking", () => {
       await gate;
       return "ran";
     });
-    await new Promise((r) => setTimeout(r, 50));
+    // Wait until the first caller holds the lock; a fixed sleep races a slow runner.
+    for (let i = 0; i < 200 && inside === 0; i++) await new Promise((r) => setTimeout(r, 25));
     const second = await exclusive(worker, "inv-test", () => Promise.resolve("ran too"));
     release();
     expect([await first, second, inside]).toEqual(["ran", undefined, 1]);
