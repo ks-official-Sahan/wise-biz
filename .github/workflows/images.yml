@@ -43,9 +43,13 @@ jobs:
             dockerfile: infra/docker/console.Dockerfile
             args: ""
     env:
-      IMAGE: ghcr.io/${{ github.repository }}/${{ matrix.app }}
       VERSION: ${{ github.ref_name }}
     steps:
+      - name: Name the image (GHCR needs a lowercase repository path; the owner here has capitals)
+        env:
+          APP: ${{ matrix.app }}
+        run: echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}/$APP" >> "$GITHUB_ENV"
+
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

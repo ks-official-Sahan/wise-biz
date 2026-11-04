@@ -16,7 +16,8 @@ started="$(date +%s)"
 # The dumps carry no ownership: the application roles must already exist (provisioned with the database, with REAL
 # passwords; never run the dev init SQL here, it creates roles with placeholder passwords).
 for role in wb_migrator wb_app wb_worker wb_chainer wb_identity; do
-  [ "$(psql "$target" -Atc "select count(*) from pg_roles where rolname = '$role'")" = "1" ] \n    || { echo "role $role is missing on the target: provision roles first (docs/runbooks/restore.md)" >&2; exit 1; }
+  [ "$(psql "$target" -Atc "select count(*) from pg_roles where rolname = '$role'")" = "1" ] \
+    || { echo "role $role is missing on the target: provision roles first (docs/runbooks/restore.md)" >&2; exit 1; }
 done
 for ext in pgcrypto pg_trgm vector pg_stat_statements; do psql "$target" -v ON_ERROR_STOP=1 -q -c "create extension if not exists $ext"; done
 

@@ -61,6 +61,10 @@ export function createStorageService(o: {
     if (typeof sql !== "string" || sql === "" || sql.length > MAX_SQL)
       throw new StorageError("Invalid statement.");
     if (/load_extension/i.test(sql)) throw new StorageError("That statement is not allowed.");
+    // The checks below look at the start of each statement, and SQLite skips comments before it, so a leading comment
+    // ("/**/ATTACH ...", or a line comment then PRAGMA writable_schema=1) would walk past them. The app's statements never carry comments.
+    if (sql.includes("/*") || sql.includes("--"))
+      throw new StorageError("That statement is not allowed.");
     for (const part of sql.split(";")) {
       if (FORBIDDEN.test(part)) throw new StorageError("That statement is not allowed.");
       const m = PRAGMA.exec(part);

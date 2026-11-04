@@ -116,6 +116,24 @@ describe("defineEnv", () => {
 describe("assertProductionEnv", () => {
   const ok = { NODE_ENV: "production", AUTH_SECRET: "x".repeat(32), EMAIL_PROVIDER: "smtp" };
 
+  it("holds the PIN pepper to the same bar as a secret: not short, not the .env.example placeholder", () => {
+    const placeholder = "dev-only-change-me-pin-pepper-0123456789ab";
+    expect(() => {
+      assertProductionEnv({ ...ok, PIN_PEPPER: placeholder });
+    }).toThrow(/PIN_PEPPER/);
+    expect(() => {
+      assertProductionEnv({ ...ok, PIN_PEPPER: "short" });
+    }).toThrow(/PIN_PEPPER/);
+    expect(() => {
+      assertProductionEnv({ ...ok, PIN_PEPPER: "q".repeat(40) });
+    }).not.toThrow();
+    try {
+      assertProductionEnv({ ...ok, PIN_PEPPER: placeholder });
+    } catch (error) {
+      expect(String(error)).not.toContain(placeholder);
+    }
+  });
+
   it("rejects .env.example dev placeholders without echoing them", () => {
     const placeholder = "dev-only-change-me-dev-only-change-me";
     try {

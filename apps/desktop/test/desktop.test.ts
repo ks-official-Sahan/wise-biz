@@ -241,6 +241,9 @@ describe("hardening", () => {
       "SELECT load_extension('x')",
       "SELECT 1; PRAGMA cache_size = 1",
       "SELECT 1; ATTACH DATABASE 'x' AS x",
+      "/**/ATTACH DATABASE '/tmp/x.db' AS x",
+      "-- c\nPRAGMA writable_schema=1",
+      "/* */ VACUUM INTO '/tmp/copy.db'",
     ])
       expect(() => {
         s.exec(sql);

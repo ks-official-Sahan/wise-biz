@@ -4,8 +4,8 @@ Decision: ADR 0017. Do this once per environment (production, staging).
 
 ## Create
 1. Create a Neon project in the region closest to the container platform. Postgres 18. Keep compute always on in production (staging may scale to zero).
-2. Run the role and database init (`infra/postgres/init/*.sql`) with the project's owner role, as the migrator would. Do not create roles by hand in the console: the roles, grants and `FORCE ROW LEVEL SECURITY` come from the migrations.
-3. Set a strong, different password for each of `wb_migrator`, `wb_app`, `wb_worker` (rotation: `docs/runbooks/rotate-secrets.md`).
+2. Create the database `wise_biz` (console), then create the roles with `infra/neon/provision-roles.sql`: it takes every password as a psql variable (usage in the file header) and has no defaults. Generate each password with `openssl rand`, put it in Secret Manager as the matching `wb-<env>-DATABASE_*_URL`, and never run the dev init (`infra/docker/postgres/init/001-roles-db.sql`): it creates the same roles with passwords equal to their names.
+3. Passwords are rotated as in `docs/runbooks/rotate-secrets.md`.
 
 ## Connection strings (the part that goes wrong)
 | Env var | Role | Host |

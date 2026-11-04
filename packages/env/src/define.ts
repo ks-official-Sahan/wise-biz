@@ -98,9 +98,11 @@ export function assertProductionEnv(source: EnvSource = process.env): void {
   }
   if (AUTH_SECRET === undefined) problems.set("AUTH_SECRET", "required");
   for (const [key, value] of Object.entries(env)) {
-    if (key.endsWith("_SECRET") && value.length < MIN_SECRET) {
+    // PIN_PEPPER keys every operator PIN hash: as sensitive as a secret, though its name does not say so.
+    const isPepper = key === "PIN_PEPPER";
+    if ((key.endsWith("_SECRET") || isPepper) && value.length < MIN_SECRET) {
       problems.set(key, `too short (min ${String(MIN_SECRET)})`);
-    } else if (/_SECRET|_KEY$|_PASSWORD$/.test(key) && DEV_PLACEHOLDER.test(value)) {
+    } else if ((/_SECRET|_KEY$|_PASSWORD$/.test(key) || isPepper) && DEV_PLACEHOLDER.test(value)) {
       problems.set(key, "dev placeholder from .env.example is not allowed in production");
     }
   }

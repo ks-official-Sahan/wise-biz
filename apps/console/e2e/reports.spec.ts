@@ -278,7 +278,7 @@ test("requests an export and offers a finished one for download", async ({ page 
   await expect(page.getByText("Ready, 1200 rows")).toBeVisible();
   await expect(page.getByRole("link", { name: "Download" })).toHaveAttribute(
     "href",
-    //v1/reporting/exports/.+/download$/,
+    /\/v1\/reporting\/exports\/.+\/download$/,
   );
   await a11y(page);
   await page.getByRole("button", { name: "Request export" }).click();
