@@ -92,6 +92,7 @@ export async function createEnrollmentCodeCommand(
   ctx: CommandContext,
   input: { branchId: string; name: string },
   branchExists: BranchExists,
+  pepper: Uint8Array,
 ): Promise<CommandResult> {
   const tenantId = ctx.tenant.tenantId;
   if (!(await branchExists(tx, tenantId, input.branchId))) notFound();
@@ -104,7 +105,7 @@ export async function createEnrollmentCodeCommand(
     [
       id,
       tenantId,
-      codeHash(normaliseCode(code) ?? ""),
+      codeHash(normaliseCode(code) ?? "", pepper),
       input.branchId,
       input.name,
       ctx.userId,
@@ -130,6 +131,8 @@ export interface EnrollDeps {
   pool: pg.Pool;
   ids: { uuidv7(): string };
   clock: { now(): number };
+  /** Server secret keying the code hash: a copy of the table alone cannot be inverted to live codes. */
+  pepper: Uint8Array;
   /** Proves the caller holds the private key it enrolls (the enroll request is signed with it). */
   verifyPossession: (publicKey: Uint8Array) => Promise<boolean>;
 }
@@ -156,7 +159,7 @@ export async function enroll(
   ip?: string,
 ): Promise<DeviceDto> {
   const normalised = normaliseCode(input.code) ?? notFound();
-  const hash = codeHash(normalised);
+  const hash = codeHash(normalised, deps.pepper);
   const code = await withLookupTx(
     deps.pool,
     { key: "enrollment_code", value: hash, requestId },

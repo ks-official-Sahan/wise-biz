@@ -182,7 +182,12 @@ describe("enrollment codes", () => {
     expect(normaliseCode("o1z0 1zoz")).toBe("01Z01Z0Z");
     expect(normaliseCode("ABC-12")).toBeNull();
     expect(normaliseCode("UUUU-UUUU")).toBeNull();
-    expect(codeHash("01Z01Z0Z")).toMatch(/^[0-9a-f]{64}$/);
+    const pepper = new TextEncoder().encode("test-pepper");
+    expect(codeHash("01Z01Z0Z", pepper)).toMatch(/^[0-9a-f]{64}$/);
+    // keyed: the same code under another secret gives another hash, so the table alone cannot be inverted
+    expect(codeHash("01Z01Z0Z", pepper)).not.toBe(
+      codeHash("01Z01Z0Z", new TextEncoder().encode("other")),
+    );
   });
 
   it("owner creates one for a known branch; unknown branch and non-managers get 404", async () => {

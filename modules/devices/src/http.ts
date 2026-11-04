@@ -121,7 +121,8 @@ export function mountRoutes(
       input: CreateEnrollmentCodeSchema,
       idempotency: "off",
       resource: (b) => ({ branchId: b.branchId }),
-      handler: (tx, body, ctx) => createEnrollmentCodeCommand(tx, ctx, body, opts.branchExists),
+      handler: (tx, body, ctx) =>
+        createEnrollmentCodeCommand(tx, ctx, body, opts.branchExists, opts.pin.pepper),
     });
     return res as never;
   });
@@ -133,6 +134,7 @@ export function mountRoutes(
         pool: deps.pool,
         ids: deps.ids,
         clock: deps.clock,
+        pepper: opts.pin.pepper,
         verifyPossession: (publicKey) =>
           verifyEnrollSignature(
             c,

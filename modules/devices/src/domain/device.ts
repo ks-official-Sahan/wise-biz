@@ -1,4 +1,4 @@
-import { sha256, toHex } from "@wise-biz/crypto";
+import { hmacSha256, toHex } from "@wise-biz/crypto";
 
 /** Crockford base32 without I, L, O, U: no look-alike characters when a code is typed on a terminal. */
 const ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
@@ -48,7 +48,7 @@ export function normaliseCode(input: string): string | null {
   return CODE.test(s) ? s : null;
 }
 
-/** Hex SHA-256 of the normalised code: the only form stored or used as a lookup key. */
-export function codeHash(normalised: string): string {
-  return toHex(sha256(`wb-enroll:v1:${normalised}`));
+/** Hex HMAC-SHA256 (server pepper) of the normalised code: the only form stored or used as a lookup key. */
+export function codeHash(normalised: string, pepper: Uint8Array): string {
+  return toHex(hmacSha256(pepper, `wb-enroll:v2:${normalised}`));
 }
