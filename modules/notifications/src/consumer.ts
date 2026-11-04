@@ -28,7 +28,7 @@ export interface NotificationsDeps {
     client: PoolClient,
     tenantId: string,
     permission: string,
-    scope: { locationIds?: readonly string[]; branchIds?: readonly string[] },
+    scope: { locationIds?: readonly string[]; branchIds?: readonly string[]; tenantWide?: boolean },
   ) => Promise<string[]>;
 }
 
@@ -101,7 +101,7 @@ export function createNotificationsConsumer(deps: NotificationsDeps): Notificati
     tenantId: string,
     kind: Kind,
     permission: string,
-    scope: { locationIds?: readonly string[]; branchIds?: readonly string[] },
+    scope: { locationIds?: readonly string[]; branchIds?: readonly string[]; tenantWide?: boolean },
     title: string,
     body: string,
     eventId: string,
@@ -169,7 +169,8 @@ export function createNotificationsConsumer(deps: NotificationsDeps): Notificati
           event.tenantId,
           "daily_summary",
           "reporting:read",
-          {},
+          // Tenant-wide totals: only people who may see every branch (a branch-limited reader would learn other branches' sales).
+          { tenantWide: true },
           `Sales on ${p.businessDate}`,
           `${lines.join("; ")}. Open Reports for the detail.`,
           event.id,

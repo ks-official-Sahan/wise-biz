@@ -157,6 +157,11 @@ export const LIMITS = {
   pinLoginPerDevice: { limit: 20, windowMs: MINUTE },
   /** Signed command batches per device (a terminal sends a few a minute; a backlog arrives in chunks of 100). */
   syncPushPerDevice: { limit: 120, windowMs: MINUTE },
+  /**
+   * Setting a PIN per signed-in user. A PIN must be unique in the business, so a refusal tells the caller another operator
+   * has it: without a limit that is a way to probe the business's PINs one guess at a time.
+   */
+  setPinPerUser: { limit: 10, windowMs: MINUTE },
   /** Heartbeats per device (one a minute is normal). */
   heartbeatPerDevice: { limit: 30, windowMs: MINUTE },
 } as const;

@@ -311,6 +311,30 @@ describe("receive", () => {
 });
 
 describe("adjust", () => {
+  it("a stock line with no known cost is not free: a value-limited role needs approval for it", async () => {
+    const unpriced = await variant(false); // never received anywhere, so no cost basis exists
+    role = "clerk";
+    try {
+      const res = await send("POST", "/adjustments", {
+        locationId: LOC,
+        reason: "damage",
+        lines: [{ variantId: unpriced, qty: "-1" }],
+      });
+      expect(res.status).toBe(412);
+    } finally {
+      role = "owner";
+    }
+    // the owner may still write it off (the value is recorded as 0: nothing was ever received at a cost)
+    await ok(
+      await send("POST", "/adjustments", {
+        locationId: LOC,
+        reason: "damage",
+        lines: [{ variantId: unpriced, qty: "-1" }],
+      }),
+      201,
+    );
+  });
+
   it("values the adjustment at cost; over the role's limit is 412 with approver roles", async () => {
     const bread = await variant(false);
     await ok(

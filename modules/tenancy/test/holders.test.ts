@@ -78,6 +78,11 @@ describe("permissionHolders", () => {
     expect((await holders(tenantId, "tenancy:read", { branchIds: [uuidv7()] })).sort()).toEqual(
       [owner, everywhere.userId].sort(),
     );
+
+    // Tenant-wide figures: only members who see every branch, never the branch-limited one.
+    expect((await holders(tenantId, "tenancy:read", { tenantWide: true })).sort()).toEqual(
+      [owner, everywhere.userId].sort(),
+    );
   });
 
   it("leaves out suspended members and other businesses", async () => {

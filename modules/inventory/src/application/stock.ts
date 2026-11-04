@@ -206,17 +206,18 @@ const MOVEMENT_REASON: Readonly<Record<string, MovementReason>> = {
 
 /**
  * Unit cost per line: the batch's own cost, else the latest received cost of the variant at the location (one lateral
- * index probe per distinct variant), else 0.
+ * index probe per distinct variant), else the latest received cost anywhere, else `null`: no cost is known, so the
+ * value of the line is unknown and must be treated as unbounded for the approval limit (never as 0).
  */
 async function unitCosts(
   tx: TxHandle,
   tenantId: string,
   locationId: string,
   lines: readonly { variantId: string; batchId?: string | null | undefined }[],
-): Promise<number[]> {
+): Promise<(number | null)[]> {
   const batchIds = [...new Set(lines.flatMap((l) => (l.batchId == null ? [] : [l.batchId])))];
   const variants = [...new Set(lines.filter((l) => l.batchId == null).map((l) => l.variantId))];
-  const [b, v] = [
+  const [b, v, any] = [
     batchIds.length === 0
       ? { rows: [] }
       : await tx.query<{ id: string; variant_id: string; unit_cost_minor: string }>(
@@ -234,11 +235,25 @@ async function unitCosts(
            ) m`,
           [tenantId, locationId, variants],
         ),
+    // No receive at this location (stock that arrived by transfer, or was received elsewhere): the latest receive of the
+    // variant at any location is the best known cost.
+    variants.length === 0
+      ? { rows: [] }
+      : await tx.query<{ variant_id: string; unit_cost_minor: string }>(
+          `select v.variant_id, m.unit_cost_minor from unnest($2::uuid[]) as v(variant_id)
+           cross join lateral (
+             select unit_cost_minor from inventory.stock_movements
+             where tenant_id = $1 and variant_id = v.variant_id and reason = 'receive'
+             order by occurred_at desc, id desc limit 1
+           ) m`,
+          [tenantId, variants],
+        ),
   ];
   const batch = new Map(b.rows.map((x) => [x.id, x]));
   const latest = new Map(v.rows.map((x) => [x.variant_id, Number(x.unit_cost_minor)]));
+  const anywhere = new Map(any.rows.map((x) => [x.variant_id, Number(x.unit_cost_minor)]));
   return lines.map((l, i) => {
-    if (l.batchId == null) return latest.get(l.variantId) ?? 0;
+    if (l.batchId == null) return latest.get(l.variantId) ?? anywhere.get(l.variantId) ?? null;
     const row = batch.get(l.batchId);
     if (row?.variant_id !== l.variantId)
       return invalid(`lines.${String(i)}.batchId`, "Unknown batch for this variant.");
@@ -272,7 +287,9 @@ export async function adjustCommand(
     (a, l, i) => a + lineValueMinor(toQty4(l.qty), costs[i] ?? 0),
     0,
   );
-  deps.authorizeValue(value);
+  // A line with no known cost is worth an unknown amount: a role limited by value must not pass it as free.
+  const unknownCost = input.lines.some((l, i) => costs[i] === null && toQty4(l.qty) !== 0n);
+  deps.authorizeValue(unknownCost ? Number.MAX_SAFE_INTEGER : value);
   const id = input.id ?? ctx.ids.uuidv7();
   await tx.query(
     `insert into inventory.adjustments (tenant_id, id, location_id, reason, note, value_minor, created_by, created_at)
@@ -292,7 +309,7 @@ export async function adjustCommand(
           variant_id: l.variantId,
           batch_id: l.batchId ?? null,
           qty: l.qty,
-          unit_cost_minor: costs[i],
+          unit_cost_minor: costs[i] ?? 0,
         })),
       ),
     ],

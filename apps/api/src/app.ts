@@ -172,6 +172,22 @@ export function createApp(opts: CreateAppOptions): OpenAPIHono<AppEnv> {
     ),
   );
   app.use(
+    "/v1/devices/pin",
+    rateLimit(
+      [
+        {
+          name: "set-pin:user",
+          ...LIMITS.setPinPerUser,
+          subject: (c) => {
+            const auth = c.get("auth");
+            return auth.kind === "user" ? auth.userId : null;
+          },
+        },
+      ],
+      { redis: opts.kernelRedis, method: "PUT" },
+    ),
+  );
+  app.use(
     "/v1/devices/heartbeat",
     rateLimit(
       [{ name: "heartbeat:device", ...LIMITS.heartbeatPerDevice, subject: deviceSubject }],
