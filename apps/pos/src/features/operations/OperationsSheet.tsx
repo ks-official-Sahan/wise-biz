@@ -11,7 +11,7 @@ import {
   createStyles,
   useToast,
 } from "@wise-biz/ui";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ScrollView, View } from "react-native";
 import { useStore } from "react-redux";
 
@@ -157,13 +157,18 @@ export function OperationsSheet(p: OperationsSheetProps) {
     [deps],
   );
 
+  const pickSeq = useRef(0);
   const pick = useCallback(
     async (sale: StoredSale | undefined) => {
+      const mine = ++pickSeq.current;
       setPicked(sale);
       setOpenedAt(Date.now());
       setQty({});
       setReason("");
-      setLeft(sale === undefined || deps === undefined ? [] : await returnableLines(deps.db, sale));
+      const lines =
+        sale === undefined || deps === undefined ? [] : await returnableLines(deps.db, sale);
+      // A slower, older pick must not overwrite the lines of the sale picked since.
+      if (mine === pickSeq.current) setLeft(lines);
     },
     [deps],
   );
