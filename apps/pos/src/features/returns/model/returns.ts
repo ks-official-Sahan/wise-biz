@@ -29,6 +29,8 @@ export interface StoredSale {
   readonly shiftId: string;
   readonly completedAt: number;
   readonly voidedAt?: number;
+  /** Who rang the sale up (absent on sales stored before this was kept). */
+  readonly operatorId?: string;
   readonly currency: string;
   readonly payableMinor: number;
   readonly lines: readonly SoldLine[];
@@ -60,6 +62,7 @@ function toSale(r: SaleRow): StoredSale {
     shiftId: r.shift_id,
     completedAt: r.completed_at,
     ...(r.voided_at === null ? {} : { voidedAt: r.voided_at }),
+    ...(b.operatorId === undefined ? {} : { operatorId: b.operatorId }),
     currency: b.currency,
     payableMinor: b.payableMinor,
     lines: b.lines,
@@ -168,7 +171,13 @@ export interface ReturnDeps {
 export class ReturnError extends Error {
   override readonly name = "ReturnError";
   readonly code:
-    "nothing" | "over_return" | "voided" | "needs_override" | "no_sale" | "reason_required";
+    | "nothing"
+    | "over_return"
+    | "voided"
+    | "needs_override"
+    | "no_sale"
+    | "reason_required"
+    | "bad_refund";
   constructor(code: ReturnError["code"], message: string) {
     super(message);
     this.code = code;
@@ -207,7 +216,8 @@ export async function commitReturn(
   const reason = o.reason.trim();
   if (reason === "") throw new ReturnError("reason_required", "Add a reason for the return.");
   if (o.lines.length === 0) throw new ReturnError("nothing", "Pick something to return.");
-  if (!deps.has(RETURN_PERMISSION) && o.approval === undefined) {
+  // An approval only counts when it is for this permission: one granted for another action must not unlock a return.
+  if (!deps.has(RETURN_PERMISSION) && o.approval?.permission !== RETURN_PERMISSION) {
     throw new ReturnError("needs_override", "A supervisor must approve this return.");
   }
   return deps.transaction(async (tx) => {
@@ -226,6 +236,10 @@ export async function commitReturn(
         if (l.saleLine !== undefined)
           priorRefund.set(l.saleLine, (priorRefund.get(l.saleLine) ?? 0) + l.refundMinor);
       }
+    }
+    // One entry per sold line: two entries for the same line would each be checked against the full remainder.
+    if (new Set(o.lines.map((l) => l.saleLine)).size !== o.lines.length) {
+      throw new ReturnError("over_return", "Each sold line can appear once in a return.");
     }
     const lines = o.lines.map((input) => {
       const r = left.get(input.saleLine);
@@ -250,8 +264,54 @@ export async function commitReturn(
     const totalMinor = lines.reduce((n, l) => n + l.refundMinor, 0);
     const card = o.cardRefunds ?? [];
     const cardTotal = card.reduce((n, c) => n + c.amountMinor, 0);
+    if (card.some((c) => !Number.isSafeInteger(c.amountMinor) || c.amountMinor <= 0)) {
+      throw new ReturnError("bad_refund", "A card refund must be a positive amount.");
+    }
     if (cardTotal > totalMinor)
       throw new ReturnError("over_return", "Card refunds exceed the return total.");
+    // Money goes back the way it came. A card refund names the card payment it reverses and cannot exceed what that
+    // payment still holds; cash back is limited to what was paid in cash when the sale also had card payments.
+    const paidBy = new Map(sale.tenders.map((t) => [t.id, t] as const));
+    const refundedBefore = new Map<string, number>();
+    let cashBefore = 0;
+    for (const r of await tx.all<{ body: string }>(
+      "SELECT body FROM local_returns WHERE sale_id = ?",
+      [sale.id],
+    )) {
+      for (const t of (
+        JSON.parse(r.body) as {
+          tenders?: { kind: string; amountMinor: number; card?: { providerRef?: string } }[];
+        }
+      ).tenders ?? []) {
+        if (t.kind === "cash") cashBefore += t.amountMinor;
+      }
+    }
+    for (const c of card) {
+      const original = paidBy.get(c.tenderId);
+      if (original?.kind !== "card") {
+        throw new ReturnError("bad_refund", "A card refund must name a card payment of this sale.");
+      }
+      const used = (refundedBefore.get(c.tenderId) ?? 0) + c.amountMinor;
+      refundedBefore.set(c.tenderId, used);
+      if (used > original.amountMinor) {
+        throw new ReturnError("bad_refund", "That is more than the card payment holds.");
+      }
+    }
+    const cashPaid = sale.tenders
+      .filter((t) => t.kind === "cash")
+      .reduce((n, t) => n + t.amountMinor, 0);
+    const paidByCard = sale.tenders.some((t) => t.kind === "card");
+    // Cash rounding at the till makes the lines add up to a little more than was paid; that difference is allowed.
+    const rounding = Math.max(
+      0,
+      sale.lines.reduce((n, l) => n + l.totalMinor, 0) - sale.payableMinor,
+    );
+    if (paidByCard && totalMinor - cardTotal + cashBefore > cashPaid + rounding) {
+      throw new ReturnError(
+        "bad_refund",
+        "This sale was paid by card: refund the card for that part.",
+      );
+    }
     const tenders = [
       ...card.map((c) => ({
         id: deps.newId(),

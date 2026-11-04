@@ -106,7 +106,13 @@ export function OperationsSheet(p: OperationsSheetProps) {
   const base = () =>
     deps === undefined
       ? undefined
-      : { transaction: deps.transaction, now: Date.now, newId: uuidv7, operatorId };
+      : {
+          transaction: deps.transaction,
+          now: Date.now,
+          newId: uuidv7,
+          operatorId,
+          has: (x: string) => perms().has(x),
+        };
 
   // ---- shift ----
   const [shift, setShift] = useState<ShiftRow>();

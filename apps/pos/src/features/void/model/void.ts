@@ -56,8 +56,21 @@ export async function voidSale(
     if ((returned?.n ?? 0) > 0)
       throw new VoidError("returned", "Part of this sale was returned. Return the rest instead.");
     const at = deps.now();
-    if (voidNeedsOverride(sale.completedAt, at, deps.has) && o.approval === undefined) {
-      throw new VoidError("needs_override", "A supervisor must approve a void after 15 minutes.");
+    // Late voids and other operators' sales need a supervisor, and the approval must be for voiding.
+    const othersSale =
+      sale.operatorId !== undefined &&
+      sale.operatorId !== deps.operatorId &&
+      !deps.has(VOID_PERMISSION);
+    if (
+      (voidNeedsOverride(sale.completedAt, at, deps.has) || othersSale) &&
+      o.approval?.permission !== VOID_PERMISSION
+    ) {
+      throw new VoidError(
+        "needs_override",
+        othersSale
+          ? "A supervisor must approve voiding another operator's sale."
+          : "A supervisor must approve a void after 15 minutes.",
+      );
     }
     const shift = await ensureShift(tx, deps, {
       completedAt: at,

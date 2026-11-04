@@ -40,13 +40,18 @@ export interface ShiftDeps {
   readonly now: () => number;
   readonly newId: () => string;
   readonly operatorId: string;
+  /** The signed-in operator's permissions: cash leaving the drawer and closing the shift are checked here, not only in the UI. */
+  readonly has: (permission: string) => boolean;
 }
+
+export const CASH_PERMISSION = "sales:cash";
+export const SHIFT_PERMISSION = "sales:shift";
 
 export type CashMovementKind = "pay_in" | "pay_out" | "float_add" | "drop";
 
 export class ShiftError extends Error {
   override readonly name = "ShiftError";
-  readonly code: "no_shift" | "bad_amount" | "reason_required";
+  readonly code: "no_shift" | "bad_amount" | "reason_required" | "forbidden";
   constructor(code: ShiftError["code"], message: string) {
     super(message);
     this.code = code;
@@ -138,6 +143,11 @@ export async function recordCashMovement(
   deps: ShiftDeps,
   o: { kind: CashMovementKind; amountMinor: number; reason: string },
 ): Promise<void> {
+  if (!deps.has(CASH_PERMISSION))
+    throw new ShiftError(
+      "forbidden",
+      "You need a supervisor to move cash in or out of the drawer.",
+    );
   if (!isMoney(o.amountMinor) || o.amountMinor === 0)
     throw new ShiftError("bad_amount", "Enter an amount above zero.");
   const reason = o.reason.trim();
@@ -287,6 +297,8 @@ export async function closeShift(
   deps: ShiftDeps,
   o: { countedMinor: number; blind: boolean; note?: string },
 ): Promise<CloseResult> {
+  if (!deps.has(SHIFT_PERMISSION))
+    throw new ShiftError("forbidden", "You are not allowed to close the shift.");
   if (!isMoney(o.countedMinor))
     throw new ShiftError("bad_amount", "The count is not a valid amount.");
   return deps.transaction(async (tx) => {

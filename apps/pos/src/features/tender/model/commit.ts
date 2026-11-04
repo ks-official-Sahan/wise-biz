@@ -107,6 +107,7 @@ export async function commitSale(deps: CommitDeps, input: CommitInput): Promise<
         saleNo,
         completedAt,
         JSON.stringify({
+          operatorId: deps.operatorId,
           currency: priced.currency,
           payableMinor: priced.payableMinor,
           lines: command.lines,

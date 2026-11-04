@@ -35,6 +35,7 @@ const shiftDeps = (fx: Fx) => ({
   now: fx.deps.now,
   newId: uuidv7,
   operatorId: ids.operator,
+  has: () => true,
 });
 const returnDeps = (fx: Fx, has = true) => ({
   ...shiftDeps(fx),
@@ -44,14 +45,25 @@ const returnDeps = (fx: Fx, has = true) => ({
 const voidDeps = (fx: Fx, has = true) => ({ ...shiftDeps(fx), has: () => has });
 
 /** Rings up 2 x tea + 1 x rice paid in cash (total 19.85). */
-async function sell(fx: Fx) {
+async function sell(fx: Fx, cardMinor = 0) {
   await fx.model.addVariant(ids.tea, "2");
   await fx.model.addVariant(ids.rice, "1");
   const pricing = fx.model.pricing()!;
   const sale = await commitSale(fx.deps, {
     pricing,
     cart: linesOf(fx.store),
-    tenders: [{ id: uuidv7(), kind: "cash", amountMinor: pricing.totals.totalMinor }],
+    tenders:
+      cardMinor === 0
+        ? [{ id: uuidv7(), kind: "cash", amountMinor: pricing.totals.totalMinor }]
+        : [
+            { id: uuidv7(), kind: "cash", amountMinor: pricing.totals.totalMinor - cardMinor },
+            {
+              id: uuidv7(),
+              kind: "card",
+              amountMinor: cardMinor,
+              card: { provider: "terminal", providerRef: "mock_sale", last4: "4242" },
+            },
+          ],
     customerId: null,
     approvals: [],
   });
@@ -268,13 +280,14 @@ describe("returns", () => {
 
   it("splits a refund between the original card and cash", async () => {
     const fx = await setup();
-    const sale = await sell(fx);
+    const sale = await sell(fx, 500);
     const stored = (await saleById(fx.db, sale.saleId))!;
+    const cardId = stored.tenders.find((t) => t.kind === "card")!.id;
     const out = await commitReturn(returnDeps(fx), {
       sale: stored,
       lines: [{ saleLine: 0, qty: "1", disposition: "restock" }],
       reason: "x",
-      cardRefunds: [{ tenderId: "t", amountMinor: 100, providerRef: "mock_1", last4: "4242" }],
+      cardRefunds: [{ tenderId: cardId, amountMinor: 100, providerRef: "mock_1", last4: "4242" }],
     });
     expect(out.cashMinor).toBe(out.totalMinor - 100);
     const body = (await bodies(fx, "complete_return"))[0] as unknown as {
@@ -287,9 +300,67 @@ describe("returns", () => {
         sale: stored,
         lines: [{ saleLine: 1, qty: "1", disposition: "restock" }],
         reason: "x",
-        cardRefunds: [{ tenderId: "t", amountMinor: 999_999, providerRef: "m" }],
+        cardRefunds: [{ tenderId: cardId, amountMinor: 999_999, providerRef: "m" }],
       }),
     ).rejects.toMatchObject({ code: "over_return" });
+  });
+
+  it("refunds the way the sale was paid: no cash for a card payment, no made-up or negative card refunds", async () => {
+    const fx = await setup();
+    const sale = await sell(fx, 1000);
+    const stored = (await saleById(fx.db, sale.saleId))!;
+    const cardId = stored.tenders.find((t) => t.kind === "card")!.id;
+    const cashId = stored.tenders.find((t) => t.kind === "cash")!.id;
+    const whole = [
+      { saleLine: 0, qty: "2", disposition: "restock" as const },
+      { saleLine: 1, qty: "1", disposition: "restock" as const },
+    ];
+    const base = { sale: stored, lines: whole, reason: "x" };
+    const refused = (
+      cardRefunds?: { tenderId: string; amountMinor: number; providerRef: string }[],
+    ) =>
+      expect(
+        commitReturn(returnDeps(fx), {
+          ...base,
+          ...(cardRefunds === undefined ? {} : { cardRefunds }),
+        }),
+      ).rejects.toMatchObject({ code: "bad_refund" });
+    // the whole sale back in cash although 10.00 was paid by card
+    await refused();
+    await refused([{ tenderId: cashId, amountMinor: 100, providerRef: "m" }]);
+    await refused([{ tenderId: cardId, amountMinor: -50, providerRef: "m" }]);
+    await refused([{ tenderId: "nope", amountMinor: 50, providerRef: "m" }]);
+    // refunding the card for its part goes through
+    await commitReturn(returnDeps(fx), {
+      ...base,
+      cardRefunds: [{ tenderId: cardId, amountMinor: 1000, providerRef: "m" }],
+    });
+  });
+
+  it("refuses a return line listed twice, and an approval for a different permission", async () => {
+    const fx = await setup();
+    const sale = await sell(fx);
+    const stored = (await saleById(fx.db, sale.saleId))!;
+    const line = { saleLine: 0, qty: "2", disposition: "restock" as const };
+    await expect(
+      commitReturn(returnDeps(fx), { sale: stored, lines: [line, line], reason: "x" }),
+    ).rejects.toMatchObject({ code: "over_return" });
+    await expect(
+      commitReturn(returnDeps(fx, false), {
+        sale: stored,
+        lines: [line],
+        reason: "x",
+        approval: {
+          id: uuidv7(),
+          permission: "sales:edit_line",
+          approverId: uuidv7(),
+          requesterId: ids.operator,
+          reason: "wrong approval",
+          subjectId: "s",
+          at: fx.clock.t,
+        },
+      }),
+    ).rejects.toMatchObject({ code: "needs_override" });
   });
 
   it("lists recent sales, filters by number, forgets old ones", async () => {
@@ -405,5 +476,35 @@ describe("void", () => {
     });
     expect(voidNeedsOverride(0, VOID_WINDOW_MS + 1, () => false)).toBe(true);
     expect(voidNeedsOverride(0, VOID_WINDOW_MS + 1, () => true)).toBe(false);
+  });
+});
+
+describe("who may do what", () => {
+  it("cash movements and closing the shift need their permissions, checked in the model", async () => {
+    const fx = await setup();
+    await openShift(shiftDeps(fx), { floatMinor: 1000, currency: "USD" });
+    const none = { ...shiftDeps(fx), has: () => false };
+    await expect(
+      recordCashMovement(none, { kind: "pay_out", amountMinor: 500, reason: "supplier" }),
+    ).rejects.toMatchObject({ code: "forbidden" });
+    await expect(closeShift(none, { countedMinor: 1000, blind: true })).rejects.toMatchObject({
+      code: "forbidden",
+    });
+    const cashierLike = { ...shiftDeps(fx), has: (p: string) => p === "sales:shift" };
+    await expect(
+      recordCashMovement(cashierLike, { kind: "pay_out", amountMinor: 500, reason: "supplier" }),
+    ).rejects.toMatchObject({ code: "forbidden" });
+    await closeShift(cashierLike, { countedMinor: 1000, blind: true });
+  });
+
+  it("an operator cannot void someone else's sale without a supervisor's approval", async () => {
+    const fx = await setup();
+    const sale = await sell(fx);
+    const other = { ...voidDeps(fx, false), operatorId: uuidv7() };
+    await expect(voidSale(other, { saleId: sale.saleId, reason: "x" })).rejects.toMatchObject({
+      code: "needs_override",
+    });
+    // the same operator who made the sale can void it inside the window
+    await voidSale(voidDeps(fx, false), { saleId: sale.saleId, reason: "x" });
   });
 });
