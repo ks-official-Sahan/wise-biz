@@ -74,13 +74,9 @@ services:
 
   console:
     <<: *service
-    build:
-      {
-        context: ../..,
-        dockerfile: infra/docker/console.Dockerfile,
-        args: { API_ORIGIN: "http://api:3001" },
-      }
+    build: { context: ../.., dockerfile: infra/docker/console.Dockerfile }
     image: wise-biz/console:${WB_VERSION:-local}
+    environment: { API_ORIGIN: "http://api:3001" }
     tmpfs: [/tmp, /repo/apps/console/.next/cache]
     depends_on: [api]
     deploy: { resources: { limits: { cpus: "1", memory: 768m } } }

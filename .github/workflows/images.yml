@@ -41,7 +41,7 @@ jobs:
             args: --build-arg APP=realtime --build-arg PORT=3002
           - app: console
             dockerfile: infra/docker/console.Dockerfile
-            args: --build-arg API_ORIGIN=http://api:3001
+            args: ""
     env:
       IMAGE: ghcr.io/${{ github.repository }}/${{ matrix.app }}
       VERSION: ${{ github.ref_name }}

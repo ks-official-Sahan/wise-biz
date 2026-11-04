@@ -10,6 +10,14 @@ import type { NextRequest } from "next/server";
  * Referer at all.
  */
 export function proxy(request: NextRequest): NextResponse {
+  // /v1 goes to the API, same-origin so cookies stay first-party. The origin is read per request (not baked in at build),
+  // so one console image serves every environment.
+  if (request.nextUrl.pathname.startsWith("/v1/")) {
+    const origin = process.env.API_ORIGIN ?? "http://localhost:3001";
+    return NextResponse.rewrite(
+      new URL(`${request.nextUrl.pathname}${request.nextUrl.search}`, origin),
+    );
+  }
   const nonce = generateNonce();
   const dev = process.env.NODE_ENV !== "production";
   const uploadOrigin = parseUploadOrigin(process.env.CONSOLE_UPLOAD_ORIGIN, dev);
@@ -26,8 +34,9 @@ export function proxy(request: NextRequest): NextResponse {
 }
 
 export const config = {
-  // Pages only: API proxying (/v1), static assets and prefetches skip the nonce work.
+  // The API proxy (/v1) plus pages; static assets and prefetches skip the nonce work.
   matcher: [
+    "/v1/:path*",
     {
       source: "/((?!v1/|_next/static|_next/image|favicon.ico|fonts/).*)",
       missing: [

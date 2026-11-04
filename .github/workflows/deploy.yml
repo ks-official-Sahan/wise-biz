@@ -47,6 +47,7 @@ jobs:
       REGION: ${{ vars.GCP_REGION }}
       AR: ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT }}/${{ vars.AR_REPO }}
       ENVIRONMENT: ${{ inputs.environment }}
+      API_URL: ${{ vars.API_URL }}
     steps:
       - name: Check the version looks like a release tag
         run: |
@@ -140,11 +141,10 @@ jobs:
           gcloud run deploy "wb-realtime-$ENVIRONMENT" --region "$REGION" --image "$AR/realtime:$VERSION" \
             --port 3002 --cpu 1 --memory 512Mi --min-instances 1 --max-instances 5 --timeout 3600 --allow-unauthenticated \
             --set-env-vars "NODE_ENV=production" --set-secrets "$(wire realtime)"
-          # KNOWN GAP: the console image bakes the api origin in at build time (API_ORIGIN, console.Dockerfile), and images.yml
-          # builds one image per tag with the compose default. Until the /v1 proxy reads the origin at run time, build the
-          # console image per environment with the right --build-arg before using it here.
+          # The console proxies /v1 to API_ORIGIN, read at run time (src/proxy.ts), so the one image serves every environment.
           gcloud run deploy "wb-console-$ENVIRONMENT" --region "$REGION" --image "$AR/console:$VERSION" \
-            --cpu 1 --memory 512Mi --min-instances 1 --max-instances 5 --allow-unauthenticated
+            --cpu 1 --memory 512Mi --min-instances 1 --max-instances 5 --allow-unauthenticated \
+            --set-env-vars "API_ORIGIN=$API_URL"
 
       - name: Smoke test
         env:

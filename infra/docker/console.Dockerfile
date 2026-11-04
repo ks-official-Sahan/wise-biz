@@ -1,9 +1,8 @@
-# The operator console (Next.js). API_ORIGIN is compiled into the /v1 rewrite, so it is a build argument.
-#   docker build -f infra/docker/console.Dockerfile --build-arg API_ORIGIN=http://api:3001 -t wise-biz/console .
+# The operator console (Next.js). API_ORIGIN (where /v1 is proxied to) is read at run time: set it on the container.
+#   docker build -f infra/docker/console.Dockerfile -t wise-biz/console .  &&  docker run -e API_ORIGIN=http://api:3001 wise-biz/console
 ARG NODE_VERSION=24
 FROM node:${NODE_VERSION}-slim AS build
-ARG API_ORIGIN=http://api:3001
-ENV PNPM_HOME=/pnpm CI=true NEXT_TELEMETRY_DISABLED=1 API_ORIGIN=${API_ORIGIN}
+ENV PNPM_HOME=/pnpm CI=true NEXT_TELEMETRY_DISABLED=1
 RUN corepack enable
 WORKDIR /repo
 COPY . .
@@ -12,8 +11,7 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
 RUN pnpm --filter @wise-biz/console build
 
 FROM node:${NODE_VERSION}-slim AS run
-ARG API_ORIGIN=http://api:3001
-ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 API_ORIGIN=${API_ORIGIN} HEALTH_PORT=3000
+ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 HEALTH_PORT=3000
 WORKDIR /repo
 COPY --from=build --chown=node:node /repo /repo
 # Non-root. Next writes its cache under .next/cache: mount a tmpfs there when running with --read-only.
