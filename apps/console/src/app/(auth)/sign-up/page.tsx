@@ -30,15 +30,22 @@ export default function SignUpPage() {
     if (password.length < MIN_PASSWORD) return;
     setBusy(true);
     setError(null);
-    const res = await (
-      await loadAuth()
-    ).signUp.email({
-      name: name.trim(),
-      email: email.trim(),
-      password,
-      callbackURL: "/sign-in?verified=1",
-    });
-    setBusy(false);
+    let res;
+    try {
+      res = await (
+        await loadAuth()
+      ).signUp.email({
+        name: name.trim(),
+        email: email.trim(),
+        password,
+        callbackURL: "/sign-in?verified=1",
+      });
+    } catch {
+      setError("Could not reach the server. Check your connection and try again.");
+      return;
+    } finally {
+      setBusy(false);
+    }
     if (res.error) {
       setError(
         res.error.status === 429

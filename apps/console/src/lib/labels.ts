@@ -116,7 +116,7 @@ export function toZpl(items: readonly LabelItem[], o: ZplOptions = {}): string {
       const ean = i.code === null ? null : toEan13(i.code);
       if (ean !== null) lines.push(`^FO40,80^BY2^BEN,70,Y,N^FD${ean.slice(0, 12)}^FS`);
       else if (i.code !== null) lines.push(`^FO40,80^BY2^BCN,70,Y,N,N^FD${zplText(i.code)}^FS`);
-      lines.push(`^PQ${String(i.copies)},0,1,N`, `^XZ`);
+      lines.push(`^PQ${String(Math.floor(i.copies))},0,1,N`, `^XZ`);
       return lines.join("\n");
     })
     .join("\n");

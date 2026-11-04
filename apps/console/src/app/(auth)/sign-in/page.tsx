@@ -41,8 +41,15 @@ function SignInForm() {
     e.preventDefault();
     setBusy(true);
     setError(null);
-    const res = await (await loadAuth()).signIn.email({ email, password });
-    setBusy(false);
+    let res;
+    try {
+      res = await (await loadAuth()).signIn.email({ email, password });
+    } catch {
+      setError("Could not reach the server. Check your connection and try again.");
+      return;
+    } finally {
+      setBusy(false);
+    }
     if (res.error) {
       setError(
         res.error.status === 403
@@ -65,8 +72,15 @@ function SignInForm() {
     e.preventDefault();
     setBusy(true);
     setError(null);
-    const res = await (await loadAuth()).twoFactor.verifyOtp({ code: code.trim() });
-    setBusy(false);
+    let res;
+    try {
+      res = await (await loadAuth()).twoFactor.verifyOtp({ code: code.trim() });
+    } catch {
+      setError("Could not reach the server. Check your connection and try again.");
+      return;
+    } finally {
+      setBusy(false);
+    }
     if (res.error) {
       setError("That code is wrong or expired. Request a new one below.");
       return;

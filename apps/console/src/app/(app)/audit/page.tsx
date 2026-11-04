@@ -259,7 +259,7 @@ function AuditView() {
                   <td className="num">{new Date(r.at).toLocaleString()}</td>
                   <td>{r.action}</td>
                   <td>{r.entity.type}</td>
-                  <td className="num">{r.actor.id.slice(0, 8)}</td>
+                  <td className="num">{r.actor.id.slice(-8)}</td>
                   <td>
                     <Button
                       variant="ghost"

@@ -13,7 +13,17 @@ export function proxy(request: NextRequest): NextResponse {
   // /v1 goes to the API, same-origin so cookies stay first-party. The origin is read per request (not baked in at build),
   // so one console image serves every environment.
   if (request.nextUrl.pathname.startsWith("/v1/")) {
-    const origin = process.env.API_ORIGIN ?? "http://localhost:3001";
+    // An empty value counts as unset. Outside development there is no silent fallback to localhost: say what is missing.
+    const configured = process.env.API_ORIGIN;
+    const origin =
+      configured !== undefined && configured !== ""
+        ? configured
+        : process.env.NODE_ENV === "production"
+          ? undefined
+          : "http://localhost:3001";
+    if (origin === undefined) {
+      return new NextResponse("API_ORIGIN is not set for the console.", { status: 502 });
+    }
     return NextResponse.rewrite(
       new URL(`${request.nextUrl.pathname}${request.nextUrl.search}`, origin),
     );

@@ -367,22 +367,23 @@ function Editor({
           <p className={styles.muted}>Published versions appear here.</p>
         ) : (
           <ul className={s.list}>
-            {versions.map((v) => (
-              <li key={v.id}>
-                {`Version ${String(v.version)}: ${v.name}`}{" "}
-                {v.status === "published" ? (
-                  <Badge tone="accent">Live</Badge>
-                ) : (
-                  <Button
-                    variant="ghost"
-                    disabled={busy}
-                    onClick={() => void restore(v.version ?? 0)}
-                  >
-                    {`Use version ${String(v.version)} as draft`}
-                  </Button>
-                )}
-              </li>
-            ))}
+            {versions.map((v) => {
+              const number = v.version;
+              return (
+                <li key={v.id}>
+                  {number === null ? `Draft: ${v.name}` : `Version ${String(number)}: ${v.name}`}{" "}
+                  {v.status === "published" ? (
+                    <Badge tone="accent">Live</Badge>
+                  ) : number === null ? (
+                    <Badge>Draft</Badge>
+                  ) : (
+                    <Button variant="ghost" disabled={busy} onClick={() => void restore(number)}>
+                      {`Use version ${String(number)} as draft`}
+                    </Button>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         )}
       </Stack>

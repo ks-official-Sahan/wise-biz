@@ -335,7 +335,7 @@ function ProductsTab({ filter, currency }: { filter: ReportFilter; currency: str
           {rows.map((r) => (
             <tr key={r.variantId}>
               <th scope="row">{r.sku}</th>
-              <td className={s.num}>{r.qty.replace(/\.?0+$/, "")}</td>
+              <td className={s.num}>{r.qty.includes(".") ? r.qty.replace(/\.?0+$/, "") : r.qty}</td>
               <td className={s.num}>{m(r.revenueMinor)}</td>
               <td className={s.num}>{m(r.costMinor)}</td>
               <td className={s.num}>{m(r.profitMinor)}</td>

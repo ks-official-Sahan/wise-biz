@@ -24,4 +24,11 @@ describe("console proxy", () => {
     expect(page.headers.get("x-middleware-rewrite")).toBeNull();
     expect(page.headers.get("content-security-policy")).toContain("nonce-");
   });
+
+  it("says what is missing instead of falling back to localhost in production", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("API_ORIGIN", "");
+    const res = proxy(new NextRequest("http://console.test/v1/anything"));
+    expect(res.status).toBe(502);
+  });
 });
