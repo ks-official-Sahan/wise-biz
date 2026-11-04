@@ -31,13 +31,12 @@ import type { ObjectStore } from "@wise-biz/storage";
  */
 export function createModules(
   sessions: ActiveTenantSetter,
-  tenancy: TenancyModuleOptions = {},
-  devices: { nonces: NonceStore; pinPepper: string } = {
-    nonces: unwiredNonces,
-    pinPepper: "docs-only-pepper-never-used-for-real-pins",
-  },
-  /** Object storage (imports, media). The docs/test default keeps objects in memory. */
-  store: ObjectStore = createMemoryStore(),
+  tenancy: TenancyModuleOptions,
+  // No defaults for these two: a caller that forgot them in production would hash PINs with a public pepper and keep
+  // uploads in memory. Only `docModules` below supplies docs-only values.
+  devices: { nonces: NonceStore; pinPepper: string },
+  /** Object storage (imports, media). */
+  store: ObjectStore,
   /** Realtime stream tickets (apps/realtime); omitted when the service is not configured. */
   realtime?: RealtimeOptions,
   /** Sync push metrics sink (apply latency, batch size, rejections). */
@@ -85,10 +84,11 @@ const branchExists: BranchExists = async (tx, tenantId, branchId) => {
 
 /** Stock lives at locations, and tenancy owns them (same bridge as branchExists). */
 const locationExists: LocationExists = async (tx, tenantId, locationId) => {
-  const r = await tx.query("select 1 from tenancy.locations where tenant_id = $1 and id = $2", [
-    tenantId,
-    locationId,
-  ]);
+  // Archived locations are refused like archived branches (branchExists above): stock cannot be posted to them.
+  const r = await tx.query(
+    "select 1 from tenancy.locations where tenant_id = $1 and id = $2 and archived_at is null",
+    [tenantId, locationId],
+  );
   return r.rowCount === 1;
 };
 
@@ -109,8 +109,8 @@ const unwiredNonces: NonceStore = {
 export const docModules: readonly WbModule[] = createModules(
   { setActiveTenant: () => Promise.reject(new Error("docModules: session port is not wired")) },
   {},
-  undefined,
-  undefined,
+  { nonces: unwiredNonces, pinPepper: "docs-only-pepper-never-used-for-real-pins" },
+  createMemoryStore(),
   // So the OpenAPI document lists the stream-ticket route; the secret never signs a real ticket.
   { secret: "docs-only-secret-never-used-for-real-tickets", url: "https://realtime.example.test" },
 );

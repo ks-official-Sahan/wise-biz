@@ -304,12 +304,12 @@ describe("rate limiter (fail closed, writes only)", () => {
     expect(auth).not.toHaveBeenCalled();
   });
 
-  it("11th sign-in per IP in a minute is 429 with Retry-After", async () => {
+  it("31st sign-in per IP in a minute is 429 with Retry-After", async () => {
     const { app } = build({ identity, kernelRedis: fakeRedis(), env: trusting });
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 30; i++) {
       expect((await signIn(app, `u${String(i)}@b.test`)).status).toBe(200);
     }
-    const res = await signIn(app, "u11@b.test");
+    const res = await signIn(app, "u31@b.test");
     expect(res.status).toBe(429);
     expect(((await res.json()) as Problem).code).toBe("RATE_LIMITED");
     expect(Number(res.headers.get("retry-after"))).toBeGreaterThanOrEqual(1);
@@ -317,16 +317,29 @@ describe("rate limiter (fail closed, writes only)", () => {
     expect((await signIn(app, "other@b.test", "2.2.2.2")).status).toBe(200);
   });
 
-  it("6th sign-in for the same email (any IP) is 429; the email is hashed and case-insensitive", async () => {
+  it("6th sign-in for one email from one IP is 429, but another IP can still sign that email in (no lockout by a stranger)", async () => {
     const redis = fakeRedis();
     const { app } = build({ identity, kernelRedis: redis, env: trusting });
     for (let i = 0; i < 5; i++) {
-      expect((await signIn(app, "Victim@B.test", `9.9.9.${String(i)}`)).status).toBe(200);
+      expect((await signIn(app, "Victim@B.test", "9.9.9.9")).status).toBe(200);
     }
     expect((await signIn(app, "victim@b.test", "9.9.9.9")).status).toBe(429);
+    // the account owner, from their own address, is not locked out by that attacker
+    expect((await signIn(app, "victim@b.test", "8.8.8.8")).status).toBe(200);
     const keys = [...redis.counts.keys()].join(" ");
     expect(keys).not.toContain("victim");
-    expect(keys).toMatch(/rl:signin:email:[0-9a-f]{64}/);
+    expect(keys).toMatch(/rl:signin:ip-email:[0-9.]+:[0-9a-f]{64}/);
+  });
+
+  it("31st sign-in for the same email spread over many IPs is 429 (distributed guessing)", async () => {
+    const { app } = build({ identity, kernelRedis: fakeRedis(), env: trusting });
+    for (let i = 0; i < 30; i++) {
+      expect(
+        (await signIn(app, "target@b.test", `7.7.${String(Math.floor(i / 250))}.${String(i)}`))
+          .status,
+      ).toBe(200);
+    }
+    expect((await signIn(app, "target@b.test", "7.7.9.9")).status).toBe(429);
   });
 
   it("sign-up: 6th per IP is 429", async () => {
@@ -343,7 +356,7 @@ describe("rate limiter (fail closed, writes only)", () => {
 
   it("without TRUST_PROXY_HOPS the x-forwarded-for header cannot choose the bucket", async () => {
     const { app } = build({ identity, kernelRedis: fakeRedis() });
-    for (let i = 0; i < 10; i++) await signIn(app, `u${String(i)}@b.test`, `7.7.7.${String(i)}`);
+    for (let i = 0; i < 30; i++) await signIn(app, `u${String(i)}@b.test`, `7.7.7.${String(i)}`);
     expect((await signIn(app, "z@b.test", "8.8.8.8")).status).toBe(429);
   });
 
@@ -357,7 +370,7 @@ describe("rate limiter (fail closed, writes only)", () => {
         body: JSON.stringify({ email, password: "irrelevant-password" }),
       });
     // attacker rotates the leftmost entry; the trusted client entry (2nd from right) stays 5.5.5.5
-    for (let i = 0; i < 10; i++)
+    for (let i = 0; i < 30; i++)
       expect(
         (await go(`9.9.9.${String(i)}, 5.5.5.5, 10.0.0.1`, `e${String(i)}@b.test`)).status,
       ).toBe(200);

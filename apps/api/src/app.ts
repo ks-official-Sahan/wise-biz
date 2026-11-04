@@ -200,6 +200,16 @@ export function createApp(opts: CreateAppOptions): OpenAPIHono<AppEnv> {
       [
         { name: "signin:ip", ...LIMITS.signInPerIp, subject: ipOf },
         {
+          // One source cannot lock an account out for everyone: the tight bucket is per address AND email...
+          name: "signin:ip-email",
+          ...LIMITS.signInPerIpEmail,
+          subject: async (c) => {
+            const email = await bodyEmail(c);
+            return email === null ? null : `${ipOf(c)}:${emailDigest(email)}`;
+          },
+        },
+        {
+          // ...and a looser per-email bucket still stops guessing spread over many addresses.
           name: "signin:email",
           ...LIMITS.signInPerEmail,
           subject: async (c) => {

@@ -141,8 +141,12 @@ export async function bodyEmail(c: Context<AppEnv>): Promise<string | null> {
 }
 
 export const LIMITS = {
-  signInPerIp: { limit: 10, windowMs: MINUTE },
-  signInPerEmail: { limit: 5, windowMs: MINUTE },
+  /** Per address, shared by everyone behind one NAT (a shop's staff): 10 a minute is a floor for a busy opening time, so keep it generous. */
+  signInPerIp: { limit: 30, windowMs: MINUTE },
+  /** Per client address and email: the tight bucket, so one source cannot lock an account out for everyone. */
+  signInPerIpEmail: { limit: 5, windowMs: MINUTE },
+  /** Per email from anywhere: loose enough that an attacker cannot lock a victim out, tight enough to stop spread-out guessing. */
+  signInPerEmail: { limit: 30, windowMs: MINUTE },
   signUpPerIp: { limit: 5, windowMs: MINUTE },
   createBusinessPerUser: { limit: 5, windowMs: MINUTE },
   /** Invite acceptance per signed-in user (token guessing; fails closed like the others). */
