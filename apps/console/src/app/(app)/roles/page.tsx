@@ -239,7 +239,7 @@ function RolesView() {
         <ErrorState error={roles.error} onRetry={() => void roles.refetch()} />
       ) : (
         roles.data.map((r) => (
-          <RoleEditor key={`${r.roleId}:${String(r.grants.length)}`} role={r} />
+          <RoleEditor key={`${r.roleId}:${JSON.stringify(r.grants)}`} role={r} />
         ))
       )}
       <NewRoleDialog

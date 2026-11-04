@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Suspense, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { Suspense, useEffect, useState, useSyncExternalStore } from "react";
 
 import { Alert, Button, Card, Stack } from "@/components/ui.tsx";
 import { ApiError, api } from "@/lib/api.ts";
@@ -16,8 +16,6 @@ interface InviteParams {
   readonly token: string;
 }
 
-const noop = (): (() => void) => () => undefined;
-
 /** Parses "#t=…&i=…&k=…". The link carries them in the fragment, so they never reach a server log. */
 function parseInvite(hash: string): InviteParams | null {
   const p = new URLSearchParams(hash.replace(/^#/, ""));
@@ -27,32 +25,33 @@ function parseInvite(hash: string): InviteParams | null {
   return t !== null && i !== null && k !== null ? { tenantId: t, inviteId: i, token: k } : null;
 }
 
+const subscribeNothing = (): (() => void) => () => undefined;
+const readNothing = (): undefined => undefined;
+let remembered: { hash: string; invite: InviteParams | null } | undefined;
+/** The invite in the URL fragment, remembered after the first read (the fragment is stripped from the address bar). */
+function readInvite(): InviteParams | null {
+  const hash = window.location.hash;
+  if (hash !== "" && remembered?.hash !== hash) remembered = { hash, invite: parseInvite(hash) };
+  return (remembered ??= { hash: "", invite: null }).invite;
+}
+
 function AcceptInvite() {
   const router = useRouter();
   const session = useSession();
-  const hydrated = useSyncExternalStore(
-    noop,
-    () => true,
-    () => false,
-  );
-  const hash = useSyncExternalStore(
-    noop,
-    () => window.location.hash,
-    () => "",
-  );
-  const invite = useRef<InviteParams | null>(null);
+  // undefined only on the server render and the hydration render, where there is no fragment to look at.
+  const invite = useSyncExternalStore(subscribeNothing, readInvite, readNothing);
   const [state, setState] = useState<"ready" | "busy" | "error">("ready");
   const [error, setError] = useState<string | null>(null);
 
-  // The token must not stay in the URL (history, screenshots, Referer): keep it in memory and strip it now.
-  invite.current ??= parseInvite(hash);
+  // The token must not stay in the URL (history, screenshots, Referer). It is read (and remembered) by `readInvite`
+  // during render, before this effect can run, so stripping it cannot lose it.
   useEffect(() => {
     if (window.location.hash !== "" || window.location.search !== "")
       window.history.replaceState(null, "", "/invite/accept");
   }, []);
 
-  if (!hydrated) return null;
-  if (invite.current === null) {
+  if (invite === undefined) return null;
+  if (invite === null) {
     return <Alert tone="danger">This invite link is incomplete. Ask for a new invite.</Alert>;
   }
   if (!session.isPending && session.data === null) {
@@ -82,10 +81,8 @@ function AcceptInvite() {
           busy={state === "busy"}
           className={s.full}
           onClick={() => {
-            const inv = invite.current;
-            if (inv === null) return;
             setState("busy");
-            void api("POST", "/v1/tenancy/invites/accept", { body: inv })
+            void api("POST", "/v1/tenancy/invites/accept", { body: invite })
               .then(() => {
                 router.replace("/");
               })

@@ -105,16 +105,15 @@ function BulkDialog({
     if (bad.length === 0) onClose();
   }
 
+  // Both the dialog close and the Cancel button stop a run that is still going (the loop checks `cancelled`).
+  const close = () => {
+    cancelled.current = true;
+    onClose();
+  };
+
   const verb = action === "archive" ? "Archive" : "Restore";
   return (
-    <Dialog
-      open={open}
-      title={`${verb} ${String(products.length)} product(s)`}
-      onClose={() => {
-        cancelled.current = true;
-        onClose();
-      }}
-    >
+    <Dialog open={open} title={`${verb} ${String(products.length)} product(s)`} onClose={close}>
       <Stack>
         <p>
           {action === "archive"
@@ -140,7 +139,7 @@ function BulkDialog({
           <p role="status">{`Working… ${String(done)} of ${String(products.length)}`}</p>
         ) : null}
         <Row spread>
-          <Button variant="ghost" onClick={onClose}>
+          <Button variant="ghost" onClick={close}>
             Cancel
           </Button>
           <Button
