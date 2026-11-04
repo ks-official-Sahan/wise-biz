@@ -1,0 +1,212 @@
+name: Claude
+
+# One workflow, three jobs:
+#
+#   route   Cheap trust gate + classifier. Decides whether the event is a PR review, a general "@claude-code <task>"
+#           request, or nothing. This is the single place that decides, so one event can never start two runs
+#           (the old two-file setup relied on the word "review" appearing in a comment, which is fragile).
+#   review  Sharded, resumable pull request review in claude-pr-review.yml (details below).
+#   assist  Generic "@claude-code <task>" responder for issues and PR comments.
+#
+# HOW TO USE
+#   Comment on a PR   "@claude-code review"  (also "@claude-code please review", "@claude-code, review this ...").
+#                     The comment must START with the mention. Text after the word "review" (first line, up to
+#                     400 characters) is passed along as extra focus, e.g. "@claude-code review focus on caching".
+#   Follow-ups        Comment "@claude-code review" again anytime to review new commits incrementally from
+#                     the last reviewed commit. Reviews will NOT run automatically on push.
+#   Full review       "@claude-code review full" ignores earlier progress and reviews the whole pull request.
+#   Manual            gh workflow run claude.yml -f pr_number=123
+#   Anything else     "@claude-code <task>" on an issue or PR runs the generic assistant.
+#
+# HOW THE REVIEW BEHAVES (claude-pr-review.yml)
+#   * Any size: the pull request is split into batches of about 25 files (generated and binary files skipped),
+#     reviewed in parallel by read-only Claude runs, and merged into ONE review: overview, summary per area,
+#     findings by severity, stats, and inline comments on lines in the diff. Tested against 500 files; 700+ is
+#     about 30 batches.
+#   * One status comment per PR (github-actions[bot]) says what is happening and carries the hidden progress marker.
+#   * No lost progress: batches that do not finish are retried by an automatic follow-up run (up to
+#     CLAUDE_REVIEW_MAX_CONTINUATIONS, default 7) that reviews only the files still missing. A new
+#     "@claude-code review" continues from the last reviewed commit; a force-push that drops it means a full review.
+#   * One review at a time per PR: a new request waits for the running one instead of cancelling its work.
+#   * Never silent: a run where no batch finishes fails loudly and says so on the status comment.
+
+# OPERATIONS NOTES
+#   * `issue_comment` workflows always run the version on the DEFAULT branch (master); changes to this file only
+#     take effect for comment triggers once merged. `pull_request` runs use the PR's own copy.
+#   * Only OWNER / MEMBER / COLLABORATOR can trigger anything. Fork PRs and Dependabot never get an automatic
+#     review (no secrets); a maintainer can still ask for one with "@claude-code review".
+#   * Everything that touches the PR checkout is read-only, and no script is ever executed from the checkout:
+#     the review scripts (.github/claude-review/*.py) are checked out from the default branch, and
+#     the Claude batch runs have read-only tools and a read-only token; only the summarize job posts.
+#   * Why the concurrency group is on the job and not the workflow: workflow-level concurrency is applied when a run
+#     is queued, before any `if:` is evaluated. Every comment on a PR (the status comment, each inline
+#     comment) starts a run of this workflow, so a workflow-level group let those no-op runs cancel the real review.
+#     Runs that will not review also get a unique group name (claude-noop-<run id>), so they can never cancel anything.
+
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+  pull_request_review:
+    types: [submitted]
+  issues:
+    types: [opened, assigned]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Pull request number to review
+        required: true
+        type: string
+      continuation:
+        description: Set by the review itself when it continues unfinished batches
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  # ---------------------------------------------------------------------------------------------------------------
+  route:
+    name: Route request
+    if: |
+      github.event_name == 'workflow_dispatch' || (
+        github.event_name == 'issue_comment' &&
+        github.event.comment.user.type != 'Bot' &&
+        contains(github.event.comment.body, '@claude-code') &&
+        contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)
+      ) || (
+        github.event_name == 'pull_request_review_comment' &&
+        github.event.comment.user.type != 'Bot' &&
+        contains(github.event.comment.body, '@claude-code') &&
+        contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)
+      ) || (
+        github.event_name == 'pull_request_review' &&
+        github.event.review.user.type != 'Bot' &&
+        contains(github.event.review.body, '@claude-code') &&
+        contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.review.author_association)
+      ) || (
+        github.event_name == 'issues' &&
+        github.event.issue.user.type != 'Bot' &&
+        (contains(github.event.issue.body, '@claude-code') || contains(github.event.issue.title, '@claude-code')) &&
+        contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.issue.author_association)
+      )
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: read
+    outputs:
+      mode: ${{ steps.route.outputs.mode }} # review | assist | none
+      kind: ${{ steps.route.outputs.kind }} # comment | manual | continue
+      pr: ${{ steps.route.outputs.pr }}
+      focus: ${{ steps.route.outputs.focus }}
+    steps:
+      - name: Classify the request
+        id: route
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          EVENT: ${{ github.event_name }}
+          PR_EVENT: ${{ inputs.pr_number || github.event.pull_request.number || (github.event.issue.pull_request && github.event.issue.number) || '' }}
+          BODY: ${{ github.event.comment.body || github.event.review.body || '' }}
+          REVIEW_ALL: ${{ vars.CLAUDE_REVIEW_ALL_PRS }}
+          HAS_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN != '' }}
+          CONTINUATION: ${{ inputs.continuation }}
+        run: |
+          set -eu
+          mode=none; kind=""; focus=""; pr="${PR_EVENT:-}"
+
+          re='^[[:space:]]*@claude-code[[:space:],:]+(please[[:space:]]+)?review([^[:alnum:]_-]|$)'
+          shopt -s nocasematch
+          case "$EVENT" in
+            workflow_dispatch)
+              mode=review; kind=manual
+              [ "$CONTINUATION" != true ] || kind=continue ;;
+            issues)
+              mode=assist ;;
+            *)
+              if [ -n "$pr" ] && [[ $BODY =~ $re ]]; then
+                mode=review; kind=comment
+                rest="${BODY:${#BASH_REMATCH[0]}}"
+                focus=$(printf '%s' "$rest" | tr -d '\r' | sed -n '1p' | cut -c1-400)
+              elif [[ $BODY == *@claude-code* ]]; then
+                mode=assist
+              fi ;;
+          esac
+
+          # Without the OAuth token neither job can run: route nothing instead of failing.
+          if [ "$HAS_TOKEN" != "true" ]; then
+            echo "::notice::CLAUDE_CODE_OAUTH_TOKEN is not set; skipping Claude."
+            mode=none
+          fi
+
+          { echo "mode=$mode"; echo "kind=$kind"; echo "pr=$pr"; echo "focus=$focus"; } >> "$GITHUB_OUTPUT"
+          echo "Routed ${EVENT} -> mode=${mode} kind=${kind:-n/a} pr=${pr:-n/a}"
+
+  # ---------------------------------------------------------------------------------------------------------------
+  review:
+    name: PR review
+    needs: route
+    if: needs.route.outputs.mode == 'review'
+    concurrency:
+      # One review pipeline per PR. A newer request waits for the running one (whose progress it then builds on)
+      # instead of cancelling it; GitHub keeps only the newest waiting request. Runs that do not review get a
+      # unique group name, so they can never block anything.
+      group: ${{ needs.route.outputs.mode == 'review' && format('claude-review-{0}', needs.route.outputs.pr) || format('claude-noop-{0}', github.run_id) }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      pull-requests: write # the review, inline comments, reactions
+      issues: write # the status comment
+      actions: write # dispatching a follow-up run for unfinished batches
+    uses: ./.github/workflows/claude-pr-review.yml
+    with:
+      pr: ${{ needs.route.outputs.pr }}
+      kind: ${{ needs.route.outputs.kind }}
+      focus: ${{ needs.route.outputs.focus }}
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+
+  # ---------------------------------------------------------------------------------------------------------------
+  assist:
+    name: Assistant
+    needs: route
+    if: needs.route.outputs.mode == 'assist'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    concurrency:
+      # Per thread, and never cancel running work: a second request waits for the first.
+      group: ${{ needs.route.outputs.mode == 'assist' && format('claude-assist-{0}', github.event.issue.number || github.event.pull_request.number || github.run_id) || format('claude-noop-{0}', github.run_id) }}
+      cancel-in-progress: false
+    permissions:
+      contents: write   # allow Claude to commit and push fixes
+      pull-requests: write
+      issues: write
+      id-token: write
+      actions: read # Required for Claude to read CI results on PRs
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+
+      - name: Run Claude Code
+        id: claude
+        uses: anthropics/claude-code-action@cfc3eb22bfed5c26ef66e3223c982af27e4524de # v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          trigger_phrase: '@claude-code'
+
+          # Caveman/token-efficiency instructions
+          claude_args: |
+            --model claude-haiku-5-5
+            --effort medium
+            --append-system-prompt "Caveman skill active: high-signal, objective, concise. Skip boilerplate. Save tokens aggressively. No praise, no filler — only concrete, actionable output."
+
+          # Allows Claude to read CI results on PRs.
+          additional_permissions: |
+            actions: read
