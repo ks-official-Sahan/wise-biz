@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { Readable } from "node:stream";
 
-import { withTenantTx } from "@wise-biz/db";
+import { appendAudit, withTenantTx } from "@wise-biz/db";
 import { tenantKey } from "@wise-biz/storage";
 import { parse } from "csv-parse";
 
@@ -102,12 +102,22 @@ async function run(deps: ImportJobDeps, tenantId: string, importId: string): Pro
   if (rec === undefined) return;
 
   const fail = (failure: string) =>
-    tx((t) =>
-      t.query(
+    tx(async (t) => {
+      await t.query(
         `update catalog.imports set status = 'failed', failure = $3, finished_at = $4 where tenant_id = $1 and id = $2`,
         [tenantId, importId, failure, now()],
-      ),
-    );
+      );
+      await appendAudit(t, [outcome("catalog.import.failed", { failure })]);
+    });
+  const outcome = (action: string, after: unknown) => ({
+    actorType: "user" as const,
+    actorId: rec.created_by,
+    action,
+    entity: "catalog.import",
+    entityId: importId,
+    after,
+    requestId: importId,
+  });
 
   const stream = await deps.store.get(rec.source_key);
   if (stream === null) {
@@ -187,6 +197,9 @@ async function run(deps: ImportJobDeps, tenantId: string, importId: string): Pro
        where tenant_id = $1 and id = $2`,
       [tenantId, importId, row, reportKey, now()],
     );
+    await appendAudit(t, [
+      outcome("catalog.import.finished", { totalRows: row, errors: r.rows[0]?.errors.length ?? 0 }),
+    ]);
   });
 }
 

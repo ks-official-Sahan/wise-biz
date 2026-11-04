@@ -231,6 +231,11 @@ describe("import job", () => {
       okRows: 10_000 - bad,
       errorRows: bad,
     });
+    const outcomes = await admin.query<{ action: string; entity_id: string }>(
+      "select action, entity_id from audit.audit_log where tenant_id = $1 and action like 'catalog.import.%' and entity_id = $2",
+      [T, dto.id],
+    );
+    expect(outcomes.rows.map((r) => r.action)).toContain("catalog.import.finished");
     const report = new TextDecoder().decode(
       store.objects.get(`tenants/${T}/imports/${dto.id}/report.csv`),
     );
@@ -337,6 +342,11 @@ describe("import job", () => {
       status: "failed",
       failure: expect.stringMatching(/Missing columns/) as unknown,
     });
+    const failedAudit = await admin.query<{ action: string }>(
+      "select action from audit.audit_log where tenant_id = $1 and entity_id = $2",
+      [T, header],
+    );
+    expect(failedAudit.rows.map((r) => r.action)).toContain("catalog.import.failed");
 
     // Another runner holds the lock: this run is a no-op and the import stays queued.
     const locked = await startOnly("product,sku\nL,L-1\n", true);
