@@ -1,8 +1,8 @@
 // Static server for the Playwright suite. Serves dist/ with SPA fallback to index.html.
 // Node built-ins only (no new dependency). Usage: node e2e/serve.mjs [port] [host]
-import { readFile, stat } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import { createServer } from "node:http";
-import { extname, join, resolve, sep } from "node:path";
+import { extname, join, relative, resolve, sep } from "node:path";
 import process from "node:process";
 import { URL, fileURLToPath } from "node:url";
 
@@ -28,12 +28,13 @@ const TYPES = {
   ".map": "application/json; charset=utf-8",
 };
 
-async function isFile(path) {
-  try {
-    return (await stat(path)).isFile();
-  } catch {
-    return false;
-  }
+// Every servable file is listed once at start-up (dist/ is built before this server runs). A request is answered only by
+// looking its path up in this table, so a request can never name a file that is not in dist/.
+const files = new Map();
+for (const entry of await readdir(root, { recursive: true, withFileTypes: true })) {
+  if (!entry.isFile()) continue;
+  const full = join(entry.parentPath, entry.name);
+  files.set("/" + relative(root, full).split(sep).join("/"), full);
 }
 
 const server = createServer(async (req, res) => {
@@ -41,17 +42,17 @@ const server = createServer(async (req, res) => {
     res.writeHead(405, { Allow: "GET, HEAD" }).end();
     return;
   }
-  // Resolve the request path against the root and refuse anything that lands outside it (checked here, before any file access).
-  const requested = decodeURIComponent((req.url ?? "/").split("?")[0] ?? "/");
-  const target = resolve(root, `.${sep}${requested}`);
-  if (!(target === root || target.startsWith(root + sep))) {
-    res.writeHead(403).end();
+  let requested;
+  try {
+    requested = decodeURIComponent((req.url ?? "/").split("?")[0] ?? "/");
+  } catch {
+    res.writeHead(400).end();
     return;
   }
   // Unknown paths and extensionless routes fall back to the SPA shell. Missing asset files get a 404.
-  const hasExtension = extname(target) !== "";
-  const file = (await isFile(target)) ? target : hasExtension ? null : join(root, "index.html");
-  if (file === null) {
+  const file =
+    files.get(requested) ?? (extname(requested) === "" ? files.get("/index.html") : undefined);
+  if (file === undefined) {
     res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" }).end("Not found");
     return;
   }
