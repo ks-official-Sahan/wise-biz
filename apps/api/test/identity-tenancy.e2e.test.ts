@@ -9,6 +9,7 @@ import { startRedis, testDatabase } from "@wise-biz/testing/containers";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { SoftAuthenticator } from "../../../modules/identity/test/support/soft-authenticator.ts";
+import { LIMITS } from "../src/kernel/auth/index.ts";
 import { startServer } from "../src/server.ts";
 
 import type { RunningServer } from "../src/server.ts";
@@ -1164,16 +1165,17 @@ describe("sign-in rate limit (Redis, per IP and per email)", () => {
     await stack.close();
   }, CLOSE_TIMEOUT_MS);
 
-  it("the 11th sign-in within a minute is refused with 429 RATE_LIMITED and a Retry-After", async () => {
-    for (let i = 0; i < 10; i++) {
-      const attempt = await signIn(stack, `nobody-${uuidv7()}@example.com`);
+  it("the sixth sign-in for one address and email within a minute is refused with 429 RATE_LIMITED and a Retry-After", async () => {
+    const email = `nobody-${uuidv7()}@example.com`;
+    for (let i = 0; i < LIMITS.signInPerIpEmail.limit; i++) {
+      const attempt = await signIn(stack, email);
       expect(attempt.status).not.toBe(429);
     }
-    const eleventh = await signIn(stack, `nobody-${uuidv7()}@example.com`);
-    expect(eleventh.status).toBe(429);
-    expect(eleventh.headers.get("content-type")).toContain("application/problem+json");
-    expect(problemOf(eleventh).code).toBe("RATE_LIMITED");
-    const retryAfter = Number(eleventh.headers.get("retry-after"));
+    const refused = await signIn(stack, email);
+    expect(refused.status).toBe(429);
+    expect(refused.headers.get("content-type")).toContain("application/problem+json");
+    expect(problemOf(refused).code).toBe("RATE_LIMITED");
+    const retryAfter = Number(refused.headers.get("retry-after"));
     expect(Number.isInteger(retryAfter)).toBe(true);
     expect(retryAfter).toBeGreaterThanOrEqual(1);
     expect(retryAfter).toBeLessThanOrEqual(60);
