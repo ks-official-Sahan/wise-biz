@@ -61,7 +61,7 @@ Tracked in `docs/prompts/P2/README.md` order; add rows here when P2 starts.
 
 ## Follow-ups
 
-- [ ] (verification) Four DB-heavy tests fail only when the machine is loaded: api `/ready` with a stopped Postgres, api `sync-burst` and `wiring` hooks (60 s container start), workers `relay` expired-lease. They pass alone. Make them independent of container start time (shared container per package, longer hooks, or fake clocks) — owner: P1-16
+- [ ] (verification) Four DB-heavy tests fail only when the machine is loaded: api `/ready` with a stopped Postgres, api `sync-burst` and `wiring` hooks (60 s container start), workers `relay` expired-lease. They pass alone. Make them independent of container start time (shared container per package, longer hooks, or fake clocks) — owner: P1-16 Mitigation 2026-11-04: api and workers test and hook timeout raised from 60 s to 120 s (not yet proven under load; keep open until a loaded full run is green).
 
 <!-- - [ ] (P0-04) example: add GS1 exponent edge cases — owner: next step that touches money -->
 - [ ] (P0-01) `prepare: lefthook install` fails without `.git` (Docker/CI): set `LEFTHOOK=0` or guard it — owner: P0-02/P0-03
