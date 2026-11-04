@@ -23,7 +23,7 @@ Status: **not ready for go/no-go**. This file records what is verified, what is 
 | 5. Security: scan, reviewers, PII scan | Dependency audit done. `ecc:security-reviewer` pass across devices, sync, payments and desktop still to run. |
 | 6. Accessibility with screen readers on Android and iOS | Needs devices. Console and POS web axe checks run in CI already. |
 | 7. Restore drill | Needs the hosted Postgres and object store (P1-15). |
-| 8. Usability sessions | Owner runs them; the script and metric sheet are still to prepare. |
+| 8. Usability sessions | Owner runs them. Script and metric sheet ready: `docs/reports/P1-usability.md`. |
 
 ## Needs the owner
 
