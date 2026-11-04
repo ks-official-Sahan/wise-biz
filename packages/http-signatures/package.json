@@ -1,0 +1,28 @@
+{
+  "name": "@wise-biz/http-signatures",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "wiseBiz": {
+    "runtime": "universal"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "lint": "eslint . --max-warnings 0",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --coverage",
+    "test:perf": "vitest run --config vitest.perf.config.ts"
+  },
+  "dependencies": {
+    "@wise-biz/crypto": "workspace:*"
+  },
+  "devDependencies": {
+    "@wise-biz/config": "workspace:*",
+    "@wise-biz/testing": "workspace:*",
+    "eslint": "10.13.0",
+    "typescript": "6.0.3",
+    "vitest": "5.0.5"
+  }
+}

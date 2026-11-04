@@ -38,9 +38,11 @@ beforeAll(async () => {
       c.set("auth", {
         kind: "user",
         userId: uuidv7(),
+        sessionId: "01900000-0000-7000-8000-0000000000aa",
         tenantId: T,
         roles: [role],
         branchScope: "all",
+        permissionsVersion: 1,
       });
       await next();
     });

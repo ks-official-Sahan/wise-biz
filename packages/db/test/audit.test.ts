@@ -113,9 +113,18 @@ describe("privileges and trigger", () => {
     await put(T, 1);
   });
 
-  it("wb_app cannot SELECT / UPDATE / DELETE / TRUNCATE", async () => {
+  it("wb_app cannot UPDATE / DELETE / TRUNCATE; SELECT only through the parent, own tenant only", async () => {
+    // module-audit 0002 grants SELECT on the parent for the console viewer; RLS keeps it to the active tenant.
+    const own = await withTenantTx(app, ctx(uuid7()), (tx) =>
+      tx.query("select count(*)::int n from audit.audit_log"),
+    );
+    expect(own.rows[0]).toEqual({ n: 0 });
+    expect(
+      await sqlState(
+        withTenantTx(app, ctx(T), (tx) => tx.query(`select * from audit.${currentPartition}`)),
+      ),
+    ).toBe(INSUFFICIENT);
     for (const sql of [
-      "select * from audit.audit_log",
       "update audit.audit_log set action = 'x'",
       "delete from audit.audit_log",
       "truncate audit.audit_log",
@@ -482,7 +491,7 @@ describe("partitions and RLS lint", () => {
       `select count(*)::text n from pg_indexes where schemaname = 'audit' and tablename = $1`,
       [currentPartition],
     );
-    expect(Number(idx.rows[0]?.n)).toBe(4); // pkey + chain + unchained + entity
+    expect(Number(idx.rows[0]?.n)).toBe(6); // pkey + chain + unchained + entity + actor + action (0002)
   });
 });
 

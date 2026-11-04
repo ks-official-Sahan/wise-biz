@@ -28,9 +28,10 @@ module.exports = {
   forbidden: [
     {
       name: "no-cross-module-internals",
-      comment: "A module may import another module only through its contracts.ts.",
+      comment:
+        "A module may import another module only through its contracts.ts. Tests may wire real neighbours (devDependencies), production code never.",
       severity: "error",
-      from: { path: "^modules/([^/]+)/" },
+      from: { path: "^modules/([^/]+)/", pathNot: "^modules/[^/]+/test/" },
       to: {
         path: "^modules/[^/]+/",
         pathNot: ["^modules/$1/", "^modules/[^/]+/contracts[.]ts$"],
@@ -84,13 +85,17 @@ module.exports = {
       comment: "Import that cannot be resolved: missing dependency or typo.",
       severity: "error",
       from: {},
-      to: { couldNotResolve: true },
+      // @tabler/icons-react-native 3.49 lists exports.require.types = *.d.cts but ships none; it resolves at
+      // runtime (Metro, Vite) and in tsc (paths). Drop the exception when upstream fixes it (P0-09b follow-up).
+      to: { couldNotResolve: true, pathNot: "^@tabler/icons-react-native$" },
     },
   ],
   options: {
     doNotFollow: { path: "node_modules" },
     // node_modules stays in the graph (not followed) so domain-no-infra can see resolved npm deps.
-    exclude: { path: "(^|/)(dist|coverage|\\.turbo)/|/test/fixtures/" },
+    exclude: { path: "(^|/)(dist|coverage|\\.turbo|\\.next)/|/test/fixtures/|next-env\\.d\\.ts$" },
+    // Resolves the console's `@/*` path alias (the only tsconfig paths alias in app code).
+    tsConfig: { fileName: "tsconfig.depcruise.json" },
     tsPreCompilationDeps: true,
     combinedDependencies: true,
     enhancedResolveOptions: {

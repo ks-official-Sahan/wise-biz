@@ -1,0 +1,66 @@
+.tabs {
+  display: flex;
+  gap: var(--wb-space-2);
+  border-bottom: 1px solid var(--wb-color-border);
+  overflow-x: auto;
+}
+.tab {
+  appearance: none;
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  padding: var(--wb-space-3) var(--wb-space-4);
+  min-height: 44px;
+  font: inherit;
+  color: var(--wb-color-text-muted, inherit);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.tab[aria-selected="true"] {
+  color: var(--wb-color-text);
+  border-bottom-color: var(--wb-color-accent, currentColor);
+  font-weight: 600;
+}
+.form {
+  display: grid;
+  gap: var(--wb-space-3);
+}
+.grid {
+  display: grid;
+  gap: var(--wb-space-3);
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+}
+.num {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.priceInput {
+  max-width: 9rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.changed {
+  background: var(--wb-color-accent-subtle, rgb(0 0 0 / 4%));
+}
+.stickybar {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  padding: var(--wb-space-3) var(--wb-space-4);
+  background: var(--wb-color-surface);
+  border: 1px solid var(--wb-color-border);
+  border-radius: var(--wb-radius-md);
+}
+.summary {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+.preview {
+  padding: var(--wb-space-3) var(--wb-space-4);
+  border: 1px dashed var(--wb-color-border);
+  border-radius: var(--wb-radius-md);
+}
+.strike {
+  text-decoration: line-through;
+  color: var(--wb-color-text-muted, inherit);
+}

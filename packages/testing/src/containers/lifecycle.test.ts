@@ -30,4 +30,5 @@ it("globalSetup provides wbPg, runs prepare, and tears down; failed prepare stop
       provide: () => undefined,
     }),
   ).rejects.toThrow("boom");
-});
+  // Starts two containers back to back; slow when the whole monorepo runs container suites in parallel.
+}, 300_000);

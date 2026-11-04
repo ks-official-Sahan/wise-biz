@@ -1,0 +1,4 @@
+dist/
+.expo/
+test-results/
+playwright-report/

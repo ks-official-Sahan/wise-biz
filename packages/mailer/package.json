@@ -1,0 +1,31 @@
+{
+  "name": "@wise-biz/mailer",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "wiseBiz": {
+    "runtime": "node"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "lint": "eslint . --max-warnings 0",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --coverage"
+  },
+  "devDependencies": {
+    "@types/nodemailer": "8.0.2",
+    "@wise-biz/config": "workspace:*",
+    "@wise-biz/testing": "workspace:*",
+    "eslint": "10.13.0",
+    "fast-check": "4.10.2",
+    "typescript": "6.0.3",
+    "vitest": "5.0.5"
+  },
+  "dependencies": {
+    "@sahan-sac/email-kit": "0.4.0",
+    "nodemailer": "10.1.7",
+    "resend": "6.28.1"
+  }
+}

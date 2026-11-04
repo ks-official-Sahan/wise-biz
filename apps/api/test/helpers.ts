@@ -2,19 +2,51 @@ import { Writable } from "node:stream";
 
 import { createRoute, z } from "@hono/zod-openapi";
 import { DomainError } from "@wise-biz/errors";
+import { isUuidv7 } from "@wise-biz/ids";
 import { defineModule, authorize, requireTenant } from "@wise-biz/module-kit";
-import { definePermissions } from "@wise-biz/policy";
+import { definePermissions, isTenantRole } from "@wise-biz/policy";
 
 import { createApp } from "../src/app.ts";
 import { createLogger } from "../src/logger.ts";
 
 import type { ApiEnv, CreateAppOptions } from "../src/app.ts";
+import type { AuthResolver } from "../src/kernel/auth/index.ts";
 import type { OpenAPIHono } from "@hono/zod-openapi";
-import type { AppEnv, WbModule } from "@wise-biz/module-kit";
+import type { AppEnv, AuthContext, WbModule } from "@wise-biz/module-kit";
 import type pg from "pg";
 
 export const TENANT = "01900000-0000-7000-8000-000000000001";
 export const USER = "01900000-0000-7000-8000-000000000002";
+
+const csv = (v: string): string[] =>
+  v
+    .split(",")
+    .map((x) => x.trim())
+    .filter((x) => x !== "");
+
+/**
+ * TEST-ONLY resolver (never imported by src): identity from x-wb-dev-* headers. Real sessions are covered by the
+ * identity + tenancy e2e suite. permissionsVersion is constant, so the policy cache sees one matrix per tenant.
+ */
+export const headerAuth: AuthResolver = (c) => {
+  const tenantId = c.req.header("x-wb-dev-tenant");
+  const userId = c.req.header("x-wb-dev-user");
+  if (!isUuidv7(userId) || !(isUuidv7(tenantId) || tenantId === "none")) {
+    return Promise.resolve({ kind: "anonymous" });
+  }
+  const roles = csv(c.req.header("x-wb-dev-roles") ?? "owner").filter(isTenantRole);
+  const branches = (c.req.header("x-wb-dev-branches") ?? "all").trim();
+  const auth: AuthContext = {
+    kind: "user",
+    userId,
+    sessionId: "01900000-0000-7000-8000-0000000000aa",
+    tenantId: tenantId === "none" ? null : tenantId,
+    roles,
+    branchScope: branches === "all" ? "all" : csv(branches).filter(isUuidv7),
+    permissionsVersion: 1,
+  };
+  return Promise.resolve(auth);
+};
 
 export const devHeaders = (extra: Record<string, string> = {}): Record<string, string> => ({
   "x-wb-dev-tenant": TENANT,
@@ -103,7 +135,6 @@ export function capture(): { stream: Writable; logs: LogCapture } {
 
 export const baseEnv: ApiEnv = {
   NODE_ENV: "test",
-  API_DEV_AUTH: false,
   CORS_ORIGINS: ["https://app.test"],
 };
 
@@ -117,6 +148,7 @@ export function build(over: Partial<CreateAppOptions> = {}): {
     pool: fakePool,
     redis: okRedis,
     env: baseEnv,
+    auth: headerAuth,
     logger: createLogger("info", stream),
     ...over,
   });

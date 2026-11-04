@@ -140,7 +140,7 @@ describe("appendOutbox", () => {
     );
   });
 
-  it("wb_worker may only update relay columns, may delete, never insert", async () => {
+  it("wb_worker may only update relay columns, may delete, and inserts only inside a tenant scope (ADR 0012)", async () => {
     await expect(worker.query("update infra.outbox set topic = 'x'")).rejects.toThrow(
       /permission denied/,
     );
@@ -150,6 +150,6 @@ describe("appendOutbox", () => {
         "insert into infra.outbox (tenant_id,id,topic,key,type,version,payload) values ($1,$2,'t','k','t',1,'{}')",
         [A, uuid7()],
       ),
-    ).rejects.toThrow(/permission denied/);
+    ).rejects.toThrow(/row-level security/);
   });
 });

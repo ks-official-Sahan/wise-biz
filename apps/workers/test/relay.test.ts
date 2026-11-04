@@ -458,6 +458,25 @@ describe("startWorker", () => {
     expect(metrics).toEqual(expect.arrayContaining(["processed", "relay_batch", "relay_lag_ms"]));
   });
 
+  it("builds the default consumer set from env and stops cleanly", async () => {
+    const w = startWorker({
+      NODE_ENV: "test",
+      LOG_LEVEL: "fatal",
+      DATABASE_WORKER_URL: db.workerUrl,
+      DATABASE_CHAINER_URL: db.chainerUrl,
+      WORKER_IDLE_MS: "10",
+      MAIL_FROM: "no-reply@wise-biz.test",
+      INVITE_SECRET: "workers-test-invite-secret-".padEnd(40, "x"),
+      CONSOLE_URL: "http://localhost:3001",
+      STORAGE_BUCKET: "b",
+      STORAGE_ENDPOINT: "http://127.0.0.1:9",
+      STORAGE_ACCESS_KEY_ID: "a",
+      STORAGE_SECRET_ACCESS_KEY: "s",
+      STORAGE_FORCE_PATH_STYLE: "true",
+    });
+    await w.stop();
+  });
+
   it("chains audit rows within 5 s and stops all loops", async () => {
     const tenant = uuidv7();
     await withTenantTx(db.app, { tenantId: tenant, requestId: "t" }, (tx) =>

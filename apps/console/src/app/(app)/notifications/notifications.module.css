@@ -1,0 +1,44 @@
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--wb-space-3);
+}
+
+.item {
+  display: grid;
+  gap: var(--wb-space-2);
+  padding: var(--wb-space-4);
+  border: 1px solid var(--wb-color-border);
+  border-radius: var(--wb-radius-md, 8px);
+  background: var(--wb-color-surface, transparent);
+}
+
+.item[data-unread="true"] {
+  border-inline-start: 4px solid var(--wb-color-accent, currentColor);
+}
+
+.item p {
+  margin: 0;
+}
+
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--wb-space-3);
+}
+
+/* 44px target around the checkbox (WCAG 2.5.8). */
+.toggle {
+  display: inline-grid;
+  place-items: center;
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.toggle input {
+  width: 20px;
+  height: 20px;
+}

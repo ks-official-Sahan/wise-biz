@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { modules } from "../src/modules.ts";
+import { docModules as modules } from "../src/modules.ts";
 import { buildOpenApi } from "../src/openapi.ts";
 
 const committed = join(import.meta.dirname, "../../../packages/contracts/generated/openapi.json");

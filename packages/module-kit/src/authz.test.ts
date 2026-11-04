@@ -3,7 +3,7 @@ import { DomainError, toProblem } from "@wise-biz/errors";
 import { createCatalog, matrixFromRows } from "@wise-biz/policy";
 import { describe, expect, it } from "vitest";
 
-import { authorize, policyMiddleware, requireTenant } from "./index.ts";
+import { authorize, policyMiddleware, requireTenant, requireUser } from "./index.ts";
 
 import type { AppEnv, AuthContext } from "./index.ts";
 
@@ -27,6 +27,7 @@ function build(auth: AuthContext, withPolicy = true): OpenAPIHono<AppEnv> {
   });
   if (withPolicy) app.use("*", policyMiddleware(matrix));
   app.get("/tenant", (c) => c.json(requireTenant(c)));
+  app.get("/user", (c) => c.json(requireUser(c)));
   app.get("/read", (c) => {
     authorize(c, "t:read");
     return c.json({ ok: true });
@@ -47,12 +48,17 @@ function build(auth: AuthContext, withPolicy = true): OpenAPIHono<AppEnv> {
   return app;
 }
 
-const user = (roles: string[], branchScope: "all" | string[] = "all"): AuthContext => ({
+const user = (
+  roles: string[],
+  branchScope: "all" | string[] = "all",
+): Extract<AuthContext, { kind: "user" }> => ({
   kind: "user",
   userId: U,
+  sessionId: "01900000-0000-7000-8000-0000000000aa",
   tenantId: T,
   roles,
   branchScope,
+  permissionsVersion: 1,
 });
 
 describe("requireTenant", () => {
@@ -62,9 +68,31 @@ describe("requireTenant", () => {
     expect(((await res.json()) as { code: string }).code).toBe("UNAUTHENTICATED");
   });
 
+  it("404 for a signed-in user without an active tenant (fail closed)", async () => {
+    const res = await build({ ...user(["owner"]), tenantId: null }).request("/tenant");
+    expect(res.status).toBe(404);
+    expect(((await res.json()) as { code: string }).code).toBe("NOT_FOUND");
+  });
+
+  it("authorize never passes without a tenant", async () => {
+    const res = await build({ ...user(["owner"]), tenantId: null }).request("/read");
+    expect(res.status).toBe(404);
+  });
+
   it("returns tenant ctx for a user", async () => {
     const res = await build(user(["owner"])).request("/tenant");
     expect(await res.json()).toEqual({ tenantId: T, userId: U, requestId: "req-12345678" });
+  });
+});
+
+describe("requireUser", () => {
+  it("401 for anonymous, ids for a user even without a tenant", async () => {
+    expect((await build({ kind: "anonymous" }).request("/user")).status).toBe(401);
+    const res = await build({ ...user([]), tenantId: null }).request("/user");
+    expect(await res.json()).toEqual({
+      userId: U,
+      sessionId: "01900000-0000-7000-8000-0000000000aa",
+    });
   });
 });
 

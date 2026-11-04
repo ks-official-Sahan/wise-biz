@@ -9,6 +9,10 @@ export const ERROR_CODES = Object.freeze({
   VALIDATION_FAILED: { status: 422, title: "Validation failed", slug: "validation/failed" },
   NOT_FOUND: { status: 404, title: "Not found", slug: "not-found" },
   UNAUTHENTICATED: { status: 401, title: "Authentication required", slug: "unauthenticated" },
+  /** The terminal was revoked or blacklisted: it must wipe local data and enroll again. */
+  DEVICE_REVOKED: { status: 401, title: "Device revoked", slug: "device/revoked" },
+  /** The terminal is enrolled but may not sell now (suspended or pending). */
+  DEVICE_INACTIVE: { status: 401, title: "Device inactive", slug: "device/inactive" },
   CONFLICT: { status: 409, title: "Conflict", slug: "conflict" },
   IDEMPOTENCY_MISMATCH: {
     status: 422,
@@ -21,6 +25,12 @@ export const ERROR_CODES = Object.freeze({
     slug: "idempotency/in-progress",
   },
   STOCK_INSUFFICIENT: { status: 409, title: "Insufficient stock", slug: "stock/insufficient" },
+  /** A sync batch skips device sequence numbers: the device resends from `details.expectedSeq`. */
+  SEQUENCE_GAP: { status: 409, title: "Sequence gap", slug: "sync/sequence-gap" },
+  /** A command breaks the device's signed hash chain: the device is quarantined (tamper or corruption). */
+  CHAIN_BROKEN: { status: 409, title: "Chain broken", slug: "sync/chain-broken" },
+  /** A terminal's totals disagree with the server's for the same pricing inputs, beyond tolerance (ADR 0014). */
+  PRICE_MISMATCH: { status: 409, title: "Price mismatch", slug: "pricing/mismatch" },
   ENTITLEMENT_REQUIRED: {
     status: 402,
     title: "Plan upgrade required",
@@ -28,6 +38,14 @@ export const ERROR_CODES = Object.freeze({
   },
   PAYLOAD_TOO_LARGE: { status: 413, title: "Payload too large", slug: "payload-too-large" },
   RATE_LIMITED: { status: 429, title: "Too many requests", slug: "rate-limited" },
+  RATE_LIMIT_UNAVAILABLE: {
+    status: 503,
+    title: "Rate limiter unavailable",
+    slug: "rate-limit-unavailable",
+  },
+  // The only 403: a browser cookie request from an origin we do not trust (CSRF guard). It reveals nothing about
+  // any resource, so it does not break "unauthorized = 404" for admin/platform surfaces.
+  ORIGIN_REJECTED: { status: 403, title: "Origin rejected", slug: "origin-rejected" },
   CURRENCY_MISMATCH: { status: 422, title: "Currency mismatch", slug: "money/currency-mismatch" },
   PRECONDITION_FAILED: { status: 412, title: "Precondition failed", slug: "precondition-failed" },
   INTERNAL: { status: 500, title: "Internal error", slug: "internal" },

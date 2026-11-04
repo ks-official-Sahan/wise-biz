@@ -1,0 +1,35 @@
+{
+  "name": "@wise-biz/module-identity",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "wiseBiz": {
+    "runtime": "node"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "lint": "eslint . --max-warnings 0",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --coverage"
+  },
+  "dependencies": {
+    "@better-auth/passkey": "1.7.12",
+    "@wise-biz/ids": "workspace:*",
+    "@wise-biz/mailer": "workspace:*",
+    "better-auth": "1.7.12",
+    "drizzle-orm": "0.45.4",
+    "pg": "8.23.1"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "@types/pg": "8.23.1",
+    "@wise-biz/config": "workspace:*",
+    "@wise-biz/db": "workspace:*",
+    "@wise-biz/testing": "workspace:*",
+    "eslint": "10.13.0",
+    "typescript": "6.0.3",
+    "vitest": "5.0.5"
+  }
+}

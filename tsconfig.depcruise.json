@@ -1,0 +1,10 @@
+{
+  "//": "Only for dependency-cruiser: resolves the console's @/* alias from the repo root.",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "paths": { "@/*": ["apps/console/src/*"] }
+  },
+  "include": ["apps/console/src/lib/api.ts"]
+}

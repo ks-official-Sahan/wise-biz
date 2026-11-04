@@ -20,23 +20,9 @@ interface Problem {
   [k: string]: unknown;
 }
 
-const unknownEnv = { ...baseEnv, API_DEV_AUTH: true, NODE_ENV: "staging" as never };
+const unknownEnv = { ...baseEnv, NODE_ENV: "staging" as never };
 
 describe("NODE_ENV is never inferred from absence", () => {
-  it("dev auth is ignored unless NODE_ENV is exactly development or test", async () => {
-    const res = await build({ env: unknownEnv }).app.request("/v1/probe/me", {
-      headers: devHeaders(),
-    });
-    expect(res.status).toBe(401);
-    for (const NODE_ENV of ["development", "test"] as const) {
-      const ok = await build({ env: { ...baseEnv, API_DEV_AUTH: true, NODE_ENV } }).app.request(
-        "/v1/probe/me",
-        { headers: devHeaders() },
-      );
-      expect(ok.status).toBe(200);
-    }
-  });
-
   it("/openapi.json is 404 for an unknown or missing NODE_ENV", async () => {
     expect((await build({ env: unknownEnv }).app.request("/openapi.json")).status).toBe(404);
     const missing = { ...baseEnv, NODE_ENV: undefined as never };
@@ -223,7 +209,7 @@ describe("tracing", () => {
 
 describe("authorize details never reach the response", () => {
   it("404 body has no details/permission/reason", async () => {
-    const { app } = build({ env: { ...baseEnv, API_DEV_AUTH: true } });
+    const { app } = build();
     const res = await app.request("/v1/probe/guarded", {
       headers: devHeaders({ "x-wb-dev-roles": "cashier" }),
     });

@@ -105,10 +105,18 @@ describe("pg bus", () => {
       [name],
     );
     expect(dl.rows[0]?.error).toMatch(/timed out/);
-    const idle = await db.admin.query<{ n: string }>(
-      "select count(*) n from pg_stat_activity where usename = 'wb_worker' and state = 'idle in transaction'",
-    );
-    expect(Number(idle.rows[0]?.n)).toBe(0);
+    // The server drops the destroyed backend asynchronously; poll briefly instead of a single snapshot.
+    await expect
+      .poll(
+        async () => {
+          const idle = await db.admin.query<{ n: string }>(
+            "select count(*) n from pg_stat_activity where usename = 'wb_worker' and datname = current_database() and state = 'idle in transaction'",
+          );
+          return Number(idle.rows[0]?.n);
+        },
+        { timeout: 5_000, interval: 100 },
+      )
+      .toBe(0);
   });
 
   it("statement_timeout cancels a slow SQL statement", async () => {

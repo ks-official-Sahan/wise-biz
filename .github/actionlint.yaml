@@ -1,0 +1,11 @@
+# The Claude workflows come from the upstream template and are owned outside this branch. Their three shellcheck
+# findings are style-level (SC2016 info on a GraphQL query, SC2209 on `[ ] && VAR=x || VAR=y`) and do not change behavior.
+# Ignored here so the lint job still fails on anything else in them.
+paths:
+  .github/workflows/claude.yml:
+    ignore:
+      - "shellcheck reported issue in this script: SC2209:"
+  .github/workflows/claude-pr-review.yml:
+    ignore:
+      - "shellcheck reported issue in this script: SC2016:"
+      - "shellcheck reported issue in this script: SC2209:"

@@ -92,7 +92,7 @@ function format(b: Uint8Array): Uuid7 {
 export const uuidv7: () => Uuid7 = createUuidv7({
   now: () => Date.now(),
   random: (bytes) => {
-    globalThis.crypto.getRandomValues(bytes);
+    globalThis.crypto.getRandomValues(bytes as Uint8Array<ArrayBuffer>);
   },
 });
 

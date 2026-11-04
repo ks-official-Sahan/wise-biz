@@ -22,7 +22,7 @@ Keep this file short. Read linked docs only when the task touches that area.
 | Docker, nginx, CI/CD, Cloudflare, backups | `docs/architecture/deployment.md` |
 | Payments, printers, scanners, drawers | `docs/features/payments-hardware.md` |
 | Plans, trials, limits, pay-as-you-go | `docs/features/subscriptions.md` |
-| UI/UX, checkout flow, ergonomics | `docs/design/ux.md` |
+| UI/UX, checkout flow, ergonomics | `docs/design/ux.md`, `docs/design/ui-principles.md` (build rules) |
 | Brand themes, fonts, receipts, cards | `docs/design/theming.md` |
 | `@sahan-sac/*` packages, gaps, upgrades | `docs/research/sahan-packages.md` |
 | Market research, competitor flaws | `docs/research/pos-market.md` |

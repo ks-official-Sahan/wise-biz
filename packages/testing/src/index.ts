@@ -16,6 +16,8 @@ export interface WiseBizVitestOptions {
   testTimeout?: number;
   /** Vitest globalSetup files (e.g. a Postgres container started once per run). */
   globalSetup?: string[];
+  /** Test files run in parallel per package (default 4). Turbo already runs packages in parallel. */
+  maxWorkers?: number;
 }
 
 const DEFAULT_INCLUDE = ["src/**/*.test.ts", "test/**/*.test.ts"];
@@ -24,11 +26,17 @@ const DEFAULT_THRESHOLD = 80;
 /** Shared Vitest config for wise-biz packages. Overrides tune thresholds and test includes. */
 export function wiseBizVitest(options: WiseBizVitestOptions = {}): ViteUserConfig {
   const { coverage = {} } = options;
+  const testTimeout = options.testTimeout ?? 5_000;
   return defineConfig({
     test: {
       include: options.include ?? DEFAULT_INCLUDE,
       passWithNoTests: true,
-      testTimeout: options.testTimeout ?? 5_000,
+      testTimeout,
+      // beforeAll/afterAll create, migrate and drop databases: give hooks the same budget as tests.
+      hookTimeout: Math.max(testTimeout, 10_000),
+      // Bounded per package: `pnpm check` runs every container-backed package at once and saturates Docker
+      // (connection timeouts) with one fork per core per package.
+      maxWorkers: options.maxWorkers ?? 4,
       ...(options.globalSetup ? { globalSetup: options.globalSetup } : {}),
       coverage: {
         provider: "v8",

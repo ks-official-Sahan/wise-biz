@@ -10,7 +10,7 @@ Goal: a registered terminal can sell for days without internet, with zero lost s
 | Web | expo-sqlite web (wa-sqlite on OPFS) | Needs COOP/COEP headers (`Cross-Origin-Opener-Policy: same-origin`, `Cross-Origin-Embedder-Policy: credentialless`). `withExclusiveTransactionAsync` is not available on web → use `withTransactionAsync` and a single writer queue. Web terminals are **secondary** (no hardware drawer, limited printing). |
 | Electron | better-sqlite3 in main process, exposed via IPC | Key from OS keychain via `safeStorage` |
 
-One writer per DB: all writes go through `@wise-biz/sync`'s serialized write queue. Reads are free.
+One writer per DB: all writes go through `@wise-biz/sync`'s serialized write queue. Reads are free. The client package (storage port, schema v1, outbox, push and pull loops, hint stream, indexes) and its guarantees are described in ADR 0016; the local schema is `packages/sync/src/schema/migrations.ts`.
 
 ## What lives on the device
 
@@ -34,7 +34,7 @@ device_outbox(seq integer primary key, id uuid, type text, payload json, hash bl
 ```
 
 1. Completing a sale runs **one local transaction**: insert sale + lines + tenders + local stock movements + outbox row. Then the UI confirms. No network.
-2. Each command carries: `id` (UUIDv7, also the idempotency key), `device_id`, `device_seq` (monotonic), `hlc` (hybrid logical clock), `prev_hash`, `hash = sha256(canonical(payload) ‖ prev_hash)`, `signature = Ed25519(device_key, hash)`.
+2. Each command carries: `id` (UUIDv7, also the idempotency key), `device_id`, `device_seq` (monotonic), `hlc` (hybrid logical clock), `prev_hash`, `hash = sha256(canonical({ type, seq, body without meta }) ‖ prev_hash)` (ADR 0015), `signature = Ed25519(device_key, hash)`.
 3. Sync worker pushes in `seq` order in batches (≤ 100 commands or 256 KB), with exponential backoff + jitter.
 4. Server per command: verify device active → verify signature → verify chain continuity (`prev_hash` matches last accepted for this device) → check idempotency (`unique(tenant_id, terminal_id, device_seq)`) → apply in a transaction → ack with server ids (`invoice_no`).
 5. Gaps in `device_seq` → server answers `409 SEQUENCE_GAP` with expected seq; device resends from there. Chain break → device quarantined, owner alerted (tamper or corruption).
@@ -45,7 +45,7 @@ Commands, not row diffs: the server re-runs business rules (prices honored as sn
 
 - Server keeps a per-tenant change feed (`sync_changes(tenant_id, scope, entity, entity_id, op, version, changed_at)`), filled by outbox consumers.
 - Device sends `cursor` per dataset; server returns up to N changes + next cursor. Keyset pagination, no offsets.
-- Realtime nudge: WebSocket/SSE message "dataset X advanced" → device pulls. Push is a hint; pull is the truth.
+- Realtime nudge: SSE message "dataset X advanced" → device pulls. Push is a hint; pull is the truth. A terminal gets a ticket from `POST /v1/sync/stream-ticket`, opens `GET {url}/v1/stream` with `Authorization: Bearer {ticket}`, pulls once on `event: ready`, then on each `event: hint` (`{"hints":[{"channel","dataset"}]}`, at most 4 a second). Keep a 30–60 s poll as the fallback: a hint can precede the commit or be lost. On `event: reconnect`, a close or a 503, fetch a new ticket and reconnect with backoff (ADR 0015).
 - First boot: bulk snapshot (gzip NDJSON from object storage, signed URL), then deltas.
 
 ## Conflict policy

@@ -191,10 +191,10 @@ describe("secure headers", () => {
   });
 });
 
-describe("dev auth", () => {
-  const on = { ...baseEnv, API_DEV_AUTH: true };
+describe("auth resolver (test header resolver)", () => {
+  const on = baseEnv;
 
-  it("is honoured when enabled in test", async () => {
+  it("resolved identity reaches the handler", async () => {
     const res = await build({ env: on }).app.request("/v1/probe/me", { headers: devHeaders() });
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({ tenantId: TENANT, userId: USER });
@@ -218,14 +218,16 @@ describe("dev auth", () => {
     expect(res.status).toBe(404);
   });
 
-  it("is ignored when API_DEV_AUTH is false", async () => {
-    const res = await build().app.request("/v1/probe/me", { headers: devHeaders() });
+  it("anonymous without credentials: 401", async () => {
+    const res = await build().app.request("/v1/probe/me");
     expect(res.status).toBe(401);
   });
 
-  it("is ignored in production even if API_DEV_AUTH is true", async () => {
-    const { app } = build({ env: { ...on, NODE_ENV: "production" } });
-    expect((await app.request("/v1/probe/me", { headers: devHeaders() })).status).toBe(401);
+  it("signed in without an active tenant: requireTenant is 404 (fail closed)", async () => {
+    const res = await build().app.request("/v1/probe/me", {
+      headers: devHeaders({ "x-wb-dev-tenant": "none" }),
+    });
+    expect(res.status).toBe(404);
   });
 
   it("rejects malformed dev ids as anonymous", async () => {
@@ -264,7 +266,7 @@ describe("logging", () => {
   });
 
   it("writes one access line with route template, status, ms, requestId and tenantId", async () => {
-    const { app, logs } = build({ env: { ...baseEnv, API_DEV_AUTH: true } });
+    const { app, logs } = build();
     await app.request("/v1/probe/me?secret=1", {
       headers: devHeaders({ "x-request-id": "abc-12345678" }),
     });

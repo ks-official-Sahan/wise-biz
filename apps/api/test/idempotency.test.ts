@@ -11,7 +11,7 @@ import { createApp } from "../src/app.ts";
 import { redisIdempotencyCache } from "../src/idempotency-cache.ts";
 import { createLogger } from "../src/logger.ts";
 
-import { baseEnv, okRedis } from "./helpers.ts";
+import { baseEnv, headerAuth, okRedis } from "./helpers.ts";
 
 import type { RedisKv } from "../src/idempotency-cache.ts";
 import type { OpenAPIHono } from "@hono/zod-openapi";
@@ -52,7 +52,8 @@ beforeAll(async () => {
     modules: [templateModule],
     pool,
     redis: okRedis,
-    env: { ...baseEnv, API_DEV_AUTH: true },
+    env: baseEnv,
+    auth: headerAuth,
     logger,
   };
   app = createApp({ ...base, idempotencyCache: redisIdempotencyCache(redis, logger) });

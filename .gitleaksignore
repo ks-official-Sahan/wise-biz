@@ -1,3 +1,7 @@
 # Reviewed false positives only (commit:file:rule:line). Never add real secrets here.
 # Idempotency-key test fixture, not a credential.
 95c96b9513436869d19318178d96a293bc04568d:packages/module-kit/src/run-command.test.ts:generic-api-key:41
+# Throwaway test-account password ("correct-horse..."), used only against disposable test containers.
+ad99169cd5a2f7cab3b6567dd89108a35ac6ee51:apps/api/test/wiring.test.ts:generic-api-key:90
+71a97e741f544a173f51a0cbbef6e2c2bae6af2e:apps/api/test/identity-tenancy.e2e.test.ts:generic-api-key:23
+71a97e741f544a173f51a0cbbef6e2c2bae6af2e:apps/api/test/wiring.test.ts:generic-api-key:72

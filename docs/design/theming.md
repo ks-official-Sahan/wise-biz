@@ -17,7 +17,10 @@ Tenants edit **primitives and a few semantic overrides** only. Component tokens 
 ```json
 {
   "color": {
-    "brand": { "$type": "color", "$value": "#0E7C66" },
+    "brand": {
+      "$type": "color",
+      "$value": { "colorSpace": "srgb", "components": [0.055, 0.486, 0.4], "hex": "#0e7c66" }
+    },
     "accent": { "$type": "color", "$value": "{color.brand}" }
   },
   "font": {
@@ -29,11 +32,26 @@ Tenants edit **primitives and a few semantic overrides** only. Component tokens 
 }
 ```
 
+Color values follow DTCG 2025.10 (color objects). Engine and styling choices: ADR 0011.
+
+## Light and dark modes
+
+Each store (tenant, optionally per branch) chooses `modes.available`: light only, dark only, or both, plus
+`modes.default`.
+
+- One mode: the app shows that mode only; no toggle.
+- Both modes: the terminal shows a theme toggle (and can follow the device setting), and the owner can customize
+  each mode separately: a per-mode brand seed and overrides for accent, canvas and surface.
+- Status colors, text colors, sizes and targets are not customizable in either mode.
+- Every mode is generated so all text pairs pass WCAG 2.2 AA; customized colors that fail are flagged with the
+  nearest passing color before publishing.
+- Platform default: both modes, teal "Counter" light and amber "Workshop" dark.
+
 ## Pipeline
 
 `@wise-biz/theme`:
 1. Validate (zod) → contrast check (WCAG AA for text pairs, AA large for totals) → auto-adjust suggestions if failing.
-2. Generate tonal scale (OKLCH) from one brand color, light and dark variants.
+2. Generate tonal palettes (HCT, Material Color Utilities) from the brand seed of each available mode.
 3. Compile: CSS custom properties (console, storefront, POS web), RN theme object (POS native), ESC/POS-safe settings (logo bitmap dithered, header font size).
 4. Version and publish → `theming.theme.published` → devices pull.
 

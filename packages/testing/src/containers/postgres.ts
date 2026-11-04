@@ -8,7 +8,7 @@ import pg from "pg";
 export const POSTGRES_IMAGE = "pgvector/pgvector:0.8.7-pg18-trixie";
 export const BASE_TEMPLATE = "wb_base";
 
-export type PgRole = "admin" | "migrator" | "app" | "worker" | "chainer";
+export type PgRole = "admin" | "migrator" | "app" | "worker" | "chainer" | "identity";
 
 export interface PgHarness {
   host: string;
@@ -31,6 +31,7 @@ const CREDENTIALS: Record<PgRole, { user: string; password: string }> = {
   app: { user: "wb_app", password: "wb_app" },
   worker: { user: "wb_worker", password: "wb_worker" },
   chainer: { user: "wb_chainer", password: "wb_chainer" },
+  identity: { user: "wb_identity", password: "wb_identity" },
 };
 
 const INIT_DIR = resolve(
@@ -77,7 +78,7 @@ export function attachPostgres(
           // CREATE DATABASE does not copy the template's ACL: re-apply the DB-level grants from 002-extensions.sql.
           const q = ident(name);
           await c.query(
-            `REVOKE ALL ON DATABASE ${q} FROM PUBLIC; GRANT CONNECT ON DATABASE ${q} TO wb_app, wb_worker, wb_chainer; REVOKE TEMPORARY ON DATABASE ${q} FROM wb_app`,
+            `REVOKE ALL ON DATABASE ${q} FROM PUBLIC; GRANT CONNECT ON DATABASE ${q} TO wb_app, wb_worker, wb_chainer, wb_identity; REVOKE TEMPORARY ON DATABASE ${q} FROM wb_app`,
           );
         } finally {
           await c.query("SELECT pg_advisory_unlock($1)", [CREATE_LOCK_KEY]);
@@ -134,7 +135,12 @@ export async function startPostgres(): Promise<PgHarness> {
       "synchronous_commit=off",
       "-c",
       "full_page_writes=off",
+      // Autovacuum on wb_base makes CREATE DATABASE ... TEMPLATE fail ("being accessed by other users") under load.
+      "-c",
+      "autovacuum=off",
     ])
+    // Parallel packages start many containers on one machine; the default 120 s is too short when it is busy.
+    .withStartupTimeout(300_000)
     .withCopyFilesToContainer([
       {
         source: resolve(INIT_DIR, "001-roles-db.sql"),

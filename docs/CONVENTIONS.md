@@ -44,6 +44,7 @@ Coverage target: domain ≥ 90%, overall ≥ 80%. Bug fix → failing test first
 ## Git
 
 - Conventional commits (`feat(sales): …`). Changesets for package releases.
+- Commit scope is enforced by `commitlint.config.js` (`scope-enum`): a workspace dir name under `apps/`, `modules/`, `packages/`, `services/`, or `docs`, `ci`, `infra`, `deps`, `release`. Scope is optional. Root-level changes (`.gitignore`, root configs, lockfile) use no scope: `chore: ignore graphify-out`. Never use a file name as scope. A new workspace dir becomes a valid scope automatically.
 - Small PRs (≤ 400 changed lines excluding generated). One module per PR when possible.
 - PR template: what, why, contract changes, migration, perf/query notes, screenshots for UI, security notes.
 

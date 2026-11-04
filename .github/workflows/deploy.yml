@@ -1,0 +1,160 @@
+name: Deploy
+
+# Rolls a released version (images already built, scanned and pushed by images.yml) out to Google Cloud Run, with Neon as
+# the database (ADR 0017). Manual only: pick the version and the environment. The order is the deploy runbook's:
+# copy images, migrate (one-shot job, must succeed), roll the services, smoke test.
+#
+# Configuration per GitHub environment (Settings > Environments > staging | production), variables:
+#   GCP_PROJECT, GCP_REGION, GCP_WIF_PROVIDER, GCP_SERVICE_ACCOUNT, AR_REPO (Artifact Registry repository), API_URL.
+# Every service setting lives in Secret Manager as `wb-<environment>-<ENV_VAR>` (for example `wb-production-DATABASE_URL`);
+# the workflow wires exactly the variables each service's env schema asks for (scripts/service-env.mts) and fails
+# before rolling anything when a required one is missing. Nothing secret is stored in GitHub.
+# Moving to another container platform means rewriting only the gcloud steps; the order stays the same.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release tag to deploy, for example v0.2.0"
+        required: true
+        type: string
+      environment:
+        description: "Target environment"
+        required: true
+        type: choice
+        options: [staging, production]
+
+permissions: {}
+
+concurrency:
+  group: deploy-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy ${{ inputs.version }} to ${{ inputs.environment }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    environment: ${{ inputs.environment }}
+    permissions:
+      contents: read
+      packages: read
+      id-token: write # workload identity federation: no long-lived cloud key
+    env:
+      LEFTHOOK: 0
+      VERSION: ${{ inputs.version }}
+      REGION: ${{ vars.GCP_REGION }}
+      AR: ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT }}/${{ vars.AR_REPO }}
+      ENVIRONMENT: ${{ inputs.environment }}
+      API_URL: ${{ vars.API_URL }}
+    steps:
+      - name: Check the version looks like a release tag
+        run: |
+          [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]] || { echo "not a release tag: $VERSION" >&2; exit 1; }
+
+      - name: Name the image registry path (GHCR needs it lowercase)
+        run: echo "GHCR=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+
+      - name: Checkout the release
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.version }}
+          persist-credentials: false
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      - name: Setup Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies (to read each service's env schema)
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
+
+      - name: Check that every required setting exists before touching anything
+        run: |
+          gcloud secrets list --format='value(name.basename())' > "$RUNNER_TEMP/secrets.txt"
+          missing=0
+          for app in api workers realtime; do
+            for key in $(node scripts/service-env.mts "$app" --required); do
+              [ "$key" = NODE_ENV ] && continue
+              grep -qx "wb-$ENVIRONMENT-$key" "$RUNNER_TEMP/secrets.txt" || { echo "missing secret wb-$ENVIRONMENT-$key ($app)" >&2; missing=1; }
+            done
+          done
+          for key in DATABASE_MIGRATOR_URL; do
+            grep -qx "wb-$ENVIRONMENT-$key" "$RUNNER_TEMP/secrets.txt" || { echo "missing secret wb-$ENVIRONMENT-$key (migrate)" >&2; missing=1; }
+          done
+          exit "$missing"
+
+      - name: Copy the images from GHCR to Artifact Registry
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_USER: ${{ github.actor }}
+        run: |
+          gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
+          echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+          for app in api workers realtime console; do
+            docker pull "$GHCR/$app:$VERSION"
+            docker tag "$GHCR/$app:$VERSION" "$AR/$app:$VERSION"
+            docker push "$AR/$app:$VERSION"
+          done
+
+      - name: Migrate (one-shot job; the roll below runs only if it succeeds)
+        run: |
+          # DATABASE_MIGRATOR_URL must be the direct (unpooled) Neon host: the migrator takes a session advisory lock.
+          gcloud run jobs deploy "wb-migrate-$ENVIRONMENT" \
+            --region "$REGION" --image "$AR/api:$VERSION" \
+            --command node --args packages/db/scripts/migrate.mts \
+            --set-secrets "DATABASE_MIGRATOR_URL=wb-$ENVIRONMENT-DATABASE_MIGRATOR_URL:latest" \
+            --max-retries 0 --task-timeout 15m
+          gcloud run jobs execute "wb-migrate-$ENVIRONMENT" --region "$REGION" --wait
+
+      - name: Roll the services
+        run: |
+          # Wires every variable the service's env schema lists and Secret Manager holds; NODE_ENV is fixed, PORT is Cloud Run's.
+          wire() {
+            local app="$1" list=""
+            for key in $(node scripts/service-env.mts "$app"); do
+              case "$key" in NODE_ENV|PORT) continue ;; esac
+              grep -qx "wb-$ENVIRONMENT-$key" "$RUNNER_TEMP/secrets.txt" && list="${list:+$list,}$key=wb-$ENVIRONMENT-$key:latest"
+            done
+            printf '%s' "$list"
+          }
+          gcloud run deploy "wb-api-$ENVIRONMENT" --region "$REGION" --image "$AR/api:$VERSION" \
+            --port 3001 --cpu 2 --memory 1Gi --min-instances 1 --max-instances 10 --allow-unauthenticated \
+            --set-env-vars "NODE_ENV=production" --set-secrets "$(wire api)"
+          # Workers take no public traffic and must not be throttled between requests: they poll and relay continuously.
+          gcloud run deploy "wb-workers-$ENVIRONMENT" --region "$REGION" --image "$AR/workers:$VERSION" \
+            --port 8080 --ingress internal --no-allow-unauthenticated --no-cpu-throttling \
+            --cpu 2 --memory 1Gi --min-instances 1 --max-instances 3 \
+            --set-env-vars "NODE_ENV=production,HEALTH_PORT=8080" --set-secrets "$(wire workers)"
+          # Streams stay open for up to an hour per connection.
+          gcloud run deploy "wb-realtime-$ENVIRONMENT" --region "$REGION" --image "$AR/realtime:$VERSION" \
+            --port 3002 --cpu 1 --memory 512Mi --min-instances 1 --max-instances 5 --timeout 3600 --allow-unauthenticated \
+            --set-env-vars "NODE_ENV=production" --set-secrets "$(wire realtime)"
+          # The console proxies /v1 to API_ORIGIN, read at run time (src/proxy.ts), so the one image serves every environment.
+          gcloud run deploy "wb-console-$ENVIRONMENT" --region "$REGION" --image "$AR/console:$VERSION" \
+            --cpu 1 --memory 512Mi --min-instances 1 --max-instances 5 --allow-unauthenticated \
+            --set-env-vars "API_ORIGIN=$API_URL"
+
+      - name: Smoke test
+        env:
+          API_URL: ${{ vars.API_URL }}
+        run: |
+          for _ in 1 2 3 4 5 6; do
+            curl -fsS --max-time 10 "$API_URL/ready" && exit 0
+            sleep 10
+          done
+          echo "api did not become ready; follow docs/runbooks/rollback.md" >&2
+          exit 1

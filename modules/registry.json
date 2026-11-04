@@ -1,1 +1,21 @@
-{ "modules": ["infra", "audit", "_template"] }
+{
+  "modules": [
+    "infra",
+    "audit",
+    "identity",
+    "tenancy",
+    "devices",
+    "catalog",
+    "pricing",
+    "inventory",
+    "sales",
+    "shortlinks",
+    "sync",
+    "search",
+    "theming",
+    "reporting",
+    "notifications",
+    "_template"
+  ],
+  "global": ["identity"]
+}

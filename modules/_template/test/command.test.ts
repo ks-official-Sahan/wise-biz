@@ -67,9 +67,11 @@ function appFor(tenantId: string, role: string, deps: ModuleDeps, failAfterInser
     c.set("auth", {
       kind: "user",
       userId: ACTOR, // keys are actor-scoped: one user per app
+      sessionId: "01900000-0000-7000-8000-0000000000aa",
       tenantId,
       roles: [role],
       branchScope: "all",
+      permissionsVersion: 1,
     });
     await next();
   });

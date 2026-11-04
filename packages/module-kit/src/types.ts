@@ -1,6 +1,6 @@
 import type { OpenAPIHono } from "@hono/zod-openapi";
 import type { TenantCtx } from "@wise-biz/db";
-import type { Permission } from "@wise-biz/policy";
+import type { Permission, PermissionCatalog } from "@wise-biz/policy";
 import type pg from "pg";
 import type { Logger } from "pino";
 
@@ -9,9 +9,17 @@ export type AuthContext =
   | {
       kind: "user";
       userId: string;
-      tenantId: string;
+      sessionId: string;
+      /** Active tenant after a fresh membership check; null = signed in, no (valid) tenant: fail closed. */
+      tenantId: string | null;
       roles: readonly string[];
       branchScope: "all" | readonly string[];
+      /** tenancy.tenants.permissions_version at resolve time; keys the policy-matrix cache. */
+      permissionsVersion: number;
+      /** Lower-cased account email from the session. Absent (test contexts) = unknown = treated as unverified. */
+      email?: string;
+      /** Email verified on the account. Absent = false: invite acceptance fails closed. */
+      emailVerified?: boolean;
     };
 
 export interface AppEnv {
@@ -20,7 +28,17 @@ export interface AppEnv {
     logger: Logger;
     auth: AuthContext;
     tenant: TenantCtx | undefined;
+    /** Set by the kernel when the request carries a valid device signature (RFC 9421); else undefined. */
+    device: DeviceContext | undefined;
   };
+}
+
+/** A terminal that signed this request. Status is read fresh on every request, so a revoke applies at once. */
+export interface DeviceContext {
+  readonly deviceId: string;
+  readonly tenantId: string;
+  readonly branchId: string;
+  readonly status: "pending" | "active" | "suspended" | "revoked" | "blacklisted";
 }
 
 /**
@@ -37,11 +55,21 @@ export const DEFAULT_IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1000;
 
 export interface ModuleDeps {
   pool: pg.Pool;
+  /**
+   * Read-only replica pool, when one is configured. Only for reads that tolerate replica lag (reports); anything a
+   * user just wrote and expects to see goes through `pool`.
+   */
+  readPool?: pg.Pool;
   clock: { now(): number };
   ids: { uuidv7(): string };
   idempotencyCache?: IdempotencyCache;
   /** Defaults to DEFAULT_IDEMPOTENCY_TTL_MS. */
   idempotencyTtlMs?: number;
+  /**
+   * Every permission of the mounted modules (the kernel builds it). Modules that validate permission names (grants)
+   * fall back to their own list when absent, so a missing catalog narrows what can be granted, never widens it.
+   */
+  catalog?: PermissionCatalog;
 }
 
 export interface WbModule {

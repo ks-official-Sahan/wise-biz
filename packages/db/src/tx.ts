@@ -4,6 +4,7 @@ import type { Db } from "./pool.ts";
 import type pg from "pg";
 
 export type TenantCtx = Readonly<{ tenantId: string; userId?: string; requestId: string }>;
+export type UserCtx = Readonly<{ userId: string; requestId: string }>;
 export type PlatformCtx = Readonly<{ reason: string; requestId: string; actorId: string }>;
 
 export interface TxHandle {
@@ -101,5 +102,51 @@ export async function withTenantTx<T>(
   fn: (tx: TxHandle) => Promise<T>,
 ): Promise<T> {
   if (!isUuidV7(ctx.tenantId)) throw new Error("withTenantTx: tenantId must be a UUIDv7");
+  if (ctx.userId !== undefined && !isUuidV7(ctx.userId))
+    throw new Error("withTenantTx: userId must be a UUIDv7");
   return run(pool, SETTINGS_SQL, [ctx.tenantId, ctx.userId ?? "", ctx.requestId], fn);
+}
+
+/**
+ * BEGIN -> set app.user_id with an EMPTY tenant (local) -> fn -> COMMIT; ROLLBACK on throw.
+ * For the signed-in-but-no-active-tenant window (list my tenants, switch tenant): tenant tables return zero rows
+ * except the user-keyed SELECT policies (tenancy.memberships / tenancy.tenants). Never use it for tenant data.
+ */
+export async function withUserTx<T>(
+  pool: pg.Pool,
+  ctx: UserCtx,
+  fn: (tx: TxHandle) => Promise<T>,
+): Promise<T> {
+  if (!isUuidV7(ctx.userId)) throw new Error("withUserTx: userId must be a UUIDv7");
+  return run(pool, SETTINGS_SQL, ["", ctx.userId, ctx.requestId], fn);
+}
+
+export type LookupCtx = Readonly<{
+  /** Which single-row lookup policy to unlock. */
+  key: "device_id" | "enrollment_code";
+  /** device_id: a UUIDv7. enrollment_code: the lowercase hex SHA-256 of the code. */
+  value: string;
+  requestId: string;
+}>;
+
+const LOOKUP_SQL: Record<LookupCtx["key"], string> = {
+  device_id:
+    "select set_config('app.tenant_id', '', true), set_config('app.device_id', $1, true), set_config('app.request_id', $2, true)",
+  enrollment_code:
+    "select set_config('app.tenant_id', '', true), set_config('app.enrollment_code', $1, true), set_config('app.request_id', $2, true)",
+};
+
+/**
+ * BEGIN -> no tenant, one lookup key (local) -> fn -> COMMIT. For the moment before a tenant is known: a signed terminal
+ * request names only its device, an enrollment names only its code. The devices schema has SELECT policies keyed on
+ * these settings that expose exactly that one row (to learn its tenant); everything else returns zero rows.
+ */
+export async function withLookupTx<T>(
+  pool: pg.Pool,
+  ctx: LookupCtx,
+  fn: (tx: TxHandle) => Promise<T>,
+): Promise<T> {
+  const valid = ctx.key === "device_id" ? isUuidV7(ctx.value) : /^[0-9a-f]{64}$/.test(ctx.value);
+  if (!valid) throw new Error(`withLookupTx: invalid ${ctx.key}`);
+  return run(pool, LOOKUP_SQL[ctx.key], [ctx.value, ctx.requestId], fn);
 }

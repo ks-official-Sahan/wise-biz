@@ -14,6 +14,45 @@ Baseline: OWASP ASVS L2, L3 for identity/payments/devices/MCP. Threat model revi
 
 PIN rules: per-tenant unique, hashed with Argon2id + pepper, 5 tries → lockout with supervisor reset, PIN snapshot on device is a salted hash list signed by server and expiring.
 
+### Implementation (P0-08a, ADR 0010)
+
+- Engine: `better-auth` behind `IdentityPort` (`modules/identity`), mounted at `/v1/auth/*`. Tenancy is our own module.
+- Identity tables (`identity.*`) are global, granted only to DB role `wb_identity`; `wb_app`, `wb_worker`, `wb_chainer`
+  have no privileges (enforced by `rls-check`). Every identity row id is UUIDv7.
+- Session cookie `__Host-wb_session`: `Secure`, `HttpOnly`, `SameSite=Strict`, `Path=/`, no `Domain`; 12 h, rolling
+  every 1 h; no cookie cache, so revocation is immediate.
+- Tenant context: only `identity.sessions.active_tenant_id`, written by switch-tenant / create-business after an active
+  membership is verified, and re-checked against `tenancy.memberships` on every request. Missing → no tenant → 404.
+- Permissions: policy rows per tenant, matrix cached in-process (LRU) and in Redis under `t:{tenant}:perm:v{n}`;
+  `permissions_version` is bumped by a trigger on any grant change (a grant change outside the tenant context fails).
+  Redis must be private and authenticated: whoever can write it can grant permissions.
+- Rate limits (Redis fixed window, fail closed with 503 `RATE_LIMIT_UNAVAILABLE`): sign-in 10/min per IP and 5/min per
+  email, sign-up 5/min per IP, other unsafe `/v1/auth/*` 10/min per session, create-business 5/min per user; at most 20
+  owned tenants per user. Client IP = socket peer, or the Nth `X-Forwarded-For` entry from the right with
+  `TRUST_PROXY_HOPS=N`; IPv6 bucketed by /64. Better Auth receives the same trusted IP.
+- CSRF: cookie-bearing unsafe requests need an allowlisted `Origin` or `Sec-Fetch-Site: same-origin` (403
+  `ORIGIN_REJECTED`); `*` is never a trusted origin and is rejected in production.
+- Known gap: the per-email sign-in limit allows a cheap lockout of one account (P1-15).
+
+### Implementation (P0-08b)
+
+- Email verification: `requireEmailVerification`, no auto sign-in, and a uniform sign-up response (same body for a new
+  and an existing email), so sign-up no longer reveals registered addresses. Links point at `CONSOLE_URL`.
+- Second factor: emailed 6-digit OTP (Better Auth `twoFactor`), stored hashed, limited attempts per challenge; enabling
+  is confirmed by an emailed code. Backup codes are encrypted by the plugin.
+- Passkeys (WebAuthn, `@better-auth/passkey`): RP ID `AUTH_RP_ID`, origins = the CORS allowlist. Registration needs a
+  fresh session. A passkey is a full sign-in on its own, so user verification (PIN or biometrics) is required: an
+  assertion without the UV flag is rejected (401 `USER_VERIFICATION_REQUIRED`) before the plugin verifies it.
+- Invites: token = base64url(HMAC-SHA256(HMAC-SHA256(`INVITE_SECRET`, "wb:invite:v1"), `tenantId:inviteId`)), never
+  stored, constant-time compared; 72 h expiry. Accept needs a signed-in, verified account whose email matches.
+  Accepted and revoked are terminal (DB trigger); unknown, revoked, expired or wrong-email tokens all answer 404.
+- Privilege ceiling: only owners create roles, edit role grants, change the owner role, or touch an owner member.
+  A non-owner with `tenancy:manage` may assign (member update, invite) only roles they hold. All refusals are 404.
+- Last owner: a demotion that would leave no active owner is 409; membership changes take a per-tenant advisory lock.
+- Mail (`@wise-biz/mailer`): SMTP (local relay) or Resend. Production SMTP requires TLS (implicit on 465, STARTTLS
+  otherwise). Bodies, subjects and addresses are never logged; Better Auth's logger is pinned to `warn` (its info lines
+  contain emails). Invite mail is sent by the outbox consumer, so a mail outage never fails the request.
+
 ## Authorization
 
 `@wise-biz/policy`: RBAC + ABAC.
@@ -33,6 +72,20 @@ Overrides: when an operator lacks permission (edit qty after add, price override
 4. **Allow/deny lists:** status `pending | active | suspended | revoked | blacklisted`. Only `active` terminals can submit sales. Console and reports can be used from any authenticated device; transactions only from active terminals.
 5. Heartbeat every 60 s online: battery, app version, unsynced count, last user, connection type, IP. Stored for 90 days; missed heartbeats alert.
 6. Lost device: revoke → key rejected; on next contact device wipes local data.
+
+### Implementation (P1-01a)
+
+- **Enrollment inverts step 2:** the owner creates a one-time code in the console (branch + name, 15 min, 40 bits of Crockford base32, only its SHA-256 stored, never audited or idempotency-cached). The terminal redeems it with its public key, and the enroll request is signed by that key (proof of possession). Redeeming makes the device `active`: creating the code was the approval. So every row is tenant-scoped from the start and no unauthenticated "pending" table exists. Every refusal (unknown, expired, used, unsigned code) is the same 404; enroll is limited to 10/min per IP.
+- **Lookup before tenant:** `withLookupTx` sets one transaction-local key (`app.device_id` or `app.enrollment_code`) and a SELECT-only policy exposes that single row while no tenant is active.
+- **Signed requests:** kernel `deviceAuth` verifies every request that carries `signature` (RFC 9421 profile in `@wise-biz/http-signatures`: `@method`, `@path`, `@query`, `content-digest`, `x-wb-timestamp`, `x-wb-nonce`, `x-wb-device-id`; Ed25519; ±5 min). The nonce is claimed last (`SET dn:{device}:{nonce} NX EX 660`), fail closed. The device row is read on every signed request, so revocation applies to the next one. `requireDevice` returns 401 `DEVICE_REVOKED` (wipe) for revoked/blacklisted; `requireTerminal` also refuses `suspended`/`pending` with `DEVICE_INACTIVE`.
+- Revoked and blacklisted are terminal states (409 on any change). Heartbeats are telemetry: not audited per beat.
+
+### Operator PIN (P1-01b)
+
+- An operator sets their own PIN (`PUT /v1/devices/pin`, 4–8 digits, no repeated or straight runs). Stored as: Argon2id **online** hash (m=19 MiB, t=2, p=1, `PIN_PEPPER` as the Argon2 secret, ~20 ms on the API); an HMAC-SHA256(pepper, tenant:pin) lookup that makes PINs unique per business; and an **offline verifier** (Argon2id m=8 MiB, t=1, no pepper, ≤ 150 ms on a low-end Android) for the signed policy snapshot.
+- **Trade-off of the offline verifier:** the terminal has no pepper, so a stolen snapshot can be brute-forced (10^4–10^8 PINs at this cost: hours to days on a GPU). Mitigations: the snapshot is signed and expires, it is rotated on every PIN change, and a stolen terminal is revoked (its key stops working online at once).
+- `POST /v1/devices/pin-login` needs an **active terminal** (signed) and an active membership. Wrong PINs are counted per operator; the counter and the audit row commit before the 401; the 5th failure locks the PIN until a supervisor (`devices:unlock`) unlocks it (audited). Unknown operators cost the same Argon2 time as a wrong PIN.
+- A successful unlock opens a 12 h operator session bound to that terminal (`devices.operator_sessions`) and ends any previous one there; every request still carries the device signature.
 
 ## Request and transaction signing
 

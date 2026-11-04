@@ -13,6 +13,8 @@ const redisUrl = z
 export const databaseEnv = {
   DATABASE_URL: pgUrl,
   DATABASE_MIGRATOR_URL: pgUrl.optional(),
+  /** Read-only replica (Neon read replica endpoint) for heavy reads that tolerate a little lag (reports). Optional. */
+  DATABASE_READ_URL: pgUrl.optional(),
   DATABASE_POOL_MAX: z.coerce.number().int().min(1).max(200).default(10),
 };
 
@@ -46,12 +48,56 @@ export const storageEnv = {
   STORAGE_FORCE_PATH_STYLE: z.stringbool().default(false),
 };
 
+const resendApiKey = z.string().min(1).optional();
+
 export const emailEnv = {
   EMAIL_PROVIDER: z.enum(["capture", "smtp", "resend", "brevo"]).default("capture"),
   EMAIL_FROM: z.email(),
   SMTP_URL: z.url().optional(),
-  RESEND_API_KEY: z.string().min(1).optional(),
+  RESEND_API_KEY: resendApiKey,
   BREVO_API_KEY: z.string().min(1).optional(),
+};
+
+/** Transactional mail (@wise-biz/mailer). SMTP wins when MAIL_SMTP_HOST is set, else Resend. */
+export const mailEnv = {
+  MAIL_FROM: z.email(),
+  MAIL_SMTP_HOST: z.string().min(1).optional(),
+  MAIL_SMTP_PORT: z.coerce.number().int().min(1).max(65535).optional(),
+  RESEND_API_KEY: resendApiKey,
+};
+
+/** HMAC key for invite tokens (tenancy). Never log it. */
+export const inviteEnv = {
+  INVITE_SECRET: z.string().min(32),
+};
+
+/** Pepper for operator PINs (devices): the Argon2 secret and the uniqueness HMAC key. Never log it; rotating it
+ * invalidates every PIN. */
+export const pinEnv = {
+  PIN_PEPPER: z.string().min(32),
+};
+
+/** Public console base URL; email links (verify, invite) point here. */
+export const consoleEnv = {
+  CONSOLE_URL: z.url(),
+};
+
+/** WebAuthn relying-party id: a bare hostname, no scheme or port. */
+export const webauthnEnv = {
+  AUTH_RP_ID: z
+    .string()
+    .min(1)
+    .max(253)
+    .regex(
+      /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$/,
+      { error: "invalid hostname" },
+    )
+    .default("localhost"),
+};
+
+/** Dev seed password (scripts/seed-demo.ts). Refused in production. */
+export const demoSeedEnv = {
+  DEMO_PASSWORD: z.string().min(12).optional(),
 };
 
 export const observabilityEnv = {
@@ -72,8 +118,7 @@ export const httpEnv = {
         .map((o) => o.trim())
         .filter((o) => o.length > 0),
     ),
-  API_DEV_AUTH: z.stringbool().default(false),
-  TRUST_PROXY: z.stringbool().default(false),
+  TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(10).default(0),
 };
 
 export const workerEnv = {
@@ -83,9 +128,31 @@ export const workerEnv = {
   WORKER_LEASE_MS: z.coerce.number().int().min(1000).max(3_600_000).default(300_000),
   WORKER_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(1000).default(10),
   WORKER_HANDLER_TIMEOUT_MS: z.coerce.number().int().min(100).max(600_000).default(30_000),
+  /** inventory.batch.expiring fires when a batch with stock expires within this many days. */
+  INVENTORY_EXPIRY_HORIZON_DAYS: z.coerce.number().int().min(0).max(365).default(7),
+  /** devices.heartbeat.missed fires when an active terminal has been silent this many minutes. */
+  DEVICE_SILENT_MINUTES: z.coerce.number().int().min(2).max(1440).default(10),
+};
+
+/**
+ * Realtime hints (apps/realtime). The ticket secret is shared by the API (mints) and the realtime service (verifies);
+ * both are optional so a deployment without realtime still boots (terminals then rely on their poll). Never log it.
+ */
+export const realtimeEnv = {
+  REALTIME_TICKET_SECRET: z.string().min(32).optional(),
+  /** Public base URL terminals use to open the stream. */
+  REALTIME_URL: z.url().optional(),
+  /** 0 binds an ephemeral port (tests). */
+  REALTIME_PORT: z.coerce.number().int().min(0).max(65535).default(3002),
+  /** Open streams per instance; the next connection gets 503 so a load balancer can spread. */
+  REALTIME_MAX_CONNECTIONS: z.coerce.number().int().min(1).max(1_000_000).default(20_000),
 };
 
 export const chainerEnv = {
   DATABASE_CHAINER_URL: pgUrl,
   AUDIT_CHAIN_INTERVAL_MS: z.coerce.number().int().min(100).max(300_000).default(2000),
+};
+
+export const identityDbEnv = {
+  DATABASE_IDENTITY_URL: pgUrl,
 };

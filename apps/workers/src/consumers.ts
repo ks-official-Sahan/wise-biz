@@ -1,4 +1,73 @@
-import type { ConsumerDefinition } from "@wise-biz/events";
+import { uuidv7 } from "@wise-biz/ids";
+import { createImportConsumer } from "@wise-biz/module-catalog";
+import { createInventoryFactsConsumer, createLowStockConsumer } from "@wise-biz/module-inventory";
+import { createExpoPush, createNotificationsConsumer } from "@wise-biz/module-notifications";
+import { createPricingFactsConsumer } from "@wise-biz/module-pricing";
+import { createReportingConsumer } from "@wise-biz/module-reporting";
+import { createSearchProjectionConsumer } from "@wise-biz/module-search";
+import { createReceiptLinkConsumer } from "@wise-biz/module-shortlinks";
+import { createSyncChangesConsumer } from "@wise-biz/module-sync";
+import { createInviteEmailConsumer, permissionHolders } from "@wise-biz/module-tenancy";
 
-/** Consumers run by this worker. Modules append here as they ship (P1+). */
-export const consumers: readonly ConsumerDefinition[] = [];
+import type { ConsumerDefinition } from "@wise-biz/events";
+import type { ImportJobDeps } from "@wise-biz/module-catalog";
+import type { PushPort } from "@wise-biz/module-notifications";
+import type { ChangeNotice } from "@wise-biz/module-sync";
+import type { MailSender } from "@wise-biz/module-tenancy";
+
+export interface ConsumerDeps {
+  /** Realtime hint sink (Redis pub/sub in production); omit to run without hints (terminals poll). */
+  readonly notify?: (notice: ChangeNotice) => void;
+  /** Real mailer in production (@wise-biz/mailer), a capture mailer in tests. */
+  readonly mailer: MailSender;
+  readonly consoleUrl: string;
+  /** Phone push; defaults to the Expo push service. Tests pass a fake so nothing leaves the machine. */
+  readonly push?: PushPort;
+  readonly inviteSecret: string;
+  /** Catalog import job (ADR 0012): the wb_worker pool, object storage, and where job failures are reported. */
+  readonly imports: {
+    readonly pool: ImportJobDeps["pool"];
+    readonly store: ImportJobDeps["store"];
+    readonly onError: (err: unknown, importId: string) => void;
+  };
+}
+
+/**
+ * Consumers run by this worker. Each module appends its own here as it ships. The invite-email consumer is built from
+ * the deps the worker resolves from env (see worker.ts), so the mailer is never constructed at import time.
+ */
+export function createConsumers(deps: ConsumerDeps): readonly ConsumerDefinition[] {
+  // Structural match: the module's consumer is a plain object with the ConsumerDefinition shape.
+  return [
+    createInviteEmailConsumer(deps),
+    createSearchProjectionConsumer(),
+    createPricingFactsConsumer(),
+    createInventoryFactsConsumer(),
+    createSyncChangesConsumer(deps.notify),
+    createReceiptLinkConsumer(),
+    createReportingConsumer({
+      zoneOf: async (client, tenantId, branchId) => {
+        const r = await client.query<{ timezone: string }>(
+          "SELECT timezone FROM tenancy.branches WHERE tenant_id = $1 AND id = $2",
+          [tenantId, branchId],
+        );
+        return r.rows[0]?.timezone ?? null;
+      },
+    }),
+    createNotificationsConsumer({
+      holders: permissionHolders,
+      mail: { send: (m) => deps.mailer.send(m), consoleUrl: deps.consoleUrl },
+      push: deps.push ?? createExpoPush(),
+    }),
+    createLowStockConsumer({ pool: deps.imports.pool, ids: { uuidv7 }, now: () => new Date() }),
+    createImportConsumer(
+      {
+        pool: deps.imports.pool,
+        store: deps.imports.store,
+        ids: { uuidv7 },
+        clock: { now: () => Date.now() },
+      },
+      deps.imports.onError,
+    ),
+  ];
+}

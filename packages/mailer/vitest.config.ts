@@ -1,0 +1,5 @@
+import { wiseBizVitest } from "@wise-biz/testing";
+
+export default wiseBizVitest({
+  coverage: { lines: 90, functions: 90, branches: 90, statements: 90 },
+});

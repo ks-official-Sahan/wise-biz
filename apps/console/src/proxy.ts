@@ -1,0 +1,58 @@
+import { NextResponse } from "next/server";
+
+import { buildCsp, generateNonce, parseUploadOrigin } from "./lib/csp.ts";
+
+import type { NextRequest } from "next/server";
+
+/**
+ * Per-request CSP nonce (Next 16 `proxy`, Node runtime). The nonce reaches Server Components through the `x-nonce`
+ * request header; Next applies it to its own scripts. Invite links carry a token in the URL, so those pages send no
+ * Referer at all.
+ */
+export function proxy(request: NextRequest): NextResponse {
+  // /v1 goes to the API, same-origin so cookies stay first-party. The origin is read per request (not baked in at build),
+  // so one console image serves every environment.
+  if (request.nextUrl.pathname.startsWith("/v1/")) {
+    // An empty value counts as unset. Outside development there is no silent fallback to localhost: say what is missing.
+    const configured = process.env.API_ORIGIN;
+    const origin =
+      configured !== undefined && configured !== ""
+        ? configured
+        : process.env.NODE_ENV === "production"
+          ? undefined
+          : "http://localhost:3001";
+    if (origin === undefined) {
+      return new NextResponse("API_ORIGIN is not set for the console.", { status: 502 });
+    }
+    return NextResponse.rewrite(
+      new URL(`${request.nextUrl.pathname}${request.nextUrl.search}`, origin),
+    );
+  }
+  const nonce = generateNonce();
+  const dev = process.env.NODE_ENV !== "production";
+  const uploadOrigin = parseUploadOrigin(process.env.CONSOLE_UPLOAD_ORIGIN, dev);
+  const csp = buildCsp(nonce, { dev, ...(uploadOrigin === undefined ? {} : { uploadOrigin }) });
+  const headers = new Headers(request.headers);
+  headers.set("x-nonce", nonce);
+  headers.set("content-security-policy", csp);
+  const response = NextResponse.next({ request: { headers } });
+  response.headers.set("content-security-policy", csp);
+  if (request.nextUrl.pathname.startsWith("/invite")) {
+    response.headers.set("referrer-policy", "no-referrer");
+  }
+  return response;
+}
+
+export const config = {
+  // The API proxy (/v1) plus pages; static assets and prefetches skip the nonce work.
+  matcher: [
+    "/v1/:path*",
+    {
+      source: "/((?!v1/|_next/static|_next/image|favicon.ico|fonts/).*)",
+      missing: [
+        { type: "header", key: "next-router-prefetch" },
+        { type: "header", key: "purpose", value: "prefetch" },
+      ],
+    },
+  ],
+};

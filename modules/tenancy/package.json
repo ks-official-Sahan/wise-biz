@@ -1,0 +1,40 @@
+{
+  "name": "@wise-biz/module-tenancy",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "wiseBiz": {
+    "runtime": "node"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "lint": "eslint . --max-warnings 0",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --coverage"
+  },
+  "dependencies": {
+    "@hono/zod-openapi": "1.6.3",
+    "@wise-biz/contracts": "workspace:*",
+    "@wise-biz/db": "workspace:*",
+    "@wise-biz/errors": "workspace:*",
+    "@wise-biz/ids": "workspace:*",
+    "@wise-biz/module-kit": "workspace:*",
+    "@wise-biz/money": "workspace:*",
+    "@wise-biz/policy": "workspace:*",
+    "hono": "4.13.13",
+    "pg": "8.23.1",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "@types/pg": "8.23.1",
+    "@wise-biz/config": "workspace:*",
+    "@wise-biz/testing": "workspace:*",
+    "eslint": "10.13.0",
+    "fast-check": "4.10.2",
+    "typescript": "6.0.3",
+    "vitest": "5.0.5"
+  }
+}

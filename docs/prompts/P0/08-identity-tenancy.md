@@ -27,7 +27,7 @@ ADR 0009 "Tenancy store": Better Auth organization plugin vs own `tenancy` table
 | 2 | wb-db (sonnet) | `modules/{identity,tenancy}/migrations/**` | Tables, RLS, indexes |
 | 3 | wb-builder (sonnet) | `modules/identity/src/**` | Item 1 |
 | 4 | wb-builder (sonnet) | `modules/tenancy/src/**`, `apps/api/src/kernel/auth/**` | Items 2–6 |
-| 5 | wb-tester (haiku) | tests + `scripts/seed-demo.ts` | Acceptance + item 7 |
+| 5 | wb-tester (haiku) | tests + `scripts/seed-demo.mts` | Acceptance + item 7 |
 
 ## Acceptance
 - API e2e: sign up → invite → accept → login (password + passkey in a virtual authenticator test if feasible) → switch tenant.

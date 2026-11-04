@@ -1,0 +1,32 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "erasableSyntaxOnly": true,
+    "types": ["node"],
+    "typeRoots": ["../../packages/config/node_modules/@types"],
+    "paths": {
+      "react": ["../../packages/ui/node_modules/@types/react"],
+      "react/*": ["../../packages/ui/node_modules/@types/react/*"],
+      "@tabler/icons-react-native": [
+        "./node_modules/@tabler/icons-react-native/dist/tabler-icons-react-native.d.ts"
+      ]
+    }
+  },
+  "include": [
+    "app",
+    "src",
+    "test",
+    "e2e",
+    "metro.config.js",
+    "eslint.config.js",
+    "playwright.config.ts",
+    "vitest.config.ts"
+  ]
+}
