@@ -2,7 +2,7 @@ import { startTelemetry } from "./telemetry.ts";
 
 const FORCE_EXIT_MS = 10_000;
 
-const stopTelemetry = await startTelemetry();
+const stopTelemetry = await startTelemetry(process.env, () => import("@opentelemetry/sdk-node"));
 const { startWorker } = await import("./worker.ts");
 
 const worker = startWorker();

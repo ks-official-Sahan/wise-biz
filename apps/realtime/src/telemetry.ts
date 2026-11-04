@@ -11,8 +11,8 @@ interface SdkModule {
  * lazily so deployments without tracing do not pay for it. Returns a shutdown function (or undefined).
  */
 export async function startTelemetry(
-  source: Readonly<Record<string, string | undefined>> = process.env,
-  load: () => Promise<SdkModule> = () => import("@opentelemetry/sdk-node"),
+  source: Readonly<Record<string, string | undefined>>,
+  load: () => Promise<SdkModule>,
 ): Promise<(() => Promise<void>) | undefined> {
   if (!source.OTEL_EXPORTER_OTLP_ENDPOINT) return undefined;
   const { NodeSDK } = await load();

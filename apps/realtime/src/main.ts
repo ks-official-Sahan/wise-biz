@@ -2,7 +2,7 @@ import { startTelemetry } from "./telemetry.ts";
 
 const FORCE_EXIT_MS = 10_000;
 
-const stopTelemetry = await startTelemetry();
+const stopTelemetry = await startTelemetry(process.env, () => import("@opentelemetry/sdk-node"));
 const { startRealtime } = await import("./start.ts");
 
 const rt = await startRealtime();
