@@ -57,6 +57,8 @@ export default function PromotionPage() {
   const promo = usePromotion(t, id);
   // Kept here: the editor remounts on every new version, and the message must survive that.
   const [notice, setNotice] = useState<string | null>(null);
+  // Kept here because a save-then-failed-publish bumps the version, which remounts the editor and would drop a local error.
+  const [failure, setFailure] = useState<string | null>(null);
   const profile = useProfile(t);
   const currency = profile.data?.currency;
   if (profile.isError)
@@ -86,6 +88,8 @@ export default function PromotionPage() {
       promo={promo.data}
       notice={notice}
       onNotice={setNotice}
+      failure={failure}
+      onFailure={setFailure}
       currency={currency ?? "USD"}
     />
   );
@@ -96,11 +100,15 @@ function Editor({
   currency,
   notice,
   onNotice,
+  failure,
+  onFailure,
 }: {
   promo: Promotion;
   currency: string;
   notice: string | null;
   onNotice: (message: string | null) => void;
+  failure: string | null;
+  onFailure: (message: string | null) => void;
 }) {
   const { tenant } = useTenant();
   const t = tenant.tenantId;
@@ -182,12 +190,13 @@ function Editor({
     }
     setBusy(true);
     setError(null);
+    onFailure(null);
     try {
       await api("POST", `/v1/pricing/promotions/${promo.id}/publish`, { body: { version } });
       setPublishing(false);
       await refresh();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Publishing failed.");
+      onFailure(e instanceof Error ? e.message : "Publishing failed.");
       setPublishing(false);
       // The save may have gone through (version N to N+1): refresh so the next save does not 409.
       await refresh();
@@ -235,6 +244,7 @@ function Editor({
       </Row>
       {error === null ? null : <Alert tone="danger">{error}</Alert>}
       {notice === null ? null : <Alert tone="success">{notice}</Alert>}
+      {failure === null ? null : <Alert tone="danger">{failure}</Alert>}
       {lock ? (
         <Alert tone="info">
           Published and archived promotions cannot be edited. Copy the settings into a new draft to
