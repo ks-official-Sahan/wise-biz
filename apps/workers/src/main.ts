@@ -1,6 +1,9 @@
-import { startWorker } from "./worker.ts";
+import { startTelemetry } from "./telemetry.ts";
 
 const FORCE_EXIT_MS = 10_000;
+
+const stopTelemetry = await startTelemetry();
+const { startWorker } = await import("./worker.ts");
 
 const worker = startWorker();
 
@@ -15,10 +18,13 @@ const shutdown = (signal: string, code = 0): void => {
     process.stderr.write("shutdown timed out: forcing exit\n");
     process.exit(1);
   }, FORCE_EXIT_MS).unref();
-  worker.stop().then(
-    () => process.exit(code),
-    () => process.exit(1),
-  );
+  worker
+    .stop()
+    .then(() => stopTelemetry?.())
+    .then(
+      () => process.exit(code),
+      () => process.exit(1),
+    );
 };
 process.on("unhandledRejection", (reason) => {
   worker.logger.fatal({ err: reason }, "unhandled rejection: stopping worker");

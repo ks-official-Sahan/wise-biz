@@ -615,6 +615,9 @@ importers:
 
   apps/realtime:
     dependencies:
+      '@opentelemetry/sdk-node':
+        specifier: 0.223.0
+        version: 0.223.0(@opentelemetry/api@1.9.1)(supports-color@7.2.0)
       '@wise-biz/env':
         specifier: workspace:*
         version: link:../../packages/env
@@ -713,6 +716,9 @@ importers:
 
   apps/workers:
     dependencies:
+      '@opentelemetry/sdk-node':
+        specifier: 0.223.0
+        version: 0.223.0(@opentelemetry/api@1.9.1)(supports-color@7.2.0)
       '@wise-biz/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
