@@ -370,6 +370,17 @@ function PeopleView() {
               ))}
             </ul>
           )}
+          {invites.hasNextPage ? (
+            <Button
+              variant="secondary"
+              busy={invites.isFetchingNextPage}
+              onClick={() => {
+                void invites.fetchNextPage();
+              }}
+            >
+              Load more
+            </Button>
+          ) : null}
         </Stack>
       </section>
       <InviteDialog
