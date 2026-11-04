@@ -1,3 +1,4 @@
+import { startRedis } from "@wise-biz/testing/containers";
 import { createClient } from "redis";
 import { describe, expect, it, vi } from "vitest";
 
@@ -39,7 +40,9 @@ describe("realtime publisher", () => {
   });
 
   it("reaches a real Redis subscriber and stops cleanly", async () => {
-    const url = process.env.TEST_REDIS_URL ?? "redis://127.0.0.1:6379";
+    // A throwaway Redis of its own: the test must not depend on one already running on the machine (CI has none).
+    const redis = await startRedis();
+    const url = redis.url;
     const sub = createClient({ url });
     await sub.connect();
     const got: string[] = [];
@@ -60,6 +63,7 @@ describe("realtime publisher", () => {
     } finally {
       await p.stop();
       await sub.close();
+      await redis.stop();
     }
   });
 
