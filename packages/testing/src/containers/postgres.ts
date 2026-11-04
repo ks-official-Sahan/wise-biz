@@ -139,6 +139,8 @@ export async function startPostgres(): Promise<PgHarness> {
       "-c",
       "autovacuum=off",
     ])
+    // Parallel packages start many containers on one machine; the default 120 s is too short when it is busy.
+    .withStartupTimeout(300_000)
     .withCopyFilesToContainer([
       {
         source: resolve(INIT_DIR, "001-roles-db.sql"),

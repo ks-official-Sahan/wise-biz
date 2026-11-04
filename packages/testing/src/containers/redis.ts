@@ -8,7 +8,7 @@ export interface RedisHarness {
 }
 
 export async function startRedis(): Promise<RedisHarness> {
-  const container = await new RedisContainer(REDIS_IMAGE).start();
+  const container = await new RedisContainer(REDIS_IMAGE).withStartupTimeout(300_000).start();
   return {
     url: container.getConnectionUrl(),
     stop: async () => {
