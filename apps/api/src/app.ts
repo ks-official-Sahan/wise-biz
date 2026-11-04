@@ -152,6 +152,30 @@ export function createApp(opts: CreateAppOptions): OpenAPIHono<AppEnv> {
     "/v1/devices/enroll",
     rateLimit([{ name: "enroll:ip", ...LIMITS.enrollPerIp, subject: ipOf }], limited),
   );
+  // Terminals are limited per device (the signature is verified above), so one busy or hostile terminal cannot spend
+  // the business's CPU. A request with no verified device has no subject and is not counted here.
+  const deviceSubject = (c: Context<AppEnv>): string | null => c.get("device")?.deviceId ?? null;
+  app.use(
+    "/v1/devices/pin-login",
+    rateLimit(
+      [{ name: "pin-login:device", ...LIMITS.pinLoginPerDevice, subject: deviceSubject }],
+      limited,
+    ),
+  );
+  app.use(
+    "/v1/sync/commands",
+    rateLimit(
+      [{ name: "sync-push:device", ...LIMITS.syncPushPerDevice, subject: deviceSubject }],
+      limited,
+    ),
+  );
+  app.use(
+    "/v1/devices/heartbeat",
+    rateLimit(
+      [{ name: "heartbeat:device", ...LIMITS.heartbeatPerDevice, subject: deviceSubject }],
+      limited,
+    ),
+  );
   app.use(
     "/v1/auth/sign-in/*",
     rateLimit(

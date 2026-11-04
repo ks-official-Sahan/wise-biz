@@ -153,4 +153,10 @@ export const LIMITS = {
   authWritePerIp: { limit: 30, windowMs: MINUTE },
   /** Terminal enrollment per IP: a code has 40 bits, so guessing needs far more than this allows. */
   enrollPerIp: { limit: 10, windowMs: MINUTE },
+  /** Terminal PIN sign-in per device: each try costs an Argon2id hash (19 MiB), and the PIN space is small. */
+  pinLoginPerDevice: { limit: 20, windowMs: MINUTE },
+  /** Signed command batches per device (a terminal sends a few a minute; a backlog arrives in chunks of 100). */
+  syncPushPerDevice: { limit: 120, windowMs: MINUTE },
+  /** Heartbeats per device (one a minute is normal). */
+  heartbeatPerDevice: { limit: 30, windowMs: MINUTE },
 } as const;

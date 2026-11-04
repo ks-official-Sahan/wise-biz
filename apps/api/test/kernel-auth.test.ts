@@ -620,3 +620,50 @@ describe("AuthContext carries the account email (invite acceptance reads it)", (
     });
   });
 });
+
+describe("per-device limits", () => {
+  const appFor = async () => {
+    const { Hono } = await import("hono");
+    const { LIMITS, rateLimit } = await import("../src/kernel/auth/index.ts");
+    const redis = fakeRedis();
+    const app = new Hono<AppEnv>();
+    app.use("*", async (c, next) => {
+      c.set("requestId", "req-12345678");
+      c.set("logger", { warn: () => undefined } as never);
+      const id = c.req.header("x-device");
+      c.set("device", id === undefined ? undefined : ({ deviceId: id } as never));
+      await next();
+    });
+    app.use(
+      "/v1/devices/pin-login",
+      rateLimit(
+        [
+          {
+            name: "pin-login:device",
+            ...LIMITS.pinLoginPerDevice,
+            subject: (c) => c.get("device")?.deviceId ?? null,
+          },
+        ],
+        { redis, method: "POST" },
+      ),
+    );
+    app.post("/v1/devices/pin-login", (c) => c.json({ ok: true }));
+    const call = (device?: string) =>
+      app.request("/v1/devices/pin-login", {
+        method: "POST",
+        headers: device === undefined ? {} : { "x-device": device },
+      });
+    return { call };
+  };
+
+  it("stops one terminal's PIN guessing, leaves the others alone, and ignores unsigned calls", async () => {
+    const { call } = await appFor();
+    const limit = 20;
+    for (let i = 0; i < limit; i++) expect((await call("dev-a")).status).toBe(200);
+    const blocked = await call("dev-a");
+    expect(blocked.status).toBe(429);
+    expect(blocked.headers.get("retry-after")).not.toBeNull();
+    expect((await call("dev-b")).status).toBe(200);
+    expect((await call()).status).toBe(200); // no verified device: the route's own auth refuses it
+  });
+});
