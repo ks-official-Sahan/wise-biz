@@ -55,6 +55,11 @@ export const DEFAULT_IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1000;
 
 export interface ModuleDeps {
   pool: pg.Pool;
+  /**
+   * Read-only replica pool, when one is configured. Only for reads that tolerate replica lag (reports); anything a
+   * user just wrote and expects to see goes through `pool`.
+   */
+  readPool?: pg.Pool;
   clock: { now(): number };
   ids: { uuidv7(): string };
   idempotencyCache?: IdempotencyCache;

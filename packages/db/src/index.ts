@@ -1,6 +1,7 @@
 export { createDb, createPool } from "./pool.ts";
 export type { Db, PoolOptions } from "./pool.ts";
 export { isUuidV7, withLookupTx, withTenantTx, withUserTx } from "./tx.ts";
+export { isReplicaUnavailable, withReadTx } from "./read-tx.ts";
 export type { LookupCtx, TenantCtx, TxHandle, UserCtx } from "./tx.ts";
 export { findGlobalSchemaLeaks, findTablesWithoutRls, rlsSql } from "./rls.ts";
 export { MIGRATE_LOCK_KEY, listMigrations, migrate } from "./migrator.ts";

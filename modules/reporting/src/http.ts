@@ -1,5 +1,5 @@
 import { createRoute } from "@hono/zod-openapi";
-import { withTenantTx } from "@wise-biz/db";
+import { withReadTx } from "@wise-biz/db";
 import { DomainError } from "@wise-biz/errors";
 import { authorize, requireTenant, runCommand } from "@wise-biz/module-kit";
 import { z } from "zod";
@@ -23,6 +23,7 @@ import {
 
 import type { Range } from "./queries.ts";
 import type { OpenAPIHono } from "@hono/zod-openapi";
+import type { withTenantTx } from "@wise-biz/db";
 import type { AppEnv, ModuleDeps } from "@wise-biz/module-kit";
 import type { ObjectStore } from "@wise-biz/storage";
 import type { MiddlewareHandler } from "hono";
@@ -150,7 +151,19 @@ export function mountRoutes(app: OpenAPIHono<AppEnv>, deps: ModuleDeps, store: O
     fn: (tx: Parameters<Parameters<typeof withTenantTx>[2]>[0], tenantId: string) => Promise<T>,
   ) => {
     const tenant = requireTenant(c);
-    return withTenantTx(deps.pool, tenant, (tx) => fn(tx, tenant.tenantId));
+    // Reports are aggregates over async rollups, so a replica's small lag is invisible; they go to the replica when there is one.
+    return withReadTx(
+      deps.pool,
+      deps.readPool,
+      tenant,
+      (tx) => fn(tx, tenant.tenantId),
+      (err) => {
+        (c.get("logger") as { warn?: (o: object, m: string) => void } | undefined)?.warn?.(
+          { err },
+          "read replica unreachable; report served from the primary",
+        );
+      },
+    );
   };
 
   app.openapi(routes.sales, async (c) => {

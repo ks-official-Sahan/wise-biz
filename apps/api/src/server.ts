@@ -80,6 +80,17 @@ export async function startServer(
     },
   });
   if (env.NODE_ENV !== "production") instrumentPool(pool);
+  // Optional read replica (Neon read-only endpoint): heavy, lag-tolerant reads only. Absent: everything uses the primary.
+  const readPool =
+    env.DATABASE_READ_URL === undefined
+      ? undefined
+      : createPool(env.DATABASE_READ_URL, {
+          max: env.DATABASE_POOL_MAX,
+          applicationName: "wb-api-read",
+          onError: (err) => {
+            logger.warn({ err }, "idle replica client error");
+          },
+        });
   // Dedicated pool for the identity schema: wb_identity is the only role allowed to touch it (ADR 0010).
   const identityPool = createPool(env.DATABASE_IDENTITY_URL, {
     max: Math.min(env.DATABASE_POOL_MAX, 10),
@@ -106,6 +117,11 @@ export async function startServer(
     syncMetrics.stop();
     try {
       await pool.end();
+    } catch {
+      // already ended or never connected
+    }
+    try {
+      await readPool?.end();
     } catch {
       // already ended or never connected
     }
@@ -166,6 +182,7 @@ export async function startServer(
         syncMetrics.onMetric,
       ),
       pool,
+      ...(readPool && { readPool }),
       redis,
       env,
       logger,

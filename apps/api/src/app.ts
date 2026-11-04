@@ -59,6 +59,8 @@ export interface AuthHandler {
 export interface CreateAppOptions {
   modules: readonly WbModule[];
   pool: pg.Pool;
+  /** Optional read replica pool, handed to modules as `deps.readPool`. */
+  readPool?: pg.Pool;
   redis: RedisLike;
   env: ApiEnv;
   /** Resolves the caller. Production: `sessionResolver`; tests inject a header-based resolver. Required. */
@@ -280,6 +282,7 @@ export function createApp(opts: CreateAppOptions): OpenAPIHono<AppEnv> {
   mountHealth(app, { pool, redis });
   const deps: ModuleDeps = {
     pool,
+    ...(opts.readPool && { readPool: opts.readPool }),
     clock,
     ids: { uuidv7 },
     catalog,

@@ -13,6 +13,8 @@ const redisUrl = z
 export const databaseEnv = {
   DATABASE_URL: pgUrl,
   DATABASE_MIGRATOR_URL: pgUrl.optional(),
+  /** Read-only replica (Neon read replica endpoint) for heavy reads that tolerate a little lag (reports). Optional. */
+  DATABASE_READ_URL: pgUrl.optional(),
   DATABASE_POOL_MAX: z.coerce.number().int().min(1).max(200).default(10),
 };
 

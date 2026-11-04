@@ -9,7 +9,7 @@ import { policyMiddleware } from "@wise-biz/module-kit";
 import { createCatalog, matrixFromRows } from "@wise-biz/policy";
 import { createMemoryStore } from "@wise-biz/storage";
 import { testDatabase } from "@wise-biz/testing/containers";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import {
   localHour,
@@ -589,9 +589,11 @@ function appFor(
   role: string,
   branchScope: "all" | string[] = "all",
   userId: string = ACTOR,
+  readPool?: pg.Pool,
 ) {
   const deps: ModuleDeps = {
     pool: app,
+    ...(readPool && { readPool }),
     clock: { now: () => Date.UTC(2026, 10, 4) },
     ids: { uuidv7 },
     idempotencyCache,
@@ -623,6 +625,43 @@ function appFor(
   return a;
 }
 const Q_RANGE = "from=2026-11-01&to=2026-11-03";
+
+describe("read replica", () => {
+  const tenantId = uuidv7();
+  beforeAll(async () => {
+    await feed(tenantId, generate(22));
+  });
+  const sales = (a: ReturnType<typeof appFor>) =>
+    a.request(`/v1/reporting/sales?from=2026-11-01&to=2026-11-03&groupBy=day`);
+
+  it("reports are read through the replica pool when one is given", async () => {
+    const replica = createPool(db.url("app"), { max: 2 });
+    const used = vi.spyOn(replica, "connect");
+    try {
+      const res = await sales(appFor(tenantId, "analyst", "all", ACTOR, replica));
+      expect(res.status).toBe(200);
+      expect(used).toHaveBeenCalled();
+    } finally {
+      await replica.end();
+    }
+  });
+
+  it("a replica that cannot be reached falls back to the primary, with the same answer", async () => {
+    // nothing listens on this port: every connect is refused
+    const dead = createPool("postgres://wb_app:x@127.0.0.1:1/none", {
+      max: 1,
+      connectionTimeoutMs: 500,
+    });
+    try {
+      const viaPrimary = await (await sales(appFor(tenantId, "analyst"))).json();
+      const res = await sales(appFor(tenantId, "analyst", "all", ACTOR, dead));
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual(viaPrimary);
+    } finally {
+      await dead.end().catch(() => undefined);
+    }
+  });
+});
 
 describe("reports API", () => {
   const tenantId = uuidv7();
