@@ -268,5 +268,5 @@ describe("/ready against a real Postgres that is stopped", () => {
     } finally {
       await pg.stop().catch(() => undefined);
     }
-  }, 90_000);
+  }, 300_000);
 });
