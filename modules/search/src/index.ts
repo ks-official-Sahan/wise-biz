@@ -19,6 +19,7 @@ const HitSchema = z
     title: z.string(),
     sku: z.string(),
     barcodes: z.array(z.string()),
+    tracksBatches: z.boolean(),
     score: z.number(),
   })
   .openapi("SearchHit");

@@ -19,6 +19,7 @@ const VariantUpserted = z.object({
     categoryPath: z.array(z.string()),
     tags: z.array(z.string()),
     archived: z.boolean(),
+    tracksBatches: z.boolean().default(false),
   }),
 });
 
@@ -45,12 +46,12 @@ export async function applyVariantUpserted(client: PoolClient, payload: unknown)
   await client.query(
     `insert into search.search_documents
        (tenant_id, kind, entity_id, product_id, title, sku, barcodes, category_path, tags, archived, tsv, source_time,
-        updated_at)
-     values ($1, 'variant', $2, $3, $4, $5, $6, $7, $8, $9, search.doc_tsv($4, $5, $8, $7), $10, now())
+        updated_at, tracks_batches)
+     values ($1, 'variant', $2, $3, $4, $5, $6, $7, $8, $9, search.doc_tsv($4, $5, $8, $7), $10, now(), $11)
      on conflict (tenant_id, kind, entity_id) do update set
        product_id = excluded.product_id, title = excluded.title, sku = excluded.sku, barcodes = excluded.barcodes,
        category_path = excluded.category_path, tags = excluded.tags, archived = excluded.archived, tsv = excluded.tsv,
-       source_time = excluded.source_time, updated_at = now()
+       source_time = excluded.source_time, updated_at = now(), tracks_batches = excluded.tracks_batches
      where search.search_documents.source_time <= excluded.source_time`,
     [
       e.tenantId,
@@ -63,6 +64,7 @@ export async function applyVariantUpserted(client: PoolClient, payload: unknown)
       d.tags,
       d.archived,
       e.time,
+      d.tracksBatches,
     ],
   );
 }

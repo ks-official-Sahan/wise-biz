@@ -3645,11 +3645,22 @@
           "title": {
             "type": "string"
           },
+          "tracksBatches": {
+            "type": "boolean"
+          },
           "variantId": {
             "type": "string"
           }
         },
-        "required": ["variantId", "productId", "title", "sku", "barcodes", "score"],
+        "required": [
+          "variantId",
+          "productId",
+          "title",
+          "sku",
+          "barcodes",
+          "tracksBatches",
+          "score"
+        ],
         "type": "object"
       },
       "SetBarcodes": {

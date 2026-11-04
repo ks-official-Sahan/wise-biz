@@ -85,6 +85,7 @@ async function deliver(
     sku: string;
     barcodes: string[];
     archived: boolean;
+    tracksBatches: boolean;
   }>,
   time = new Date(),
 ) {
@@ -133,7 +134,9 @@ async function deliver(
 const search = async (q: string) => {
   const res = await app.request(`/v1/search/variants?q=${encodeURIComponent(q)}`);
   expect(res.status).toBe(200);
-  return ((await res.json()) as { hits: { variantId: string; title: string }[] }).hits;
+  return (
+    (await res.json()) as { hits: { variantId: string; title: string; tracksBatches: boolean }[] }
+  ).hits;
 };
 
 describe("normalisation", () => {
@@ -155,6 +158,20 @@ describe("projection + hybrid query", () => {
     expect(hits[0]).toMatchObject({ variantId: coke.variantId, title: "Coca-Cola 1.5L" });
     expect((await search("coca col"))[0]?.title).toMatch(/^Coca-Cola/);
     expect((await search(coke.sku))[0]?.variantId).toBe(coke.variantId);
+  });
+
+  it("returns tracksBatches, and a later event can change it", async () => {
+    const milk = await deliver(T, { productName: "Fresh Milk", name: "1L", tracksBatches: true });
+    expect((await search(milk.sku))[0]).toMatchObject({
+      variantId: milk.variantId,
+      tracksBatches: true,
+    });
+    await deliver(
+      T,
+      { productName: "Fresh Milk", name: "1L", variantId: milk.variantId, sku: milk.sku },
+      new Date(Date.now() + 1000),
+    );
+    expect((await search(milk.sku))[0]?.tracksBatches).toBe(false);
   });
 
   it("archived variants drop out; an older event never overwrites a newer document", async () => {

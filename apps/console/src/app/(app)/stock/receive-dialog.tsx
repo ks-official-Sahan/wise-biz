@@ -38,6 +38,7 @@ export function ReceiveDialog({
   const [reference, setReference] = useState("");
   const [lines, setLines] = useState<readonly ReceiveLineDraft[]>([]);
   const [titles, setTitles] = useState<ReadonlyMap<string, string>>(new Map());
+  const [tracked, setTracked] = useState<ReadonlySet<string>>(new Set());
   const [errors, setErrors] = useState<ReadonlyMap<string, string>>(new Map());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -47,6 +48,7 @@ export function ReceiveDialog({
   };
   const add = (h: Hit) => {
     setTitles((cur) => new Map(cur).set(h.variantId, h.title));
+    if (h.tracksBatches === true) setTracked((cur) => new Set(cur).add(h.variantId));
     setLines((cur) => [
       ...cur,
       {
@@ -67,7 +69,7 @@ export function ReceiveDialog({
       setError("The business currency is not set yet.");
       return;
     }
-    const built = buildReceive(lines, currency, new Set());
+    const built = buildReceive(lines, currency, tracked);
     if (!built.ok) {
       setErrors(built.errors);
       return;
@@ -139,7 +141,7 @@ export function ReceiveDialog({
                 }}
               />
               <TextField
-                label="Lot code"
+                label={tracked.has(l.variantId) ? "Lot code (or expiry)" : "Lot code"}
                 value={l.lot}
                 error={errors.get(`${l.key}.lot`)}
                 onChange={(e) => {

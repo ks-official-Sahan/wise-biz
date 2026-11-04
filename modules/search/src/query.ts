@@ -29,6 +29,7 @@ export interface SearchHit {
   title: string;
   sku: string;
   barcodes: string[];
+  tracksBatches: boolean;
   score: number;
 }
 
@@ -51,6 +52,7 @@ export async function searchVariants(
     title: string;
     sku: string;
     barcodes: string[];
+    tracks_batches: boolean;
     score: number;
   }>(
     `with fts as (
@@ -69,7 +71,7 @@ export async function searchVariants(
      fused as (
        select entity_id, sum(1.0 / (${String(RRF_K)} + r))::float8 as score
        from (select * from fts union all select * from trg) u group by entity_id)
-     select d.entity_id, d.product_id, d.title, d.sku, d.barcodes, f.score
+     select d.entity_id, d.product_id, d.title, d.sku, d.barcodes, d.tracks_batches, f.score
      from fused f
      join search.search_documents d on d.tenant_id = $1 and d.kind = 'variant' and d.entity_id = f.entity_id
      order by f.score desc, d.title, d.entity_id
@@ -82,6 +84,7 @@ export async function searchVariants(
     title: row.title,
     sku: row.sku,
     barcodes: row.barcodes,
+    tracksBatches: row.tracks_batches,
     score: row.score,
   }));
 }

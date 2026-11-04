@@ -13,6 +13,7 @@ export interface Hit {
   readonly title: string;
   readonly sku: string;
   readonly barcodes?: readonly string[] | undefined;
+  readonly tracksBatches?: boolean | undefined;
 }
 
 export function useDebounced(value: string, ms: number): string {
