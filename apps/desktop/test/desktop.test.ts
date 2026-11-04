@@ -10,6 +10,7 @@ import { createKiosk } from "../src/main/kiosk.ts";
 import {
   APP_ORIGIN,
   buildCsp,
+  forbiddenSwitches,
   isAllowedNavigation,
   isTrustedSender,
   needsHtmlFallback,
@@ -57,6 +58,36 @@ const storage = () =>
     join: (_d, n) => (n === "" ? "" : ":memory:"),
     open: (f) => new Database(f) as unknown as Driver,
   });
+
+describe("forbidden start-up switches", () => {
+  it("finds debugging and sandbox-weakening switches, with or without a value", () => {
+    expect(
+      forbiddenSwitches([
+        "--remote-debugging-port=9222",
+        "--REMOTE-DEBUGGING-PIPE",
+        "--remote-allow-origins=*",
+        "--inspect=0.0.0.0:9229",
+        "--inspect-brk",
+        "--no-sandbox",
+        "--disable-web-security",
+      ]),
+    ).toEqual([
+      "--remote-debugging-port",
+      "--REMOTE-DEBUGGING-PIPE",
+      "--remote-allow-origins",
+      "--inspect",
+      "--inspect-brk",
+      "--no-sandbox",
+      "--disable-web-security",
+    ]);
+  });
+
+  it("leaves ordinary arguments alone", () => {
+    expect(
+      forbiddenSwitches(["--lang=en", "--inspector-note", "/opt/app/--no-sandbox.txt"]),
+    ).toEqual([]);
+  });
+});
 
 describe("navigation and assets", () => {
   it("allows only the app origin", () => {

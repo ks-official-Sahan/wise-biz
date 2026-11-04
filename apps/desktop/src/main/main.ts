@@ -25,6 +25,7 @@ import { createKiosk, isBlockedKioskKey, parseKioskRecord } from "./kiosk.ts";
 import {
   APP_ORIGIN,
   buildCsp,
+  forbiddenSwitches,
   isAllowedNavigation,
   needsHtmlFallback,
   resolveAsset,
@@ -47,6 +48,16 @@ const e2e = dev && process.env.WISE_BIZ_E2E === "1";
 
 if (e2e && process.env.WISE_BIZ_USER_DATA !== undefined)
   app.setPath("userData", process.env.WISE_BIZ_USER_DATA);
+
+// A packaged terminal refuses debugging and sandbox-weakening switches (see forbiddenSwitches) before anything else runs.
+if (!dev) {
+  const refused = forbiddenSwitches(process.argv.slice(1));
+  if (refused.length > 0) {
+    process.stderr.write(`Refusing to start with ${refused.join(", ")}
+`);
+    app.exit(2);
+  }
+}
 
 app.enableSandbox();
 protocol.registerSchemesAsPrivileged([

@@ -57,3 +57,18 @@ export function resolveAsset(root: string, pathname: string): string | undefined
 }
 
 export const needsHtmlFallback = (pathname: string): boolean => path.extname(pathname) === "";
+
+const FORBIDDEN_SWITCH =
+  /^--(?:remote-debugging-(?:port|pipe)|remote-allow-origins|inspect(?:-brk|-port)?|no-sandbox|disable-web-security|disable-site-isolation-trials)(?:=|$)/;
+
+/**
+ * Command-line switches a packaged terminal must not run with. `--remote-debugging-port` hands any local process full
+ * control of the renderer (and so of the vault and the till) over a local socket, and the Node inspector fuse does not
+ * cover it: it is a Chromium switch. A packaged build exits when it finds one; the argument may come from a shortcut
+ * edited on the till or from a launcher.
+ */
+export function forbiddenSwitches(argv: readonly string[]): string[] {
+  return argv
+    .filter((a) => FORBIDDEN_SWITCH.test(a.toLowerCase()))
+    .map((a) => a.split("=")[0] ?? a);
+}
