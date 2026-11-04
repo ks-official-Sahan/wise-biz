@@ -101,10 +101,12 @@ export interface ReturnableLine {
   readonly line: SoldLine;
   /** Quantity not yet returned. */
   readonly qtyLeft: string;
+  /** Money already refunded for this line by earlier returns. */
+  readonly refundedMinor: number;
 }
 
 interface ReturnBody {
-  readonly lines: readonly { saleLine?: number; qty: string }[];
+  readonly lines: readonly { saleLine?: number; qty: string; refundMinor?: number }[];
 }
 
 /** What can still come back from a sale: sold quantity minus every return already made against it (on this terminal). */
@@ -114,15 +116,19 @@ export async function returnableLines(q: Queryable, sale: StoredSale): Promise<R
     sale.id,
   ]);
   const returned = new Map<number, number>();
+  const refunded = new Map<number, number>();
   for (const r of prior) {
     for (const l of (JSON.parse(r.body) as ReturnBody).lines) {
       if (l.saleLine === undefined) continue;
       returned.set(l.saleLine, (returned.get(l.saleLine) ?? 0) + (toQty4(l.qty) ?? 0));
+      refunded.set(l.saleLine, (refunded.get(l.saleLine) ?? 0) + (l.refundMinor ?? 0));
     }
   }
   return sale.lines.flatMap((line, saleLine) => {
     const left = (toQty4(line.qty) ?? 0) - (returned.get(saleLine) ?? 0);
-    return left > 0 ? [{ saleLine, line, qtyLeft: fromQty4(left) }] : [];
+    return left > 0
+      ? [{ saleLine, line, qtyLeft: fromQty4(left), refundedMinor: refunded.get(saleLine) ?? 0 }]
+      : [];
   });
 }
 

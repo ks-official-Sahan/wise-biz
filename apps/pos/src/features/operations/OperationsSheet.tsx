@@ -22,6 +22,7 @@ import {
   RETURN_PERMISSION,
   commitReturn,
   recentSales,
+  refundFor,
   returnableLines,
 } from "../returns/model/returns.ts";
 import { fromQty4, toQty4 } from "../sell/model/qty.ts";
@@ -250,9 +251,8 @@ export function OperationsSheet(p: OperationsSheetProps) {
   };
 
   const refundPreview = left.reduce((n, l) => {
-    const q = toQty4(qty[l.saleLine] ?? "0") ?? 0;
-    const max = toQty4(l.qtyLeft) ?? 1;
-    return n + (q <= 0 ? 0 : Math.round((l.line.totalMinor * q) / (toQty4(l.line.qty) ?? max)));
+    // The same rule the return command uses, so the button shows what will actually be refunded.
+    return n + refundFor(l.line, l.qtyLeft, qty[l.saleLine] ?? "0", l.refundedMinor).refundMinor;
   }, 0);
 
   const needsVoidApproval =
