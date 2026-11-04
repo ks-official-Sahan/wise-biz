@@ -21,9 +21,9 @@ import {
   autoMap,
   catalogKeys,
   mappingProblems,
-  parseCsv,
   sha256Hex,
 } from "@/lib/catalog.ts";
+import { parseCsvAsync } from "@/lib/csv-client.ts";
 import { useTenant } from "@/lib/tenant.tsx";
 
 import s from "../catalog.module.css";
@@ -93,7 +93,7 @@ export default function ImportPage() {
       return;
     }
     try {
-      const parsed = parseCsv(await file.text());
+      const parsed = await parseCsvAsync(await file.text());
       const header = parsed[0];
       if (header === undefined || parsed.length < 2) {
         setError("The file has no products in it (it needs a header row and at least one row).");
