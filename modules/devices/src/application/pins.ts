@@ -28,6 +28,23 @@ export const OFFLINE_PARAMS = {
   parallelism: 1,
 };
 export const MAX_ATTEMPTS = 5;
+
+/** Runs at most `max` tasks at once and queues the rest, so a burst of PIN tries cannot take all the memory (19 MiB each). */
+export function createGate(max: number): <T>(task: () => Promise<T>) => Promise<T> {
+  let running = 0;
+  const waiting: (() => void)[] = [];
+  return async <T>(task: () => Promise<T>): Promise<T> => {
+    if (running >= max) await new Promise<void>((resume) => waiting.push(resume));
+    running += 1;
+    try {
+      return await task();
+    } finally {
+      running -= 1;
+      waiting.shift()?.();
+    }
+  };
+}
+const argonGate = createGate(4);
 export const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
 
 /** Supplied by the composition root: tenancy owns memberships. */
@@ -169,14 +186,15 @@ export async function pinLogin(
 
   if (row === undefined) {
     dummyHash ??= hash("0000-not-a-pin", { ...ONLINE_PARAMS, secret });
-    await verify(await dummyHash, input.pin, { secret });
+    const dummy = await dummyHash;
+    await argonGate(() => verify(dummy, input.pin, { secret }));
     return { ok: false, locked: false };
   }
   if (row.locked) return { ok: false, locked: true };
 
   const good =
     PIN.test(input.pin) &&
-    (await verify(row.pin_hash, input.pin, { secret })) &&
+    (await argonGate(() => verify(row.pin_hash, input.pin, { secret }))) &&
     (await deps.isActiveMember(tx, device.tenantId, input.userId));
   if (!good) {
     const failed = row.failed_attempts + 1;

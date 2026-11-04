@@ -478,3 +478,25 @@ describe("operator PIN", () => {
     expect(await json<{ code: string }>(res)).toMatchObject({ code: "DEVICE_INACTIVE" });
   });
 });
+
+describe("argon2 gate", () => {
+  it("never runs more than the limit at once, and runs every task", async () => {
+    const { createGate } = await import("../src/application/pins.ts");
+    const gate = createGate(3);
+    let now = 0;
+    let peak = 0;
+    const done = await Promise.all(
+      Array.from({ length: 12 }, (_, i) =>
+        gate(async () => {
+          now += 1;
+          peak = Math.max(peak, now);
+          await new Promise((r) => setTimeout(r, 5));
+          now -= 1;
+          return i;
+        }),
+      ),
+    );
+    expect(peak).toBe(3);
+    expect(done).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
+  });
+});
