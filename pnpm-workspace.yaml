@@ -65,3 +65,5 @@ patchedDependencies:
 # node-forge <=1.4.0 reaches the repo only through the Expo CLI (build-time signing helpers); 1.4.1 is a drop-in patch.
 overrides:
   node-forge: ">=1.4.1"
+  # @expo/cli pins zod 3.x (GHSA-mrhx-c7xc-m3w5, fixed only in 4.6.6+). It is a dev-time tool; zod 4 keeps the API it uses.
+  "@expo/cli>zod": 4.6.7
