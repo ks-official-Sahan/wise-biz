@@ -44,6 +44,8 @@ export interface DisplayWindow {
   send: (state: DisplayState | null) => void;
   close: () => void;
   isLoaded: () => boolean;
+  /** True once the window is gone (closed by the user or the OS), so the controller opens a new one. */
+  isClosed?: () => boolean;
 }
 
 /**
@@ -67,6 +69,10 @@ export function createDisplayController(o: {
   const ensure = (): DisplayWindow | undefined => {
     if (chosen === null || chosen === o.primaryId()) return undefined;
     if (!o.screens().some((s) => s.id === chosen)) return undefined;
+    if (win?.isClosed?.() === true) {
+      win = undefined;
+      openedOn = undefined;
+    }
     if (win !== undefined && openedOn !== chosen) {
       win.close();
       win = undefined;

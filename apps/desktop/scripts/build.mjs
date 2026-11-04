@@ -7,11 +7,16 @@ import process from "node:process";
 import { build } from "rolldown";
 
 const root = path.resolve(import.meta.dirname, "..");
+// `package` and `dist` pass --release; WISE_BIZ_RELEASE=1 does the same for a hand-run build.
+const release = process.argv.includes("--release") || process.env.WISE_BIZ_RELEASE === "1";
+// A release must name its API: the localhost default is for a developer machine only.
+if (release && process.env.WISE_BIZ_API_URL === undefined)
+  throw new Error("A release build needs WISE_BIZ_API_URL (the https API origin).");
 const apiUrl = process.env.WISE_BIZ_API_URL ?? "http://localhost:3000";
 const apiOrigin = new URL(apiUrl).origin;
 // A release talks to its API over TLS only; plain http is for a developer machine.
-if (process.env.WISE_BIZ_RELEASE === "1" && !apiOrigin.startsWith("https://"))
-  throw new Error("WISE_BIZ_RELEASE=1 needs WISE_BIZ_API_URL to be an https URL.");
+if (release && !apiOrigin.startsWith("https://"))
+  throw new Error("A release build needs WISE_BIZ_API_URL to be an https URL.");
 
 fs.rmSync(path.join(root, "dist"), { recursive: true, force: true });
 

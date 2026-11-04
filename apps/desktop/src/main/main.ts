@@ -253,6 +253,7 @@ if (gotLock)
               if (!win.isDestroyed()) win.close();
             },
             isLoaded: () => ready,
+            isClosed: () => win.isDestroyed(),
           };
         },
         load: () => {

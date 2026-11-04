@@ -57,8 +57,9 @@ linux:
 
 # Updates are fetched from a static origin (S3 or any HTTPS host): `latest.yml` for production and `staging.yml` for the
 # staging channel, published next to the installers. The channel is set at runtime from WISE_BIZ_UPDATE_CHANNEL
-# (defaults to production) and the feed from WISE_BIZ_UPDATE_URL at build time.
+# (defaults to production); the feed is read from WISE_BIZ_UPDATE_URL when electron-builder runs, and the build fails
+# if it is missing, so a release can never ship pointing at a placeholder host.
 publish:
   - provider: generic
-    url: https://updates.example.invalid/wise-biz-pos
+    url: ${env.WISE_BIZ_UPDATE_URL}
     channel: latest

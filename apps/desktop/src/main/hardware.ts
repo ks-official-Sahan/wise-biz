@@ -104,7 +104,12 @@ export function createHardwareService(deps: HardwareDeps) {
     if (pending >= MAX_QUEUE)
       return Promise.reject(new HardwareError("offline", "The printer is busy."));
     pending++;
-    // A device that never answers must not hold the line for everything behind it.
+    // The caller stops waiting after JOB_TIMEOUT_MS, but the line is held until the job itself settles: a stuck job
+    // still has the port or socket open, and starting the next one on top of it would interleave bytes on one device.
+    let settled!: () => void;
+    const finished = new Promise<void>((resolve) => {
+      settled = resolve;
+    });
     const guarded = () =>
       new Promise<T>((resolve, reject) => {
         const timer = setTimeout(() => {
@@ -113,10 +118,12 @@ export function createHardwareService(deps: HardwareDeps) {
         fn().then(
           (v) => {
             clearTimeout(timer);
+            settled();
             resolve(v);
           },
           (e: unknown) => {
             clearTimeout(timer);
+            settled();
             reject(e instanceof Error ? e : new Error("Device error."));
           },
         );
@@ -124,7 +131,11 @@ export function createHardwareService(deps: HardwareDeps) {
     const run = queue.then(guarded, guarded).finally(() => {
       pending--;
     });
-    queue = run.catch(() => undefined);
+    queue = run.then(
+      () => undefined,
+      // A timed-out job rejects early; the next job still waits for it to really finish.
+      () => finished,
+    );
     return run;
   };
 

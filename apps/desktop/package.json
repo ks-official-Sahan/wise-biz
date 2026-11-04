@@ -14,8 +14,8 @@
     "build": "node scripts/build.mjs",
     "start": "pnpm build && electron .",
     "e2e": "pnpm build && playwright test",
-    "package": "pnpm build && electron-builder --dir",
-    "dist": "pnpm build && electron-builder",
+    "package": "node scripts/build.mjs --release && electron-builder --dir",
+    "dist": "node scripts/build.mjs --release && electron-builder",
     "package:smoke": "node scripts/smoke-packaged.mjs"
   },
   "dependencies": {

@@ -52,6 +52,7 @@ describe("display controller", () => {
     { id: 3, label: "Other", primary: false, width: 1280, height: 720 },
   ];
   function make(initial: number | null = null) {
+    let gone = false;
     const opened: number[] = [];
     const sent: (DisplayState | null)[] = [];
     let closed = 0;
@@ -67,12 +68,26 @@ describe("display controller", () => {
             closed++;
           },
           isLoaded: () => true,
+          isClosed: () => gone,
         };
       },
       load: () => initial,
       save: (id) => void saved.push(id),
     });
-    return { c, opened, sent, saved, closed: () => closed };
+    return {
+      c,
+      opened,
+      sent,
+      saved,
+      closed: () => closed,
+      /** The window disappears on its own (the OS or the customer closed it). */
+      vanish: () => {
+        gone = true;
+      },
+      reappear: () => {
+        gone = false;
+      },
+    };
   }
 
   it("opens nothing until a screen is chosen, and never on the till screen", () => {
@@ -85,6 +100,20 @@ describe("display controller", () => {
     t.c.choose(99);
     t.c.show(state);
     expect(t.opened).toEqual([]);
+  });
+
+  it("opens a new window when the customer screen was closed from outside", () => {
+    const t = make();
+    t.c.choose(2);
+    t.c.show(state);
+    expect(t.opened).toEqual([2]);
+    t.vanish();
+    t.reappear(); // a new window opens fresh, so the flag is for the old one only
+    t.c.show({ ...state, changeMinor: 5 });
+    expect(t.opened).toEqual([2]);
+    t.vanish();
+    t.c.show({ ...state, changeMinor: 6 });
+    expect(t.opened).toEqual([2, 2]);
   });
 
   it("opens on the chosen screen, replays the latest state, moves and closes", () => {

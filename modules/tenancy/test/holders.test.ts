@@ -28,7 +28,7 @@ afterAll(async () => {
 const holders = (
   tenantId: string,
   permission: string,
-  scope: { locationIds?: string[]; branchIds?: string[] } = {},
+  scope: { locationIds?: string[]; branchIds?: string[]; tenantWide?: boolean } = {},
 ) =>
   withTenantTx(migrator, { tenantId, userId: uuidv7(), requestId: "test" }, (tx) =>
     permissionHolders(tx as never, tenantId, permission, scope),
