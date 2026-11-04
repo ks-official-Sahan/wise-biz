@@ -6,7 +6,7 @@ Status: **not ready for go/no-go**. This file records what is verified, what is 
 
 | Check | Result |
 |---|---|
-| Per-package `turbo run check`, one group at a time | modules 51/51, packages 78/78, apps and services 22/23, then the three load-sensitive api files re-run alone and green. A single all-at-once `pnpm check` has not completed on the build machine (memory). |
+| Full `turbo run check --continue --concurrency=4` (lint, typecheck, tests with coverage gates; REDIS_URL unset) | 146 of 146 tasks green (2026-11-04, commit `1b97bfd`). Run it with that concurrency on a machine this size; unbounded parallel container starts time out. |
 | Hourly rollup, reporting, workers, console | Reporting 33, workers 31, console 91 unit tests and the mocked-API Playwright reports spec pass (commit `1b35596`). |
 | Dependency audit (`pnpm audit --prod`) | 13 findings before, 2 moderate after pinning `node-forge >= 1.4.1`. Left: `minimatch` (Expo tooling, build time) and `glob` (testcontainers, tests only). Both need a major bump upstream; re-check on each Renovate PR. |
 | Offline drill, server half (`apps/api/test/sync-sales.test.ts`) | A day-long backlog of 120 sales, sent in uneven chunks, is applied once and in order with distinct invoice numbers; a full resend is replayed with nothing stored twice; a sale from a clock two hours ahead is refused with "The terminal clock is ahead of the server" and stores nothing (the sale stays on the terminal). Not covered: app killed mid-commit, two terminals on the last unit, 1k-sale sync lag p95 (need the POS client and a load run). |
