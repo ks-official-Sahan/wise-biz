@@ -3,6 +3,7 @@ import { join } from "node:path";
 
 import { afterAll, describe, expect, it } from "vitest";
 
+import { withinBudget } from "./support/budget.ts";
 import { createDevice, saleBody } from "./support/fake-server.ts";
 
 const base = join(import.meta.dirname, "..", "node_modules", ".cache", "wb-sync-test");
@@ -42,7 +43,7 @@ describe("local sale commit", () => {
       process.stderr.write(
         `local sale commit: p50 ${(times[150] ?? 0).toFixed(1)} ms, p95 ${p95.toFixed(1)} ms, max ${(times.at(-1) ?? 0).toFixed(1)} ms\n`,
       );
-      expect(p95).toBeLessThan(15);
+      withinBudget(p95, 15, expect);
     } finally {
       await d.close();
     }

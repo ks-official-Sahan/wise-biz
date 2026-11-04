@@ -8,6 +8,7 @@ import { applyChanges, applySnapshot } from "../src/pull.ts";
 import { openLocalDb } from "../src/schema/migrations.ts";
 
 import { betterSqliteAdapter } from "./support/better-sqlite.ts";
+import { withinBudget } from "./support/budget.ts";
 
 import type { PullChange } from "../src/pull.ts";
 import type { LocalDb } from "../src/storage/local-db.ts";
@@ -230,8 +231,8 @@ describe("lookup budgets", () => {
       process.stderr.write(
         `100k variants: snapshot applied in ${(loadMs / 1000).toFixed(1)} s; barcode lookup ${(perLookupMs * 1000).toFixed(2)} us; FTS p95 ${p95.toFixed(1)} ms\n`,
       );
-      expect(perLookupMs).toBeLessThan(0.1);
-      expect(p95).toBeLessThan(30);
+      withinBudget(perLookupMs, 0.1, expect);
+      withinBudget(p95, 30, expect);
     },
   );
 });

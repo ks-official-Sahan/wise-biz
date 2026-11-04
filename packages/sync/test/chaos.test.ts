@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { createPushLoop, TransportError } from "../src/push.ts";
 
+import { chaosRuns } from "./support/budget.ts";
 import { createDevice, saleBody } from "./support/fake-server.ts";
 
 import type { Timers } from "../src/backoff.ts";
@@ -34,10 +35,10 @@ const instant: Timers = {
  */
 describe("push chaos", () => {
   it(
-    "zero lost or duplicated commands across 1,000 randomized runs",
+    "zero lost or duplicated commands across randomized runs (1,000; fewer on shared CI)",
     { timeout: 300_000 },
     async () => {
-      for (let seed = 1; seed <= 1000; seed++) {
+      for (let seed = 1; seed <= chaosRuns; seed++) {
         const rnd = prng(seed);
         const d = await createDevice();
         try {

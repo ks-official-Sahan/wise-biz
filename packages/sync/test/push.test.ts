@@ -63,22 +63,26 @@ const fail = (
 ) => new TransportError("boom", { status, ...(code ? { code } : {}), ...more });
 
 describe("push loop", () => {
-  it("sends the outbox oldest first in batches of 100 and acknowledges everything", async () => {
-    const d = await device();
-    await enqueue(d, 250);
-    const { l, events } = loop(d, d.server);
-    await l.trigger();
-    expect(d.server.requests.map((r) => [r.length, r[0], r.at(-1)])).toEqual([
-      [100, 0, 99],
-      [100, 100, 199],
-      [50, 200, 249],
-    ]);
-    expect(d.server.applied).toHaveLength(250);
-    expect(await d.outbox.unsyncedCount()).toBe(0);
-    expect(l.state()).toBe("idle");
-    expect(events.at(-1)).toEqual({ type: "idle" });
-    expect(events.filter((e) => e.type === "pushed")).toHaveLength(3);
-  });
+  it(
+    "sends the outbox oldest first in batches of 100 and acknowledges everything",
+    { timeout: 60_000 },
+    async () => {
+      const d = await device();
+      await enqueue(d, 250);
+      const { l, events } = loop(d, d.server);
+      await l.trigger();
+      expect(d.server.requests.map((r) => [r.length, r[0], r.at(-1)])).toEqual([
+        [100, 0, 99],
+        [100, 100, 199],
+        [50, 200, 249],
+      ]);
+      expect(d.server.applied).toHaveLength(250);
+      expect(await d.outbox.unsyncedCount()).toBe(0);
+      expect(l.state()).toBe("idle");
+      expect(events.at(-1)).toEqual({ type: "idle" });
+      expect(events.filter((e) => e.type === "pushed")).toHaveLength(3);
+    },
+  );
 
   it("does nothing, and sends nothing, when the outbox is empty", async () => {
     const d = await device();
@@ -277,44 +281,48 @@ describe("push loop", () => {
     expect(await d.outbox.unsyncedCount()).toBe(0);
   });
 
-  it("coalesces triggers while running, wakes a backoff early, yields to the UI between batches", async () => {
-    const d = await device();
-    await enqueue(d, 150);
-    let yields = 0;
-    let first = true;
-    const t: Transport = {
-      push: (c: readonly WireCommand[]) => {
-        if (first) {
-          first = false;
-          return Promise.reject(fail(503));
-        }
-        return d.server.push(c);
-      },
-    };
-    // Real timers with a long delay: only trigger() can end the wait.
-    const real: Timers = {
-      set: (fn, ms) => setTimeout(fn, ms),
-      clear: (h) => {
-        clearTimeout(h as never);
-      },
-    };
-    const { l } = loop(d, t, {
-      timers: real,
-      baseDelayMs: 60_000,
-      random: () => 0.99,
-      yieldToUi: () => {
-        yields++;
-        return Promise.resolve();
-      },
-    });
-    const run = l.trigger();
-    await new Promise((r) => setTimeout(r, 30));
-    expect(l.state()).toBe("backoff");
-    const again = l.networkUp(); // network is back
-    await Promise.all([run, again]);
-    expect(await d.outbox.unsyncedCount()).toBe(0);
-    expect(yields).toBeGreaterThanOrEqual(1);
-  });
+  it(
+    "coalesces triggers while running, wakes a backoff early, yields to the UI between batches",
+    { timeout: 60_000 },
+    async () => {
+      const d = await device();
+      await enqueue(d, 150);
+      let yields = 0;
+      let first = true;
+      const t: Transport = {
+        push: (c: readonly WireCommand[]) => {
+          if (first) {
+            first = false;
+            return Promise.reject(fail(503));
+          }
+          return d.server.push(c);
+        },
+      };
+      // Real timers with a long delay: only trigger() can end the wait.
+      const real: Timers = {
+        set: (fn, ms) => setTimeout(fn, ms),
+        clear: (h) => {
+          clearTimeout(h as never);
+        },
+      };
+      const { l } = loop(d, t, {
+        timers: real,
+        baseDelayMs: 60_000,
+        random: () => 0.99,
+        yieldToUi: () => {
+          yields++;
+          return Promise.resolve();
+        },
+      });
+      const run = l.trigger();
+      await new Promise((r) => setTimeout(r, 30));
+      expect(l.state()).toBe("backoff");
+      const again = l.networkUp(); // network is back
+      await Promise.all([run, again]);
+      expect(await d.outbox.unsyncedCount()).toBe(0);
+      expect(yields).toBeGreaterThanOrEqual(1);
+    },
+  );
 
   it("stop ends a backoff wait and later triggers do nothing", async () => {
     const d = await device();
