@@ -81,6 +81,7 @@ describe("signature base (RFC 9421 §2.5)", () => {
       {
         "@method": "POST",
         "@path": "/v1/sales",
+        "@query": "?",
         "content-digest": h["content-digest"],
         "x-wb-timestamp": String(NOW),
         "x-wb-nonce": "AAAAAAAAAAAAAAAAAAAAAA",
@@ -91,11 +92,12 @@ describe("signature base (RFC 9421 §2.5)", () => {
     expect(base.split("\n")).toEqual([
       '"@method": POST',
       '"@path": /v1/sales',
+      '"@query": ?',
       `"content-digest": ${h["content-digest"]}`,
       `"x-wb-timestamp": ${String(NOW)}`,
       '"x-wb-nonce": AAAAAAAAAAAAAAAAAAAAAA',
       `"x-wb-device-id": ${DEVICE}`,
-      `"@signature-params": ("@method" "@path" "content-digest" "x-wb-timestamp" "x-wb-nonce" "x-wb-device-id");created=${String(NOW)};keyid="${DEVICE}";alg="ed25519"`,
+      `"@signature-params": ("@method" "@path" "@query" "content-digest" "x-wb-timestamp" "x-wb-nonce" "x-wb-device-id");created=${String(NOW)};keyid="${DEVICE}";alg="ed25519"`,
     ]);
   });
 });
@@ -219,5 +221,37 @@ describe("verifyRequest", () => {
       nonces: memoryNonces(),
     });
     expect(r.ok).toBe(true);
+  });
+});
+
+describe("query component (@query)", () => {
+  const get = { method: "get", path: "/v1/sync/changes", body: undefined } as const;
+
+  it("is covered: a changed query is refused, the same query (with or without ?) is accepted", async () => {
+    const h = signed({ ...get, query: "dataset=catalog&cursor=5" });
+    const send = (query: string | undefined) =>
+      verifyWith(h, { method: "GET", path: "/v1/sync/changes", body: undefined, query });
+    expect((await send("?dataset=catalog&cursor=5")).ok).toBe(true);
+    const h2 = signed({ ...get, query: "dataset=catalog&cursor=5" });
+    expect(
+      await verifyWith(h2, {
+        method: "GET",
+        path: "/v1/sync/changes",
+        body: undefined,
+        query: "dataset=catalog&cursor=6",
+      }),
+    ).toEqual({ ok: false, reason: "bad_signature" });
+    const h3 = signed({ ...get, query: "dataset=catalog&cursor=5" });
+    expect(
+      await verifyWith(h3, { method: "GET", path: "/v1/sync/changes", body: undefined }),
+    ).toEqual({ ok: false, reason: "bad_signature" });
+  });
+
+  it("an unsigned empty query matches a request with none", async () => {
+    const h = signed({ ...get });
+    expect(
+      (await verifyWith(h, { method: "GET", path: "/v1/sync/changes", body: undefined, query: "" }))
+        .ok,
+    ).toBe(true);
   });
 });

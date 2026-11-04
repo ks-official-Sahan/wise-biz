@@ -51,11 +51,15 @@ export function createSignedFetch(opts: SignedFetchOptions): SignedFetch {
     path: string,
     options: { body?: unknown; headers?: Record<string, string>; accept304?: boolean } = {},
   ): Promise<Reply<T>> => {
+    const cut = path.indexOf("?");
+    const pathOnly = cut < 0 ? path : path.slice(0, cut);
+    const query = cut < 0 ? "" : path.slice(cut + 1);
     const body = options.body === undefined ? undefined : JSON.stringify(options.body);
     const headers: Record<string, string> = {
       ...signRequest({
         method,
-        path,
+        path: pathOnly,
+        query,
         body,
         deviceId: opts.deviceId,
         secretKey: await opts.secretKey(),

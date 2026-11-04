@@ -63,10 +63,11 @@ const identity: DeviceIdentity = {
 const BASE = "https://api.test/";
 
 async function verifies(req: Seen, publicKey: Uint8Array, nowMs: number) {
-  const path = new URL(req.url).pathname;
+  const url = new URL(req.url);
   return verifyRequest({
     method: req.method,
-    path,
+    path: url.pathname,
+    query: url.search,
     header: (n) => req.headers[n.toLowerCase()],
     body: new TextEncoder().encode(req.body ?? ""),
     publicKeyOf: () => Promise.resolve(publicKey),
@@ -76,6 +77,17 @@ async function verifies(req: Seen, publicKey: Uint8Array, nowMs: number) {
 }
 
 describe("signed fetch", () => {
+  it("signs the query apart from the path, and the server verifies both", async () => {
+    const api = fakeApi(() => ({ status: 200, body: {} }));
+    const f = signedFetchFor(identity, BASE, api.fetchFn, () => 1_800_000_000_000);
+    await f("GET", "/v1/sync/changes?dataset=catalog&cursor=5");
+    const req = first(api.seen);
+    expect(req.url).toBe("https://api.test/v1/sync/changes?dataset=catalog&cursor=5");
+    expect((await verifies(req, keys.publicKey, 1_800_000_000_000)).ok).toBe(true);
+    const tampered = { ...req, url: req.url.replace("cursor=5", "cursor=0") };
+    expect((await verifies(tampered, keys.publicKey, 1_800_000_000_000)).ok).toBe(false);
+  });
+
   it("signs method, path, body digest, time and nonce exactly as the server verifies", async () => {
     const api = fakeApi(() => ({ status: 200, body: { ok: true } }));
     const f = signedFetchFor(identity, BASE, api.fetchFn, () => 1_800_000_000_000);

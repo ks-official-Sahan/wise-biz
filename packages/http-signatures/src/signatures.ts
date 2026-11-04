@@ -13,6 +13,7 @@ export const ALG = "ed25519";
 export const COMPONENTS = [
   "@method",
   "@path",
+  "@query",
   "content-digest",
   "x-wb-timestamp",
   "x-wb-nonce",
@@ -30,6 +31,8 @@ export interface SignInput {
   readonly method: string;
   /** Path only (`@path`): no query, no origin. */
   readonly path: string;
+  /** The query string as sent, with or without the leading `?` (`@query`); empty when there is none. */
+  readonly query?: string | undefined;
   readonly body?: Bytes | string | undefined;
   readonly deviceId: string;
   readonly secretKey: Bytes;
@@ -72,6 +75,8 @@ export interface NonceStore {
 export interface VerifyInput {
   readonly method: string;
   readonly path: string;
+  /** The request's query string, with or without the leading `?`. */
+  readonly query?: string | undefined;
   readonly header: (name: string) => string | null | undefined;
   readonly body?: Bytes | string | undefined;
   /** The device's active public key, or null when unknown. Status checks belong to the caller. */
@@ -98,6 +103,12 @@ const bodyBytes = (body: Bytes | string | undefined): Bytes =>
 /** RFC 9530 `Content-Digest` for the body (an empty body digests the empty string). */
 export function contentDigest(body: Bytes | string | undefined): string {
   return `sha-256=:${toBase64(sha256(bodyBytes(body)))}:`;
+}
+
+/** RFC 9421 §2.2.7: the query component is the string with a leading `?` (a lone `?` when empty). */
+export function queryComponent(query: string | undefined): string {
+  const q = query ?? "";
+  return q.startsWith("?") ? q : `?${q}`;
 }
 
 function signatureParams(created: number, keyid: string): string {
@@ -132,6 +143,7 @@ export function signRequest(input: SignInput): SignedHeaders {
     {
       "@method": input.method.toUpperCase(),
       "@path": input.path,
+      "@query": queryComponent(input.query),
       "content-digest": digest,
       "x-wb-timestamp": String(created),
       "x-wb-nonce": nonce,
@@ -200,6 +212,7 @@ export async function verifyRequest(input: VerifyInput): Promise<VerifyResult> {
     {
       "@method": input.method.toUpperCase(),
       "@path": input.path,
+      "@query": queryComponent(input.query),
       "content-digest": digest,
       "x-wb-timestamp": ts,
       "x-wb-nonce": nonce,

@@ -36,6 +36,7 @@ export function deviceAuth(deps: DeviceAuthDeps): MiddlewareHandler<AppEnv> {
     const result = await verifyRequest({
       method: c.req.method,
       path: c.req.path,
+      query: new URL(c.req.url).search,
       header: (n) => c.req.header(n),
       body,
       publicKeyOf: async (id) => {
@@ -74,6 +75,7 @@ export async function verifyEnrollSignature(
   const result = await verifyRequest({
     method: c.req.method,
     path: c.req.path,
+    query: new URL(c.req.url).search,
     header: (n) => c.req.header(n),
     body: new Uint8Array(await c.req.arrayBuffer()),
     publicKeyOf: (id) => Promise.resolve(id === deviceId ? publicKey : null),
