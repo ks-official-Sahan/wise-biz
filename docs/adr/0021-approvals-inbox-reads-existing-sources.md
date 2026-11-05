@@ -1,6 +1,6 @@
 # ADR 0021: The approvals inbox reads existing sources first; no approval engine yet
 
-Status: proposed · 2026-11-05
+Status: accepted · 2026-11-05 (confirmed by the owner)
 
 ## Context
 `docs/design/ux.md` calls for an approvals inbox in the console: overrides, large stock adjustments, price changes that need approval, and device enrollments. Today only two of those exist as data: sales flagged "needs review" (supervisor overrides recorded by terminals) and devices waiting for approval. Large stock adjustments and price changes need approval rules and a workflow that no module owns.

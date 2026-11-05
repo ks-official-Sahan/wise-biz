@@ -105,6 +105,9 @@ export const observabilityEnv = {
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace"]).default("info"),
   OTEL_EXPORTER_OTLP_ENDPOINT: z.url().optional(),
   SENTRY_DSN: z.url().optional(),
+  /** Names the deployment in Sentry (staging, production); NODE_ENV is production in both. */
+  SENTRY_ENVIRONMENT: z.string().min(1).optional(),
+  SENTRY_RELEASE: z.string().min(1).optional(),
 };
 
 export const httpEnv = {

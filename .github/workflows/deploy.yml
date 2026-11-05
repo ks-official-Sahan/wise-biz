@@ -133,16 +133,16 @@ jobs:
           }
           gcloud run deploy "wb-api-$ENVIRONMENT" --region "$REGION" --image "$AR/api:$VERSION" \
             --port 3001 --cpu 2 --memory 1Gi --min-instances 1 --max-instances 10 --allow-unauthenticated \
-            --set-env-vars "NODE_ENV=production" --set-secrets "$(wire api)"
+            --set-env-vars "NODE_ENV=production,SENTRY_ENVIRONMENT=$ENVIRONMENT,SENTRY_RELEASE=$VERSION" --set-secrets "$(wire api)"
           # Workers take no public traffic and must not be throttled between requests: they poll and relay continuously.
           gcloud run deploy "wb-workers-$ENVIRONMENT" --region "$REGION" --image "$AR/workers:$VERSION" \
             --port 8080 --ingress internal --no-allow-unauthenticated --no-cpu-throttling \
             --cpu 2 --memory 1Gi --min-instances 1 --max-instances 3 \
-            --set-env-vars "NODE_ENV=production,HEALTH_PORT=8080" --set-secrets "$(wire workers)"
+            --set-env-vars "NODE_ENV=production,HEALTH_PORT=8080,SENTRY_ENVIRONMENT=$ENVIRONMENT,SENTRY_RELEASE=$VERSION" --set-secrets "$(wire workers)"
           # Streams stay open for up to an hour per connection.
           gcloud run deploy "wb-realtime-$ENVIRONMENT" --region "$REGION" --image "$AR/realtime:$VERSION" \
             --port 3002 --cpu 1 --memory 512Mi --min-instances 1 --max-instances 5 --timeout 3600 --allow-unauthenticated \
-            --set-env-vars "NODE_ENV=production" --set-secrets "$(wire realtime)"
+            --set-env-vars "NODE_ENV=production,SENTRY_ENVIRONMENT=$ENVIRONMENT,SENTRY_RELEASE=$VERSION" --set-secrets "$(wire realtime)"
           # The console proxies /v1 to API_ORIGIN, read at run time (src/proxy.ts), so the one image serves every environment.
           gcloud run deploy "wb-console-$ENVIRONMENT" --region "$REGION" --image "$AR/console:$VERSION" \
             --cpu 1 --memory 512Mi --min-instances 1 --max-instances 5 --allow-unauthenticated \

@@ -1,8 +1,15 @@
+import { startSentry } from "@wise-biz/observability";
+
 import { startTelemetry } from "./telemetry.ts";
 
 const FORCE_EXIT_MS = 10_000;
 
 const stopTelemetry = await startTelemetry(process.env, () => import("@opentelemetry/sdk-node"));
+const stopSentry = await startSentry(
+  process.env,
+  () => import("@sentry/node"),
+  "wise-biz-realtime",
+);
 const { startRealtime } = await import("./start.ts");
 
 const rt = await startRealtime();
@@ -26,6 +33,7 @@ const shutdown = (signal: string, code = 0): void => {
     // Flush telemetry after a failed stop too; keep the failure as the exit code.
     .then(async (failed) => {
       await stopTelemetry?.().catch(() => undefined);
+      await stopSentry?.().catch(() => undefined);
       process.exit(failed === 0 ? code : 1);
     })
     .catch(() => process.exit(1));

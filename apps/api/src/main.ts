@@ -1,8 +1,11 @@
+import { startSentry } from "@wise-biz/observability";
+
 import { startTelemetry } from "./telemetry.ts";
 
 const FORCE_EXIT_MS = 10_000;
 
 const stopTelemetry = await startTelemetry();
+const stopSentry = await startSentry(process.env, () => import("@sentry/node"), "wise-biz-api");
 const { startServer } = await import("./server.ts");
 
 const server = await startServer();
@@ -21,6 +24,7 @@ const shutdown = (signal: string): void => {
   server
     .close()
     .then(() => stopTelemetry?.())
+    .then(() => stopSentry?.())
     .then(
       () => process.exit(0),
       () => process.exit(1),

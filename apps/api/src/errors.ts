@@ -1,4 +1,5 @@
 import { DomainError, isDomainError, toProblem } from "@wise-biz/errors";
+import { captureError } from "@wise-biz/observability";
 import { HTTPException } from "hono/http-exception";
 
 import { problemResponse } from "./problem.ts";
@@ -63,6 +64,7 @@ export function createErrorHandler(rootLogger: Logger): ErrorHandler<AppEnv> {
     const cause: unknown = err instanceof HTTPException ? fromHttpException(err) : err;
     if (!isDomainError(cause) || cause.code === "INTERNAL") {
       log.error({ err }, "unhandled error");
+      captureError(err, { requestId });
     }
     return problemResponse(c, toProblem(cause, requestId));
   };
