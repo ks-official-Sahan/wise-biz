@@ -234,3 +234,14 @@
   line-height: 18px;
   text-align: center;
 }
+
+.count {
+  margin-left: 0.5rem;
+  padding: 0 0.4rem;
+  border-radius: 999px;
+  background: var(--wb-color-warning, #b45309);
+  color: #fff;
+  font-size: 0.75rem;
+  line-height: 1.25rem;
+  font-variant-numeric: tabular-nums;
+}
