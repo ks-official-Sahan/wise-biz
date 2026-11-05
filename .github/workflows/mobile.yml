@@ -77,6 +77,7 @@ jobs:
         working-directory: apps/pos
         run: |
           if [ "$PROFILE" = production ]; then ENV=production; else ENV=preview; fi
+          # shellcheck disable=SC2016 # the inner bash expands the variable, not this shell
           eas env:exec "$ENV" 'test -n "$EXPO_PUBLIC_API_URL" || { echo "EXPO_PUBLIC_API_URL is not set in the Expo environment" >&2; exit 1; }' --non-interactive
 
       - name: Start the Android and iOS builds
@@ -129,5 +130,6 @@ jobs:
         working-directory: apps/pos
         run: |
           if [ "$CHANNEL" = production ]; then ENV=production; else ENV=preview; fi
+          # shellcheck disable=SC2016 # the inner bash expands the variable, not this shell
           eas env:exec "$ENV" 'test -n "$EXPO_PUBLIC_API_URL" || { echo "EXPO_PUBLIC_API_URL is not set in the Expo environment" >&2; exit 1; }' --non-interactive
           eas update --channel "$CHANNEL" --environment "$ENV" --message "${GITHUB_SHA::7}" --non-interactive
