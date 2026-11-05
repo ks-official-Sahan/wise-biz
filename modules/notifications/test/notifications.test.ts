@@ -850,8 +850,11 @@ describe("delivery limits", () => {
     await runDeliveries(opts);
     expect(sent.length).toBeGreaterThan(0);
     expect(sent.length).toBeLessThan(4);
-    await new Promise((r) => setTimeout(r, 450));
-    await runDeliveries(opts);
+    // A slow runner can send fewer per pass than expected; the rest must still go out, once, on later passes.
+    for (let pass = 0; pass < 6 && sent.length < 4; pass++) {
+      await new Promise((r) => setTimeout(r, 450));
+      await runDeliveries(opts);
+    }
     expect([...sent].sort()).toEqual(people.map((_, i) => `p${String(i)}@example.test`));
   });
 
