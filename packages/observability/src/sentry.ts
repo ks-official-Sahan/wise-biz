@@ -30,7 +30,12 @@ function maskText(text: string): string {
 function pathOf(url: string | undefined): string | undefined {
   if (url === undefined) return undefined;
   try {
-    return new URL(url, "http://local").pathname.replace(UUID, "<id>");
+    return (
+      new URL(url, "http://local").pathname
+        .replace(UUID, "<id>")
+        // A receipt code is the only key to its page, so it must not leave the server either.
+        .replace(/^\/r\/[^/]+/, "/r/<code>")
+    );
   } catch {
     return undefined;
   }

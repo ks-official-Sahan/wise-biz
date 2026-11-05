@@ -130,6 +130,12 @@ describe("scrubEvent", () => {
     expect(JSON.stringify(out)).not.toMatch(/secret|Bearer|4111|jane@/);
   });
 
+  it("masks a receipt code in the path", () => {
+    expect(scrub({ request: { url: "https://x.test/r/AbC123xyz?lang=en" } }).request).toEqual({
+      url: "/r/<code>",
+    });
+  });
+
   it("copes with an event that has no message, exception or request, and an unparsable url", () => {
     expect(scrub({})).toEqual({});
     expect(scrub({ request: { url: "http://[bad" } }).request).toEqual({});

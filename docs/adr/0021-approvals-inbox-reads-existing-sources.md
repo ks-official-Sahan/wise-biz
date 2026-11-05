@@ -14,4 +14,4 @@ Status: accepted · 2026-11-05 (confirmed by the owner)
 ## Consequences
 - The inbox ships without a new table, event or permission.
 - Anyone who expects an "approve" button for price changes will not find one until the rules exist.
-- Marked proposed: it changes what the roadmap promises for P1, so the owner should confirm it before the inbox is built.
+- Confirmed by the owner on 2026-11-05; the inbox is built as described, without the approval rules for stock adjustments and price changes.

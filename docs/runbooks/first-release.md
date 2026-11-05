@@ -8,7 +8,7 @@ What you need to hold in the end:
 
 | Where | What |
 |---|---|
-| Neon | one project, database `wise_biz`, four roles, one read replica (optional) |
+| Neon | one project per environment (staging and production never share a database), database `wise_biz`, four roles, one read replica (optional) |
 | Google Cloud | one project, Cloud Run, Artifact Registry, Secret Manager, a deploy service account with workload identity |
 | Redis | one managed Redis (Upstash or similar) per environment |
 | Object storage | one S3-compatible bucket per environment (Cloudflare R2 or AWS S3) |
@@ -32,7 +32,7 @@ These are the three services the API and workers need besides Postgres.
 
 **Redis** (`REDIS_URL`, required by the API and realtime, used by workers): create a managed Redis (for example Upstash, region near the Cloud Run region). Use the TLS URL (`rediss://default:<password>@<host>:<port>`).
 
-**Object storage** (`STORAGE_BUCKET`, `STORAGE_ACCESS_KEY_ID`, `STORAGE_SECRET_ACCESS_KEY`, plus `STORAGE_ENDPOINT` and `STORAGE_REGION` for non-AWS): create one private bucket per environment (imports, exports, product images). With Cloudflare R2: create the bucket, then an API token with Object Read and Write on that bucket only, and use `STORAGE_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com` and `STORAGE_REGION=auto`. With AWS S3: an IAM user limited to the bucket, no endpoint. Set `STORAGE_FORCE_PATH_STYLE=true` only for MinIO or a provider that needs it. Add the bucket CORS rule that lets the console origin `PUT` (browser uploads go straight to the bucket for imports).
+**Object storage** (`STORAGE_BUCKET`, `STORAGE_ACCESS_KEY_ID`, `STORAGE_SECRET_ACCESS_KEY`, plus `STORAGE_ENDPOINT` and `STORAGE_REGION` for non-AWS): create one private bucket per environment (imports, exports, product images). With Cloudflare R2: create the bucket, then an API token with Object Read and Write on that bucket only, and use `STORAGE_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com` and `STORAGE_REGION=auto`. With AWS S3: an IAM user limited to the bucket, no endpoint. Set `STORAGE_FORCE_PATH_STYLE=true` only for MinIO or a provider that needs it. Add a bucket CORS rule for the console origin with methods `PUT` and `GET` and `AllowedHeaders` set to `Content-Type` (browser imports send `Content-Type: text/csv`, which triggers a preflight; a rule without the header makes the upload fail).
 
 **Email** (`MAIL_FROM`, `RESEND_API_KEY` or `MAIL_SMTP_HOST` and `MAIL_SMTP_PORT`): at Resend add your sending domain and add the DNS records they list (SPF, DKIM) until it shows verified, then create an API key limited to sending. `MAIL_FROM` must be an address on that domain, for example `wise-biz <no-reply@yourdomain>`.
 
@@ -46,7 +46,8 @@ Check: you have the Redis URL, the bucket name with its two keys, and a verified
 PROJECT=<your-project-id>   REGION=<your-region>   REPO=wise-biz
 gcloud config set project $PROJECT
 gcloud services enable run.googleapis.com artifactregistry.googleapis.com \
-  secretmanager.googleapis.com iam.googleapis.com iamcredentials.googleapis.com
+  secretmanager.googleapis.com iam.googleapis.com iamcredentials.googleapis.com \
+  sts.googleapis.com
 
 # Where the workflow copies the images to
 gcloud artifacts repositories create $REPO --repository-format=docker --location=$REGION
@@ -69,7 +70,7 @@ gcloud projects add-iam-policy-binding $PROJECT \
   --member="serviceAccount:$RUNTIME" --role=roles/secretmanager.secretAccessor
 ```
 
-The workflow deploys with the project's default service account unless you tell it otherwise. To run the services as `wb-runtime`, add `--service-account "$RUNTIME_SA"` to the four `gcloud run deploy` lines and the job deploy in `deploy.yml` (a one-line change per command), or grant `roles/secretmanager.secretAccessor` to the default Compute Engine account instead. Pick one before the first deploy.
+The workflow deploys with the project's default service account unless you tell it otherwise. To run the services as `wb-runtime`, add `--service-account wb-runtime@<your-project-id>.iam.gserviceaccount.com` (the account name written out, because the workflow defines no variable for it) to the `gcloud run deploy` lines and the `gcloud run jobs deploy` line in `deploy.yml`, one line per command, or grant `roles/secretmanager.secretAccessor` to the default Compute Engine account instead. Pick one before the first deploy.
 
 Workload identity (lets only this repository act as the deployer):
 
@@ -103,17 +104,23 @@ Decide the public addresses first, because several values refer to them:
 - The API is reached by browsers through the console, which proxies `/v1` to the API (`API_ORIGIN`). So `AUTH_URL` is the console URL (the same value as `CONSOLE_URL`), and `CORS_ORIGINS` is that URL too.
 - `AUTH_RP_ID` is the bare hostname of the console (`app.yourdomain`, no scheme, no port). Passkeys are bound to it: changing it later invalidates every registered passkey.
 
-Create the secrets with a helper (run it in a private shell; values go in through stdin so they never appear in a process list):
+Create the secrets with two helpers. Run them in a private shell, and stop the shell from saving what you type, because the examples below put real values on the command line: `unset HISTFILE` first (or `set +o history` in bash). Values go in through stdin, so they never appear in a process list.
 
 ```bash
-ENV=staging
+unset HISTFILE
+ENV=${ENV:?set ENV to staging or production first}   # run the block again with the other value for the other environment
+# put: sets a value you chose (a URL, a key from a provider); a second run adds a new version
 put() { printf '%s' "$2" | gcloud secrets create "wb-$ENV-$1" --data-file=- 2>/dev/null \
         || printf '%s' "$2" | gcloud secrets versions add "wb-$ENV-$1" --data-file=-; }
+# generate: makes a random key ONCE and never replaces it. A new value would invalidate sessions, invites and PIN hashes.
+generate() { gcloud secrets describe "wb-$ENV-$1" >/dev/null 2>&1 \
+        && echo "wb-$ENV-$1 exists, left as it is" \
+        || openssl rand -base64 48 | tr -d '\n' | gcloud secrets create "wb-$ENV-$1" --data-file=-; }
 
-put AUTH_SECRET        "$(openssl rand -base64 48)"
-put INVITE_SECRET      "$(openssl rand -base64 48)"
-put PIN_PEPPER         "$(openssl rand -base64 48)"
-put REALTIME_TICKET_SECRET "$(openssl rand -base64 48)"
+generate AUTH_SECRET
+generate INVITE_SECRET
+generate PIN_PEPPER
+generate REALTIME_TICKET_SECRET
 put CONSOLE_URL        "https://app.example.com"
 put AUTH_URL           "https://app.example.com"
 put CORS_ORIGINS       "https://app.example.com"
@@ -164,7 +171,7 @@ No GitHub secret is needed for the deploy: the images come from GHCR with the wo
 
 ## 6. Release and first deploy
 
-1. Merge to `master` with a green CI.
+1. Merge to `master` with a green CI. If you also release the desktop and mobile apps from this tag, merge the `eas init` commit from part 8 first (`mobile.yml` reads `app.json` on the tagged commit, and a later commit does not change a tag). The desktop workflow needs `WISE_BIZ_API_URL` and `WISE_BIZ_UPDATE_URL`, which come from the deployed console, so for the very first release expect its run to fail and re-run it after step 3 once those variables exist.
 2. Tag a release (`vX.Y.Z`) on that commit and push the tag. `images.yml` builds the four service images, scans them (HIGH and CRITICAL fail the run) and pushes them to GHCR. If the scan fails, read its table and fix the finding before you go on; do not skip the scan.
 3. Actions, Deploy, Run workflow: version `vX.Y.Z`, environment `staging`. It copies the images to Artifact Registry, runs the migration job (must succeed), rolls the services and runs a smoke test on `/ready`.
 4. Open the console URL, create the first account, create a business, go through onboarding. Check the logs of `wb-workers-staging` and `wb-api-staging` in Cloud Logging for errors.
@@ -179,7 +186,7 @@ If anything goes wrong after step 3, follow `docs/runbooks/rollback.md`. Do not 
 `desktop.yml` runs on a release tag, builds the installers for the three systems in the GitHub environment `desktop-release` and attaches them to the run as artifacts. The tag must equal the version in `apps/desktop/package.json` (tag `v0.2.1` needs `"version": "0.2.1"`); the workflow stops before building if they differ.
 
 **Accounts and certificates**
-- **Windows**: buy a code signing certificate from a certificate authority (an OV or EV certificate; EV removes the SmartScreen warning from day one). Export it as a `.pfx` with a password. Encode it: `base64 -w0 cert.pfx` (on Windows PowerShell: `[Convert]::ToBase64String([IO.File]::ReadAllBytes("cert.pfx"))`).
+- **Windows**: buy a code signing certificate from a certificate authority (an OV or EV certificate; neither removes the SmartScreen warning at once, because Microsoft builds reputation for the signed file and certificate over the first downloads). Export it as a `.pfx` with a password. Encode it: `base64 -w0 cert.pfx` (on Windows PowerShell: `[Convert]::ToBase64String([IO.File]::ReadAllBytes("cert.pfx"))`).
 - **macOS**: join the Apple Developer Program (paid, yearly). In Certificates, create a **Developer ID Application** certificate, export it from Keychain Access as a `.p12` with a password and base64 it the same way. Create an app-specific password at appleid.apple.com (Sign-In and Security, App-Specific Passwords). Your Team ID is in the membership page.
 - **Linux**: no signing step; the AppImage and deb are unsigned.
 

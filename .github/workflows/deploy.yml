@@ -126,7 +126,7 @@ jobs:
           wire() {
             local app="$1" list=""
             for key in $(node scripts/service-env.mts "$app"); do
-              case "$key" in NODE_ENV|PORT) continue ;; esac
+              case "$key" in NODE_ENV|PORT|SENTRY_ENVIRONMENT|SENTRY_RELEASE) continue ;; esac
               grep -qx "wb-$ENVIRONMENT-$key" "$RUNNER_TEMP/secrets.txt" && list="${list:+$list,}$key=wb-$ENVIRONMENT-$key:latest"
             done
             printf '%s' "$list"
