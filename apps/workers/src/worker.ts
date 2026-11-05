@@ -32,6 +32,7 @@ import {
   runDriftCheck,
   runExpiringBatches,
 } from "@wise-biz/module-inventory";
+import { createExpoPush, runDeliveries } from "@wise-biz/module-notifications";
 import { runDailyDigests, runExports } from "@wise-biz/module-reporting";
 import { createMemoryStore, storeFromEnv } from "@wise-biz/storage";
 
@@ -45,6 +46,7 @@ import { settleSteps } from "./shutdown.ts";
 import type { EnvSource } from "@wise-biz/env";
 import type { ConsumerDefinition, OnMetric } from "@wise-biz/events";
 import type { AuditOnMetric } from "@wise-biz/module-audit";
+import type { MailPort, PushPort } from "@wise-biz/module-notifications";
 import type { Logger } from "pino";
 
 /** REDIS_URL is optional here: without it the workers skip realtime hints and terminals fall back to their poll. */
@@ -60,6 +62,7 @@ const POOL_MAX = 10;
 const CHAINER_POOL_MAX = 4;
 const HOUR_MS = 3_600_000;
 const PRUNE_BATCH = 1000;
+const DELIVERY_INTERVAL_MS = 10_000;
 
 export interface RunningWorker {
   logger: Logger;
@@ -90,21 +93,30 @@ export function startWorker(
   const realtime = createRealtimePublisher(env.REDIS_URL, logger);
   // Object store for jobs that write files (exports). Tests that pass their own consumers get an in-memory one.
   const store = consumerEnv === undefined ? createMemoryStore() : storeFromEnv(consumerEnv);
+  // The default consumer set needs the mailer, and so does the delivery loop that sends what its notifications flagged
+  // (ADR 0018). Tests that pass their own consumers get neither.
+  const ports: { mail?: MailPort; push?: PushPort } = {};
   const consumerSet =
     consumers ??
-    createConsumers({
-      notify: realtime.notify,
-      mailer: createMailer(consumerEnv ?? defineEnv(CONSUMER_ENV, source)),
-      consoleUrl: consumerEnv?.CONSOLE_URL ?? "",
-      inviteSecret: consumerEnv?.INVITE_SECRET ?? "",
-      imports: {
-        pool,
-        store,
-        onError: (err, importId) => {
-          logger.error({ err, importId }, "catalog import job failed; POST /start resumes it");
+    (() => {
+      const e = consumerEnv ?? defineEnv(CONSUMER_ENV, source);
+      const mailer = createMailer(e);
+      ports.mail = { send: (m) => mailer.send(m), consoleUrl: e.CONSOLE_URL };
+      ports.push = createExpoPush();
+      return createConsumers({
+        notify: realtime.notify,
+        mailer,
+        consoleUrl: e.CONSOLE_URL,
+        inviteSecret: e.INVITE_SECRET,
+        imports: {
+          pool,
+          store,
+          onError: (err, importId) => {
+            logger.error({ err, importId }, "catalog import job failed; POST /start resumes it");
+          },
         },
-      },
-    });
+      });
+    })();
   // Audit: separate least-privilege pool (wb_chainer), never shared with the relay pool.
   const chainerPool = createPool(env.DATABASE_CHAINER_URL, {
     max: CHAINER_POOL_MAX,
@@ -192,7 +204,34 @@ export function startWorker(
       runMissedHeartbeats(inventoryDeps, env.DEVICE_SILENT_MINUTES),
     ),
   ];
-  const loops = [chainer, anchorJob, partitionJob, pruneJob, ...inventoryLoops];
+  // Stage 2 of notification delivery (ADR 0018): claims flagged rows and sends outside any transaction. Rows are leased,
+  // so several replicas can run it at once.
+  const deliveryLoops =
+    ports.mail === undefined && ports.push === undefined
+      ? []
+      : [
+          createPeriodic({
+            name: "notifications-delivery",
+            intervalMs: DELIVERY_INTERVAL_MS,
+            logger,
+            onMetric: onAuditMetric,
+            run: async () => {
+              const sent = await runDeliveries({
+                pool,
+                mail: ports.mail,
+                push: ports.push,
+                onError: (err, notificationId, channel) => {
+                  logger.warn(
+                    { err, notificationId, channel },
+                    "notification delivery failed; retried after the lease",
+                  );
+                },
+              });
+              if (sent > 0) logger.info({ sent }, "notifications delivered");
+            },
+          }),
+        ];
+  const loops = [chainer, anchorJob, partitionJob, pruneJob, ...inventoryLoops, ...deliveryLoops];
   for (const l of loops) l.start();
   metrics.start();
   logger.info({ consumers: consumerSet.map((c) => c.name) }, "worker started");
