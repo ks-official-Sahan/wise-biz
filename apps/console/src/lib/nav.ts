@@ -8,6 +8,7 @@ export interface NavItem {
     | "/sales"
     | "/reports"
     | "/shifts"
+    | "/approvals"
     | "/devices"
     | "/stock"
     | "/people"
@@ -78,6 +79,12 @@ export const NAV: readonly NavItem[] = [
     primary: false,
   },
   { href: "/roles", label: "Roles", keywords: ["permissions", "access"], primary: false },
+  {
+    href: "/approvals",
+    label: "Approvals",
+    keywords: ["review", "inbox", "pending", "flagged", "override", "terminals", "waiting"],
+    primary: false,
+  },
   {
     href: "/audit",
     label: "Audit log",

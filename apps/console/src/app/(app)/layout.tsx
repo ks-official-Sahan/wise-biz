@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Alert, Button, ErrorState, SkeletonRows, cx } from "@/components/ui.tsx";
 import { ApiError, api } from "@/lib/api.ts";
+import { useApprovals } from "@/lib/approvals.ts";
 import { NAV } from "@/lib/nav.ts";
 import { badgeText, unreadLabel, useUnreadCount } from "@/lib/notifications.ts";
 import { keys, useMyTenants } from "@/lib/queries.ts";
@@ -117,6 +118,7 @@ export default function AppLayout({ children }: { readonly children: ReactNode }
               aria-current={pathname === n.href ? "page" : undefined}
             >
               {n.label}
+              {n.href === "/approvals" ? <ApprovalsCount tenantId={active.tenantId} /> : null}
             </Link>
           ))}
         </nav>
@@ -184,6 +186,18 @@ export default function AppLayout({ children }: { readonly children: ReactNode }
         <CommandPalette />
       </div>
     </TenantProvider>
+  );
+}
+
+/** How many things wait for a decision, next to the Approvals link; nothing is drawn when nothing waits. */
+function ApprovalsCount({ tenantId }: { readonly tenantId: string }) {
+  const { label } = useApprovals(tenantId);
+  if (label === "") return null;
+  return (
+    <span className={s.count}>
+      <span aria-hidden>{label}</span>
+      <span className="sr-only">{` (${label} waiting)`}</span>
+    </span>
   );
 }
 
