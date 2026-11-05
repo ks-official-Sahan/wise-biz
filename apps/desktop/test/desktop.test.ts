@@ -1,3 +1,4 @@
+import { createPublicKey, verify } from "node:crypto";
 import path from "node:path";
 
 import Database from "better-sqlite3";
@@ -6,6 +7,7 @@ import { describe, expect, it } from "vitest";
 import { createDisplayController } from "../src/main/display.ts";
 import { createHardwareService } from "../src/main/hardware.ts";
 import { registerIpc } from "../src/main/ipc.ts";
+import { createKeyring } from "../src/main/keyring.ts";
 import { createKiosk } from "../src/main/kiosk.ts";
 import {
   APP_ORIGIN,
@@ -219,6 +221,75 @@ describe("vault", () => {
   });
 });
 
+/** A keyring over an in-memory "encrypted" file, like the vault tests. */
+function memoryKeyring(files = new Map<string, Uint8Array>()) {
+  const store = createVaultStore({
+    file: "keys.bin",
+    safe: {
+      isStrong: () => Promise.resolve(true),
+      encryptString: (s) => Promise.resolve(new TextEncoder().encode(`enc:${btoa(s)}`)),
+      decryptString: (b) => Promise.resolve(atob(new TextDecoder().decode(b).slice(4))),
+    },
+    files: {
+      read: (f) => files.get(f),
+      write: (f, d) => void files.set(f, d),
+      remove: (f) => void files.delete(f),
+    },
+  });
+  return { keyring: createKeyring({ store }), files };
+}
+
+describe("keyring", () => {
+  const ID = "0198f3a2-aaaa-7bbb-8ccc-1234567890ab";
+  const message = new TextEncoder().encode("signature base");
+
+  it("signs in the main process; the signature verifies under the public key and no secret is returned", async () => {
+    const { keyring, files } = memoryKeyring();
+    const publicKey = await keyring.generate(ID);
+    expect(publicKey).toHaveLength(32);
+    const signature = await keyring.sign(ID, message);
+    expect(signature).toHaveLength(64);
+    const key = createPublicKey({
+      key: { kty: "OKP", crv: "Ed25519", x: Buffer.from(publicKey).toString("base64url") },
+      format: "jwk",
+    });
+    expect(verify(null, message, key, signature)).toBe(true);
+    expect(await keyring.open(ID)).toEqual(publicKey);
+    // What reaches the disk is the encrypted form, not the PKCS#8 key.
+    expect(new TextDecoder().decode(files.get("keys.bin"))).toMatch(/^enc:/);
+  });
+
+  it("keeps its keys across a restart, forgets a removed key, and never replaces one", async () => {
+    const a = memoryKeyring();
+    const publicKey = await a.keyring.generate(ID);
+    const again = memoryKeyring(a.files).keyring;
+    expect(await again.open(ID)).toEqual(publicKey);
+    await expect(again.generate(ID)).rejects.toThrow("already exists");
+    await again.remove(ID);
+    expect(await again.open(ID)).toBeUndefined();
+    await expect(again.sign(ID, message)).rejects.toThrow("No such key");
+    await again.remove(ID);
+  });
+
+  it("refuses bad ids and messages, and caps the number of keys", async () => {
+    const { keyring } = memoryKeyring();
+    for (const bad of ["", "short", "../../etc/passwd-0000", 5, undefined])
+      await expect(keyring.generate(bad)).rejects.toThrow("Invalid key id");
+    await keyring.generate(ID);
+    await expect(keyring.sign(ID, "text")).rejects.toThrow("Invalid message");
+    await expect(keyring.sign(ID, new Uint8Array(70_000))).rejects.toThrow("Invalid message");
+    for (let i = 0; i < 7; i++) await keyring.generate(`key-number-${String(i)}`);
+    await expect(keyring.generate("one-too-many-keys")).rejects.toThrow("Too many keys");
+  });
+
+  it("generates two keys at once without losing one", async () => {
+    const { keyring } = memoryKeyring();
+    await Promise.all([keyring.generate("concurrent-key-1"), keyring.generate("concurrent-key-2")]);
+    expect(await keyring.open("concurrent-key-1")).toBeDefined();
+    expect(await keyring.open("concurrent-key-2")).toBeDefined();
+  });
+});
+
 describe("ipc", () => {
   it("registers exactly the allowlisted channels and checks the sender", async () => {
     const handlers = new Map<
@@ -232,6 +303,7 @@ describe("ipc", () => {
         storage: s,
         hardware: hw(),
         ...shell(),
+        keyring: memoryKeyring().keyring,
         vault: createVaultStore({
           file: "f",
           safe: {
@@ -306,6 +378,7 @@ describe("hardening", () => {
         storage: storage(),
         hardware: hw(),
         ...shell(),
+        keyring: memoryKeyring().keyring,
         vault: createVaultStore({
           file: "f",
           safe: {

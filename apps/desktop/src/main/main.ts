@@ -21,6 +21,7 @@ import { DISPLAY_PUSH } from "../shared/channels.ts";
 import { createDisplayController } from "./display.ts";
 import { createHardwareService, parseHardwareConfig } from "./hardware.ts";
 import { registerIpc } from "./ipc.ts";
+import { createKeyring } from "./keyring.ts";
 import { createKiosk, isBlockedKioskKey, parseKioskRecord } from "./kiosk.ts";
 import {
   APP_ORIGIN,
@@ -172,20 +173,23 @@ if (gotLock)
         open: openDriver,
         join: (dir, name) => path.join(dir, name),
       });
-      const vault = createVaultStore({
-        file: path.join(userData, "identity.bin"),
-        safe: {
-          isStrong: strong,
-          encryptString: (s) => safeStorage.encryptStringAsync(s),
-          decryptString: async (b) => (await safeStorage.decryptStringAsync(Buffer.from(b))).result,
+      const safe = {
+        isStrong: strong,
+        encryptString: (s: string) => safeStorage.encryptStringAsync(s),
+        decryptString: async (b: Uint8Array) =>
+          (await safeStorage.decryptStringAsync(Buffer.from(b))).result,
+      };
+      const files = {
+        read: (f: string) => (fs.existsSync(f) ? fs.readFileSync(f) : undefined),
+        write: atomicWrite,
+        remove: (f: string) => {
+          fs.rmSync(f, { force: true });
         },
-        files: {
-          read: (f) => (fs.existsSync(f) ? fs.readFileSync(f) : undefined),
-          write: atomicWrite,
-          remove: (f) => {
-            fs.rmSync(f, { force: true });
-          },
-        },
+      };
+      const vault = createVaultStore({ file: path.join(userData, "identity.bin"), safe, files });
+      // Device signing keys live here, encrypted with the same OS store, and never go to the renderer.
+      const keyring = createKeyring({
+        store: createVaultStore({ file: path.join(userData, "device-keys.bin"), safe, files }),
       });
       const configFile = path.join(userData, "hardware.json");
       const hardware = createHardwareService({
@@ -328,7 +332,7 @@ if (gotLock)
             ipcMain.handle(channel, listener);
           },
         },
-        { storage, vault, hardware, display, kiosk },
+        { storage, vault, keyring, hardware, display, kiosk },
       );
       app.on("before-quit", () => {
         kioskOn = false;
