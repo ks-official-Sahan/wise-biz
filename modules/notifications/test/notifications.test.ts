@@ -7,7 +7,7 @@ import { uuidv7 } from "@wise-biz/ids";
 import { policyMiddleware } from "@wise-biz/module-kit";
 import { createCatalog, matrixFromRows } from "@wise-biz/policy";
 import { testDatabase } from "@wise-biz/testing/containers";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { createNotificationsConsumer } from "../src/consumer.ts";
 import { runDeliveries } from "../src/delivery.ts";
@@ -764,6 +764,19 @@ describe("preferences and push tokens", () => {
 });
 
 describe("delivery limits", () => {
+  // runDeliveries serves every business, so rows other tests left owed would be sent (and counted) in these runs.
+  beforeEach(async () => {
+    const owed = await worker.query<{ tenant_id: string }>(
+      "SELECT DISTINCT tenant_id FROM notifications.notifications WHERE email_pending OR push_pending",
+    );
+    for (const { tenant_id: t } of owed.rows)
+      await withTenantTx(admin, ctx(t, uuidv7()), (tx) =>
+        tx.query(
+          "UPDATE notifications.notifications SET email_pending = false, push_pending = false WHERE tenant_id = $1",
+          [t],
+        ),
+      );
+  });
   const prefs = (a: ReturnType<typeof appFor>) =>
     a.request(
       ...argsOf(
