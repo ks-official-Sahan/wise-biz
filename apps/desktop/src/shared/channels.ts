@@ -16,6 +16,10 @@ export const CHANNELS = {
   vaultLoad: "wb:vault:load",
   vaultSave: "wb:vault:save",
   vaultClear: "wb:vault:clear",
+  keyGenerate: "wb:key:generate",
+  keyOpen: "wb:key:open",
+  keySign: "wb:key:sign",
+  keyRemove: "wb:key:remove",
   hwConfig: "wb:hw:config",
   hwSetConfig: "wb:hw:set-config",
   hwPrint: "wb:hw:print",
@@ -129,5 +133,12 @@ export interface DesktopBridge {
     readonly load: () => Promise<string | undefined>;
     readonly save: (value: string) => Promise<void>;
     readonly clear: () => Promise<void>;
+  };
+  /** Device signing keys held by the main process: the renderer gets public keys and signatures, never a secret. */
+  readonly keyring: {
+    readonly generate: (keyId: string) => Promise<Uint8Array>;
+    readonly open: (keyId: string) => Promise<Uint8Array | undefined>;
+    readonly sign: (keyId: string, message: Uint8Array) => Promise<Uint8Array>;
+    readonly remove: (keyId: string) => Promise<void>;
   };
 }

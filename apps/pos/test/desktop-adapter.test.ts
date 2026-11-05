@@ -1,3 +1,4 @@
+import { generateKeyPair, publicKeyFrom, sign } from "@wise-biz/crypto";
 import { HardwareError, DRAWER_KICK_BYTES } from "@wise-biz/hardware";
 import { openLocalDb } from "@wise-biz/sync";
 import Database from "better-sqlite3";
@@ -80,6 +81,31 @@ function fakeBridge(): DesktopBridge & { vaultValue: string | undefined } {
       setEnabled: () => Promise.resolve(),
       verify: () => Promise.resolve(true),
     },
+    // Like the main process: the secrets stay in this closure and only public keys and signatures leave it.
+    keyring: (() => {
+      const secrets = new Map<string, Uint8Array>();
+      return {
+        generate: (id: string) => {
+          const pair = generateKeyPair();
+          secrets.set(id, pair.secretKey);
+          return Promise.resolve(pair.publicKey);
+        },
+        open: (id: string) => {
+          const secret = secrets.get(id);
+          return Promise.resolve(secret === undefined ? undefined : publicKeyFrom(secret));
+        },
+        sign: (id: string, message: Uint8Array) => {
+          const secret = secrets.get(id);
+          return secret === undefined
+            ? Promise.reject(new Error("No such key."))
+            : Promise.resolve(sign(message, secret));
+        },
+        remove: (id: string) => {
+          secrets.delete(id);
+          return Promise.resolve();
+        },
+      };
+    })(),
     vault: {
       load: () => Promise.resolve(vaultValue),
       save: (v) => {
@@ -122,6 +148,22 @@ describe("desktop storage adapter", () => {
     expect(await vault.load()).toBeUndefined();
     await vault.clear();
     expect(await vault.load()).toBeUndefined();
+  });
+});
+
+describe("desktop key custody", () => {
+  it("signs through the main process and stores an identity with no secret", async () => {
+    const bridge = fakeBridge();
+    const vault = createDesktopVault(bridge);
+    const signer = await vault.keyring?.generate("0198f3a2-aaaa-7bbb-8ccc-1234567890ab");
+    expect(signer?.publicKey).toHaveLength(32);
+    const message = new TextEncoder().encode("base");
+    const signature = await signer?.sign(message);
+    expect(signature).toHaveLength(64);
+    const reopened = await vault.keyring?.open("0198f3a2-aaaa-7bbb-8ccc-1234567890ab");
+    expect(reopened?.publicKey).toEqual(signer?.publicKey);
+    await vault.keyring?.remove("0198f3a2-aaaa-7bbb-8ccc-1234567890ab");
+    expect(await vault.keyring?.open("0198f3a2-aaaa-7bbb-8ccc-1234567890ab")).toBeUndefined();
   });
 });
 

@@ -1,0 +1,5 @@
+{
+  "extends": "../../packages/config/tsconfig/library.json",
+  "compilerOptions": { "lib": ["ES2023", "WebWorker"] },
+  "include": ["src/**/*.ts", "test/**/*.ts", "vitest.config.ts", "eslint.config.js"]
+}

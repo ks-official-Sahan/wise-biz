@@ -53,6 +53,12 @@ const bridge: DesktopBridge = {
     save: (v) => call(CHANNELS.vaultSave, v),
     clear: () => call(CHANNELS.vaultClear),
   },
+  keyring: {
+    generate: (id) => call(CHANNELS.keyGenerate, id),
+    open: (id) => call(CHANNELS.keyOpen, id),
+    sign: (id, m) => call(CHANNELS.keySign, id, m),
+    remove: (id) => call(CHANNELS.keyRemove, id),
+  },
 };
 
 contextBridge.exposeInMainWorld("wiseDesktop", bridge);

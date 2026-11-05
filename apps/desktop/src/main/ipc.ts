@@ -4,6 +4,7 @@ import { isTrustedSender } from "./security.ts";
 
 import type { DisplayController } from "./display.ts";
 import type { HardwareService } from "./hardware.ts";
+import type { Keyring } from "./keyring.ts";
 import type { Kiosk } from "./kiosk.ts";
 import type { StorageService } from "./storage.ts";
 import type { createVaultStore } from "./vault.ts";
@@ -30,12 +31,13 @@ export function registerIpc(
   deps: {
     storage: StorageService;
     vault: ReturnType<typeof createVaultStore>;
+    keyring: Keyring;
     hardware: HardwareService;
     display: DisplayController;
     kiosk: Kiosk;
   },
 ): void {
-  const { storage, vault, hardware, display, kiosk } = deps;
+  const { storage, vault, keyring, hardware, display, kiosk } = deps;
   const table: Record<string, Handler> = {
     [CHANNELS.dbOpen]: (id) => {
       storage.open(id);
@@ -63,6 +65,10 @@ export function registerIpc(
     [CHANNELS.vaultClear]: () => {
       vault.clear();
     },
+    [CHANNELS.keyGenerate]: (id) => keyring.generate(id),
+    [CHANNELS.keyOpen]: (id) => keyring.open(id),
+    [CHANNELS.keySign]: (id, m) => keyring.sign(id, m),
+    [CHANNELS.keyRemove]: (id) => keyring.remove(id),
     [CHANNELS.hwConfig]: () => hardware.config(),
     [CHANNELS.hwSetConfig]: (c) => {
       kiosk.guard();

@@ -1,6 +1,12 @@
 import { HardwareError } from "@wise-biz/hardware";
 
-import type { DeviceIdentity, DeviceVault, Platform } from "../platform/index.ts";
+import type {
+  DeviceIdentity,
+  DeviceKeyring,
+  DeviceSigner,
+  DeviceVault,
+  Platform,
+} from "../platform/index.ts";
 import type { Printer } from "@wise-biz/hardware";
 import type { Prepared, Row, SqlParams, StorageAdapter } from "@wise-biz/sync";
 
@@ -45,6 +51,13 @@ export interface DesktopBridge {
     readonly load: () => Promise<string | undefined>;
     readonly save: (value: string) => Promise<void>;
     readonly clear: () => Promise<void>;
+  };
+  /** Device signing keys held by the main process: only public keys and signatures come back. */
+  readonly keyring: {
+    readonly generate: (keyId: string) => Promise<Uint8Array>;
+    readonly open: (keyId: string) => Promise<Uint8Array | undefined>;
+    readonly sign: (keyId: string, message: Uint8Array) => Promise<Uint8Array>;
+    readonly remove: (keyId: string) => Promise<void>;
   };
 }
 
@@ -116,13 +129,30 @@ const isIdentity = (v: unknown): v is DeviceIdentity => {
     typeof o.deviceId === "string" &&
     typeof o.tenantId === "string" &&
     typeof o.branchId === "string" &&
-    typeof o.secretKey === "string"
+    (typeof o.secretKey === "string" || typeof o.keyId === "string")
   );
 };
+
+/** The keyring over the bridge: the secret stays in the main process and the page asks it to sign (ADR 0019). */
+export function createDesktopKeyring(bridge: DesktopBridge): DeviceKeyring {
+  const signer = (keyId: string, publicKey: Uint8Array): DeviceSigner => ({
+    publicKey,
+    sign: (message) => bridge.keyring.sign(keyId, message),
+  });
+  return {
+    generate: async (keyId) => signer(keyId, await bridge.keyring.generate(keyId)),
+    open: async (keyId) => {
+      const publicKey = await bridge.keyring.open(keyId);
+      return publicKey === undefined ? undefined : signer(keyId, publicKey);
+    },
+    remove: (keyId) => bridge.keyring.remove(keyId),
+  };
+}
 
 /** The device identity, encrypted by the main process with the OS credential store (Electron `safeStorage`). */
 export function createDesktopVault(bridge: DesktopBridge): DeviceVault {
   return {
+    keyring: createDesktopKeyring(bridge),
     load: async () => {
       const raw = await bridge.vault.load();
       if (raw === undefined) return undefined;

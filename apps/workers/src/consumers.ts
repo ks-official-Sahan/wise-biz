@@ -1,7 +1,7 @@
 import { uuidv7 } from "@wise-biz/ids";
 import { createImportConsumer } from "@wise-biz/module-catalog";
 import { createInventoryFactsConsumer, createLowStockConsumer } from "@wise-biz/module-inventory";
-import { createExpoPush, createNotificationsConsumer } from "@wise-biz/module-notifications";
+import { createNotificationsConsumer } from "@wise-biz/module-notifications";
 import { createPricingFactsConsumer } from "@wise-biz/module-pricing";
 import { createReportingConsumer } from "@wise-biz/module-reporting";
 import { createSearchProjectionConsumer } from "@wise-biz/module-search";
@@ -11,7 +11,6 @@ import { createInviteEmailConsumer, permissionHolders } from "@wise-biz/module-t
 
 import type { ConsumerDefinition } from "@wise-biz/events";
 import type { ImportJobDeps } from "@wise-biz/module-catalog";
-import type { PushPort } from "@wise-biz/module-notifications";
 import type { ChangeNotice } from "@wise-biz/module-sync";
 import type { MailSender } from "@wise-biz/module-tenancy";
 
@@ -21,8 +20,6 @@ export interface ConsumerDeps {
   /** Real mailer in production (@wise-biz/mailer), a capture mailer in tests. */
   readonly mailer: MailSender;
   readonly consoleUrl: string;
-  /** Phone push; defaults to the Expo push service. Tests pass a fake so nothing leaves the machine. */
-  readonly push?: PushPort;
   readonly inviteSecret: string;
   /** Catalog import job (ADR 0012): the wb_worker pool, object storage, and where job failures are reported. */
   readonly imports: {
@@ -56,8 +53,8 @@ export function createConsumers(deps: ConsumerDeps): readonly ConsumerDefinition
     }),
     createNotificationsConsumer({
       holders: permissionHolders,
-      mail: { send: (m) => deps.mailer.send(m), consoleUrl: deps.consoleUrl },
-      push: deps.push ?? createExpoPush(),
+      // Stage 1 only flags email and push; the delivery loop in worker.ts sends them (ADR 0018).
+      channels: { email: true, push: true },
     }),
     createLowStockConsumer({ pool: deps.imports.pool, ids: { uuidv7 }, now: () => new Date() }),
     createImportConsumer(

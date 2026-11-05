@@ -7,9 +7,10 @@ import { uuidv7 } from "@wise-biz/ids";
 import { policyMiddleware } from "@wise-biz/module-kit";
 import { createCatalog, matrixFromRows } from "@wise-biz/policy";
 import { testDatabase } from "@wise-biz/testing/containers";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { createNotificationsConsumer } from "../src/consumer.ts";
+import { runDeliveries } from "../src/delivery.ts";
 import { notificationsModule } from "../src/index.ts";
 import { notify } from "../src/notify.ts";
 import { createExpoPush } from "../src/push.ts";
@@ -58,13 +59,24 @@ const deliver = (
 ) => {
   const consumer = createNotificationsConsumer({
     holders: () => Promise.resolve(people),
-    ...(mail === undefined ? {} : { mail }),
-    ...(push === undefined ? {} : { push }),
+    channels: { email: mail !== undefined, push: push !== undefined },
   });
   return withTenantTx(worker, ctx(tenantId, people[0] ?? uuidv7()), (tx) =>
     consumer.handle({ id, tenantId, type, payload: { data: payload } }, { client: tx as never }),
   );
 };
+
+/** Stage 2 as the worker loop runs it: no lease wait, errors collected instead of thrown. */
+const sendNow = (mail?: MailPort, push?: PushPort, errors: unknown[] = []) =>
+  runDeliveries({
+    pool: worker,
+    mail,
+    push,
+    leaseMs: 0,
+    onError: (err) => {
+      errors.push(err);
+    },
+  });
 
 const LOW = { locationId: "l", variantId: "v", qty: "2.0000", minQty: "5.0000", maxQty: null };
 
@@ -415,7 +427,10 @@ describe("email", () => {
         )
       ).status,
     ).toBe(200);
-    await deliver(t, [on, off], "inventory.balance.low", LOW, uuidv7(), mail());
+    const m = mail();
+    await deliver(t, [on, off], "inventory.balance.low", LOW, uuidv7(), m);
+    expect(sent).toHaveLength(0); // stage 1 only stores and flags
+    await sendNow(m);
     expect(sent).toHaveLength(1);
     expect(sent[0]).toMatchObject({ to: "wants@example.test", subject: "Stock is running low" });
     expect(sent[0]?.text).toContain("https://console.example.test/stock");
@@ -427,16 +442,91 @@ describe("email", () => {
     const u = uuidv7();
     await prefs(appFor(t, u), true);
     const id = uuidv7();
-    await expect(deliver(t, [u], "inventory.balance.low", LOW, id, mail(true))).rejects.toThrow(
-      "smtp down",
-    );
+    const errors: unknown[] = [];
+    await deliver(t, [u], "inventory.balance.low", LOW, id, mail());
+    await sendNow(mail(true), undefined, errors);
     expect(sent).toHaveLength(0);
-    // The retry stores nothing new (the failed attempt rolled back with it) and now sends.
+    expect(errors).toHaveLength(1);
+    // The event arriving again stores and flags nothing new; the failed email is still owed and now goes out, once.
     await deliver(t, [u], "inventory.balance.low", LOW, id, mail());
-    await deliver(t, [u], "inventory.balance.low", LOW, id, mail());
+    await sendNow(mail());
+    await sendNow(mail());
     expect(sent).toHaveLength(1);
     const body = (await (await appFor(t, u).request("/v1/notifications")).json()) as Listed;
     expect(body.notifications).toHaveLength(1);
+  });
+
+  it("sends nothing when the event's transaction rolls back, and marks only the row it sent", async () => {
+    sent.length = 0;
+    const t = uuidv7();
+    const [a, b] = [uuidv7(), uuidv7()];
+    await prefs(appFor(t, a, { email: "a@example.test", emailVerified: true }), true);
+    await prefs(appFor(t, b, { email: "b@example.test", emailVerified: true }), true);
+    const consumer = createNotificationsConsumer({
+      holders: () => Promise.resolve([a, b]),
+      channels: { email: true },
+    });
+    await expect(
+      withTenantTx(worker, ctx(t, a), async (tx) => {
+        await consumer.handle(
+          { id: uuidv7(), tenantId: t, type: "inventory.balance.low", payload: { data: LOW } },
+          { client: tx as never },
+        );
+        throw new Error("a later step failed");
+      }),
+    ).rejects.toThrow("a later step failed");
+    await sendNow(mail());
+    expect(sent).toHaveLength(0);
+
+    // Two flagged people; the mailer fails for one address only. The other is delivered and is not sent again.
+    await deliver(t, [a, b], "inventory.balance.low", LOW, uuidv7(), mail());
+    const flaky: MailPort = {
+      consoleUrl: "https://console.example.test",
+      send: (m) =>
+        m.to === "a@example.test" ? Promise.reject(new Error("bounce")) : mail().send(m),
+    };
+    await sendNow(flaky);
+    await sendNow(flaky);
+    expect(sent.map((m) => m.to)).toEqual(["b@example.test"]);
+    // a's bounce is still owed; clear it so it does not leak into later tests that share this database.
+    await withTenantTx(admin, ctx(t, a), (tx) =>
+      tx.query(
+        "UPDATE notifications.notifications SET email_pending = false WHERE tenant_id = $1",
+        [t],
+      ),
+    );
+  });
+
+  it("claims a row once across concurrent workers and gives up after the attempts", async () => {
+    sent.length = 0;
+    const t = uuidv7();
+    const u = uuidv7();
+    await prefs(appFor(t, u), true);
+    await deliver(t, [u], "inventory.balance.low", LOW, uuidv7(), mail());
+    const slow: MailPort = {
+      consoleUrl: "https://console.example.test",
+      send: async (m) => {
+        await new Promise((r) => setTimeout(r, 100));
+        sent.push(m);
+      },
+    };
+    const lease = { pool: worker, mail: slow, leaseMs: 60_000 };
+    await Promise.all([runDeliveries(lease), runDeliveries(lease), runDeliveries(lease)]);
+    expect(sent).toHaveLength(1);
+
+    const v = uuidv7();
+    await prefs(appFor(t, v, { email: "v@example.test", emailVerified: true }), true);
+    await deliver(t, [v], "inventory.balance.low", LOW, uuidv7(), mail());
+    const dead: MailPort = { consoleUrl: "x", send: () => Promise.reject(new Error("never")) };
+    for (let i = 0; i < 4; i++)
+      await runDeliveries({ pool: worker, mail: dead, leaseMs: 0, maxAttempts: 2 });
+    const left = await withTenantTx(admin, ctx(t, v), (tx) =>
+      tx.query(
+        "SELECT email_pending, delivery_attempts FROM notifications.notifications WHERE user_id = $1",
+        [v],
+      ),
+    );
+    expect(left.rows).toEqual([{ email_pending: false, delivery_attempts: 3 }]);
   });
 
   it("refuses to turn email on without a verified address, and forgets the address when turned off", async () => {
@@ -481,11 +571,13 @@ describe("phone push", () => {
     const { port, calls } = fakePush();
     const id = uuidv7();
     await deliver(t, [a, b, none], "inventory.balance.low", LOW, id, undefined, port);
+    await sendNow(undefined, port);
     expect(calls).toHaveLength(1);
     expect(calls[0]?.map((m) => m.to)).toHaveLength(3);
     expect(calls[0]?.[0]).toMatchObject({ title: "Stock is running low", link: "/stock" });
     // The same event again pushes nothing: every notification is marked.
     await deliver(t, [a, b, none], "inventory.balance.low", LOW, id, undefined, port);
+    await sendNow(undefined, port);
     expect(calls).toHaveLength(1);
   });
 
@@ -498,23 +590,26 @@ describe("phone push", () => {
       m.to.includes("gone") ? { ok: false, unregistered: true } : { ok: true },
     );
     await deliver(t, [u], "inventory.balance.low", LOW, uuidv7(), undefined, port);
+    await sendNow(undefined, port);
     const left = await withTenantTx(admin, ctx(t, u), (tx) =>
       tx.query("SELECT token FROM notifications.push_tokens ORDER BY token"),
     );
     expect(left.rows).toEqual([{ token: "ExponentPushToken[live0000000000]" }]);
   });
 
-  it("retries the whole event when the push service is down, then pushes once", async () => {
+  it("keeps the push owed when the push service is down, then pushes once", async () => {
     const t = uuidv7();
     const u = uuidv7();
     await token(u, t, "ExponentPushToken[retry000000000]");
     const id = uuidv7();
     const down: PushPort = { send: () => Promise.reject(new Error("push service answered 503")) };
-    await expect(
-      deliver(t, [u], "inventory.balance.low", LOW, id, undefined, down),
-    ).rejects.toThrow("503");
+    const errors: unknown[] = [];
+    await deliver(t, [u], "inventory.balance.low", LOW, id, undefined, down);
+    await sendNow(undefined, down, errors);
+    expect(errors).toHaveLength(1);
     const { port, calls } = fakePush();
-    await deliver(t, [u], "inventory.balance.low", LOW, id, undefined, port);
+    await sendNow(undefined, port);
+    await sendNow(undefined, port);
     expect(calls).toHaveLength(1);
   });
 
@@ -665,5 +760,135 @@ describe("preferences and push tokens", () => {
         (await tx.query("SELECT count(*)::int AS n FROM notifications.push_tokens")).rows[0],
     );
     expect(gone).toEqual({ n: 0 });
+  });
+});
+
+describe("delivery limits", () => {
+  // runDeliveries serves every business, so rows other tests left owed would be sent (and counted) in these runs.
+  beforeEach(async () => {
+    const owed = await worker.query<{ tenant_id: string }>(
+      "SELECT DISTINCT tenant_id FROM notifications.notifications WHERE email_pending OR push_pending",
+    );
+    for (const { tenant_id: t } of owed.rows)
+      await withTenantTx(admin, ctx(t, uuidv7()), (tx) =>
+        tx.query(
+          "UPDATE notifications.notifications SET email_pending = false, push_pending = false WHERE tenant_id = $1",
+          [t],
+        ),
+      );
+  });
+  const prefs = (a: ReturnType<typeof appFor>) =>
+    a.request(
+      ...argsOf(
+        put("/v1/notifications/preferences", {
+          preferences: [{ kind: "low_stock", inApp: true, email: true }],
+        }),
+      ),
+    );
+  const addTokens = (t: string, u: string, n: number, tag: string) =>
+    withTenantTx(admin, ctx(t, u), (tx) =>
+      tx.query(
+        `INSERT INTO notifications.push_tokens (tenant_id, user_id, token, platform)
+         SELECT $1, $2, 'ExponentPushToken[' || $3 || g || ']', 'android' FROM generate_series(1, $4::int) g`,
+        [t, u, tag, n],
+      ),
+    );
+  const mailTo = (sink: string[], ms = 0): MailPort => ({
+    consoleUrl: "https://console.example.test",
+    send: async (m) => {
+      if (ms > 0) await new Promise((r) => setTimeout(r, ms));
+      sink.push(m.to);
+    },
+  });
+  const pending = async (t: string, u: string) =>
+    (
+      await withTenantTx(admin, ctx(t, u), (tx) =>
+        tx.query(
+          "SELECT email_pending, push_pending FROM notifications.notifications WHERE user_id = $1",
+          [u],
+        ),
+      )
+    ).rows[0];
+
+  it("leaves an email owed, not marked sent, when this worker has no mail port", async () => {
+    const t = uuidv7();
+    const u = uuidv7();
+    await prefs(appFor(t, u));
+    await addTokens(t, u, 1, "solo");
+    const push: PushPort = { send: (ms) => Promise.resolve(ms.map(() => ({ ok: true }))) };
+    await deliver(t, [u], "inventory.balance.low", LOW, uuidv7(), mailTo([]), push);
+    await runDeliveries({ pool: worker, push, leaseMs: 0 });
+    expect(await pending(t, u)).toEqual({ email_pending: true, push_pending: false });
+    const sent: string[] = [];
+    await runDeliveries({ pool: worker, mail: mailTo(sent), leaseMs: 0 });
+    expect(sent).toEqual(["person@example.test"]);
+  });
+
+  it("reports the business with every failure", async () => {
+    const t = uuidv7();
+    const u = uuidv7();
+    await prefs(appFor(t, u));
+    await deliver(t, [u], "inventory.balance.low", LOW, uuidv7(), mailTo([]));
+    const seen: [string, string][] = [];
+    await runDeliveries({
+      pool: worker,
+      mail: { consoleUrl: "x", send: () => Promise.reject(new Error("down")) },
+      leaseMs: 0,
+      onError: (_e, tenantId, _id, channel) => seen.push([tenantId, channel]),
+    });
+    expect(seen).toEqual([[t, "email"]]);
+  });
+
+  it("stops sending when a send could outlive the lease, and the rest go out on the next pass", async () => {
+    const t = uuidv7();
+    const people = [uuidv7(), uuidv7(), uuidv7(), uuidv7()];
+    for (const [i, u] of people.entries())
+      await prefs(appFor(t, u, { email: `p${String(i)}@example.test`, emailVerified: true }));
+    await deliver(t, people, "inventory.balance.low", LOW, uuidv7(), mailTo([]));
+    const sent: string[] = [];
+    const opts = { pool: worker, mail: mailTo(sent, 150), leaseMs: 400, sendTimeoutMs: 200 };
+    await runDeliveries(opts);
+    expect(sent.length).toBeGreaterThan(0);
+    expect(sent.length).toBeLessThan(4);
+    await new Promise((r) => setTimeout(r, 450));
+    await runDeliveries(opts);
+    expect([...sent].sort()).toEqual(people.map((_, i) => `p${String(i)}@example.test`));
+  });
+
+  it("gives up on a push that never answers and keeps it owed", async () => {
+    const t = uuidv7();
+    const u = uuidv7();
+    await addTokens(t, u, 1, "hang");
+    const hang: PushPort = { send: () => new Promise(() => undefined) };
+    await deliver(t, [u], "inventory.balance.low", LOW, uuidv7(), undefined, hang);
+    const errors: unknown[] = [];
+    await runDeliveries({
+      pool: worker,
+      push: hang,
+      leaseMs: 0,
+      sendTimeoutMs: 50,
+      onError: (e) => errors.push(e),
+    });
+    expect(String(errors[0])).toMatch(/timed out/);
+    expect((await pending(t, u))?.push_pending).toBe(true);
+  });
+
+  it("marks each push group when it is sent, so a later failure leaves only that group owed", async () => {
+    const t = uuidv7();
+    const [a, b] = [uuidv7(), uuidv7()];
+    await addTokens(t, a, 60, "ga");
+    await addTokens(t, b, 60, "gb");
+    let calls = 0;
+    const second: PushPort = {
+      send: (ms) =>
+        ++calls === 2
+          ? Promise.reject(new Error("push service answered 503"))
+          : Promise.resolve(ms.map(() => ({ ok: true }))),
+    };
+    await deliver(t, [a, b], "inventory.balance.low", LOW, uuidv7(), undefined, second);
+    await runDeliveries({ pool: worker, push: second, leaseMs: 0 });
+    const states = [(await pending(t, a))?.push_pending, (await pending(t, b))?.push_pending];
+    expect(states.filter((s) => s === true)).toHaveLength(1);
+    expect(calls).toBe(2);
   });
 });

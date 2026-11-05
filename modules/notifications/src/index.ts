@@ -7,9 +7,11 @@ import { mountRoutes } from "./http.ts";
 
 export { createNotificationsConsumer, NOTIFICATIONS_CONSUMER } from "./consumer.ts";
 export type { NotificationsConsumer, NotificationsDeps } from "./consumer.ts";
-export { notify, sendPendingEmails } from "./notify.ts";
+export { markDeliveries, runDeliveries } from "./delivery.ts";
+export type { DeliveryDeps } from "./delivery.ts";
+export { notify } from "./notify.ts";
 export type { MailPort, Message } from "./notify.ts";
-export { createExpoPush, sendPendingPushes } from "./push.ts";
+export { createExpoPush } from "./push.ts";
 export type { PushMessage, PushPort, PushResult } from "./push.ts";
 export { KINDS } from "./kinds.ts";
 

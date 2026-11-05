@@ -183,7 +183,7 @@ jobs:
       group: ${{ needs.route.outputs.mode == 'assist' && format('claude-assist-{0}', github.event.issue.number || github.event.pull_request.number || github.run_id) || format('claude-noop-{0}', github.run_id) }}
       cancel-in-progress: false
     permissions:
-      contents: write   # allow Claude to commit and push fixes
+      contents: write # allow Claude to commit and push fixes
       pull-requests: write
       issues: write
       id-token: write
@@ -199,7 +199,7 @@ jobs:
         uses: anthropics/claude-code-action@cfc3eb22bfed5c26ef66e3223c982af27e4524de # v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          trigger_phrase: '@claude-code'
+          trigger_phrase: "@claude-code"
 
           # Caveman/token-efficiency instructions
           claude_args: |

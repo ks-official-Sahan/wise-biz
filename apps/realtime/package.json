@@ -17,6 +17,7 @@
     "start": "node src/main.ts"
   },
   "dependencies": {
+    "@opentelemetry/sdk-node": "0.223.0",
     "@wise-biz/env": "workspace:*",
     "@wise-biz/module-sync": "workspace:*",
     "pino": "10.4.0",

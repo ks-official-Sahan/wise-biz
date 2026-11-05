@@ -134,7 +134,11 @@ function randomNonce(): string {
 
 const nowSeconds = (): number => Math.floor(Date.now() / 1000);
 
-export function signRequest(input: SignInput): SignedHeaders {
+/** Everything except the signature itself: the headers to send and the exact bytes the signature must cover. */
+function prepare(input: Omit<SignInput, "secretKey">): {
+  headers: Omit<SignedHeaders, "signature">;
+  base: string;
+} {
   const created = input.now ?? nowSeconds();
   const nonce = input.nonce ?? randomNonce();
   const digest = contentDigest(input.body);
@@ -152,13 +156,33 @@ export function signRequest(input: SignInput): SignedHeaders {
     params,
   );
   return {
-    "content-digest": digest,
-    "x-wb-timestamp": String(created),
-    "x-wb-nonce": nonce,
-    "x-wb-device-id": input.deviceId,
-    "signature-input": `${LABEL}=${params}`,
-    signature: `${LABEL}=:${toBase64(sign(base, input.secretKey))}:`,
+    base,
+    headers: {
+      "content-digest": digest,
+      "x-wb-timestamp": String(created),
+      "x-wb-nonce": nonce,
+      "x-wb-device-id": input.deviceId,
+      "signature-input": `${LABEL}=${params}`,
+    },
   };
+}
+
+export function signRequest(input: SignInput): SignedHeaders {
+  const { headers, base } = prepare(input);
+  return { ...headers, signature: `${LABEL}=:${toBase64(sign(base, input.secretKey))}:` };
+}
+
+/**
+ * Same request signature, but the key stays where it is: `signer` receives the signature base and returns the Ed25519
+ * signature (a non-extractable WebCrypto key, or a call into another process). Verifies exactly like `signRequest`.
+ */
+export async function signRequestWith(
+  input: Omit<SignInput, "secretKey">,
+  signer: (base: Bytes) => Promise<Bytes>,
+): Promise<SignedHeaders> {
+  const { headers, base } = prepare(input);
+  const signature = await signer(utf8(base));
+  return { ...headers, signature: `${LABEL}=:${toBase64(signature)}:` };
 }
 
 const fail = (reason: VerifyFailure): VerifyResult => ({ ok: false, reason });

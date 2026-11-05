@@ -1,5 +1,3 @@
-import type { Q } from "./q.ts";
-
 /** One push to one phone. */
 export interface PushMessage {
   readonly to: string;
@@ -42,6 +40,8 @@ export function createExpoPush(
               ? {}
               : { authorization: `Bearer ${opts.accessToken}` }),
           },
+          // A hung connection must not hold a delivery pass (and its lease) open.
+          signal: AbortSignal.timeout(15_000),
           body: JSON.stringify(
             batch.map((m) => ({
               to: m.to,
@@ -70,61 +70,4 @@ export function createExpoPush(
       return results;
     },
   };
-}
-
-/**
- * Pushes this event's notifications to the phones of the people they are for, once. `pushed_at` records that a
- * notification went out, so a retry after a failure sends only what is still unsent. People with no registered phone
- * are marked done too (nothing to retry). Returns how many messages were handed over.
- */
-export async function sendPendingPushes(
-  client: Q,
-  push: PushPort,
-  tenantId: string,
-  dedupeKey: string,
-): Promise<number> {
-  const pending = await client.query<{
-    id: string;
-    title: string;
-    body: string;
-    link: string | null;
-    token: string | null;
-  }>(
-    `SELECT n.id, n.title, n.body, n.link, t.token
-       FROM notifications.notifications n
-       LEFT JOIN notifications.push_tokens t ON t.tenant_id = n.tenant_id AND t.user_id = n.user_id
-      WHERE n.tenant_id = $1 AND n.dedupe_key = $2 AND n.pushed_at IS NULL
-      ORDER BY n.id, t.token`,
-    [tenantId, dedupeKey],
-  );
-  if (pending.rows.length === 0) return 0;
-  const messages: (PushMessage & { notificationId: string })[] = [];
-  const ids = new Set<string>();
-  for (const r of pending.rows) {
-    ids.add(r.id);
-    if (r.token !== null)
-      messages.push({
-        to: r.token,
-        title: r.title,
-        body: r.body,
-        link: r.link,
-        notificationId: r.id,
-      });
-  }
-  const results = messages.length === 0 ? [] : await push.send(messages);
-  const dead = messages.filter((_, i) => {
-    const r = results[i];
-    return r !== undefined && !r.ok && r.unregistered;
-  });
-  for (const m of dead) {
-    await client.query(
-      `DELETE FROM notifications.push_tokens WHERE tenant_id = $1 AND token = $2`,
-      [tenantId, m.to],
-    );
-  }
-  await client.query(
-    `UPDATE notifications.notifications SET pushed_at = now() WHERE tenant_id = $1 AND id = ANY($2::uuid[])`,
-    [tenantId, [...ids]],
-  );
-  return messages.length;
 }

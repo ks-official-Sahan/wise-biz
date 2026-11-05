@@ -459,6 +459,24 @@ importers:
         specifier: 5.0.5
         version: 5.0.5(@edge-runtime/vm@5.0.0)(@opentelemetry/api@1.9.1)(@types/node@24.19.2)(@vitest/coverage-v8@5.0.5)(jsdom@30.1.3(@noble/hashes@2.4.0))(vite@8.3.4(@types/node@24.19.2)(jiti@2.7.0)(terser@5.51.2)(yaml@2.9.1))
 
+  apps/edge:
+    devDependencies:
+      '@wise-biz/config':
+        specifier: workspace:*
+        version: link:../../packages/config
+      '@wise-biz/testing':
+        specifier: workspace:*
+        version: link:../../packages/testing
+      eslint:
+        specifier: 10.13.0
+        version: 10.13.0(jiti@2.7.0)(supports-color@7.2.0)
+      typescript:
+        specifier: 6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: 5.0.5
+        version: 5.0.5(@edge-runtime/vm@5.0.0)(@opentelemetry/api@1.9.1)(@types/node@24.19.2)(@vitest/coverage-v8@5.0.5)(jsdom@30.1.3(@noble/hashes@2.4.0))(vite@8.3.4(@types/node@24.19.2)(jiti@2.7.0)(terser@5.51.2)(yaml@2.9.1))
+
   apps/pos:
     dependencies:
       '@expo/metro-runtime':
@@ -597,6 +615,9 @@ importers:
 
   apps/realtime:
     dependencies:
+      '@opentelemetry/sdk-node':
+        specifier: 0.223.0
+        version: 0.223.0(@opentelemetry/api@1.9.1)(supports-color@7.2.0)
       '@wise-biz/env':
         specifier: workspace:*
         version: link:../../packages/env
@@ -695,6 +716,9 @@ importers:
 
   apps/workers:
     dependencies:
+      '@opentelemetry/sdk-node':
+        specifier: 0.223.0
+        version: 0.223.0(@opentelemetry/api@1.9.1)(supports-color@7.2.0)
       '@wise-biz/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts

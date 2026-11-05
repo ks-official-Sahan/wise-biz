@@ -1,4 +1,4 @@
-import { generateKeyPair } from "@wise-biz/crypto";
+import { generateKeyPair, sign } from "@wise-biz/crypto";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -7,6 +7,7 @@ import {
   contentDigest,
   fromBase64,
   signRequest,
+  signRequestWith,
   signatureBase,
   toBase64,
   verifyRequest,
@@ -253,5 +254,24 @@ describe("query component (@query)", () => {
       (await verifyWith(h, { method: "GET", path: "/v1/sync/changes", body: undefined, query: "" }))
         .ok,
     ).toBe(true);
+  });
+});
+
+describe("signRequestWith (the key stays with the signer)", () => {
+  it("produces the same headers as signRequest and verifies", async () => {
+    const input = {
+      method: "POST",
+      path: "/v1/sales",
+      body,
+      deviceId: DEVICE,
+      now: NOW,
+      nonce: "n".repeat(22),
+    };
+    const direct = signRequest({ ...input, secretKey: keys.secretKey });
+    const viaSigner = await signRequestWith(input, (base) =>
+      Promise.resolve(sign(base, keys.secretKey)),
+    );
+    expect(viaSigner).toEqual(direct);
+    expect((await verifyWith(viaSigner, { now: NOW })).ok).toBe(true);
   });
 });

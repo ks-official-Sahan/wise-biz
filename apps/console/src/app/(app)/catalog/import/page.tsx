@@ -21,9 +21,9 @@ import {
   autoMap,
   catalogKeys,
   mappingProblems,
-  parseCsv,
   sha256Hex,
 } from "@/lib/catalog.ts";
+import { parseCsvAsync } from "@/lib/csv-client.ts";
 import { useTenant } from "@/lib/tenant.tsx";
 
 import s from "../catalog.module.css";
@@ -70,6 +70,8 @@ export default function ImportPage() {
   const [busy, setBusy] = useState(false);
   const stop = useRef(false);
   const abort = useRef<AbortController | null>(null);
+  // The newest file selection: an older parse that finishes later is dropped, never shown.
+  const parsing = useRef<AbortController | null>(null);
   // Read through a function: the flag is set from the unmount cleanup, which the compiler cannot see in `run`.
   const stopped = (): boolean => stop.current;
 
@@ -77,6 +79,7 @@ export default function ImportPage() {
     () => () => {
       stop.current = true;
       abort.current?.abort();
+      parsing.current?.abort();
     },
     [],
   );
@@ -84,6 +87,7 @@ export default function ImportPage() {
   async function choose(file: File | undefined): Promise<void> {
     setError(null);
     if (file === undefined) return;
+    parsing.current?.abort();
     if (file.size > MAX_BYTES) {
       setError("This file is larger than 20 MB. Split it into smaller files.");
       return;
@@ -92,8 +96,12 @@ export default function ImportPage() {
       setError("Choose a .csv file. In Excel or Sheets use Save as → CSV.");
       return;
     }
+    const ctl = new AbortController();
+    parsing.current = ctl;
     try {
-      const parsed = parseCsv(await file.text());
+      const text = await file.text();
+      const parsed = await parseCsvAsync(text, ctl.signal);
+      if (ctl.signal.aborted) return;
       const header = parsed[0];
       if (header === undefined || parsed.length < 2) {
         setError("The file has no products in it (it needs a header row and at least one row).");
@@ -104,7 +112,7 @@ export default function ImportPage() {
       setMapping(autoMap(header));
       setStep(1);
     } catch (e) {
-      if (stopped()) return;
+      if (stopped() || ctl.signal.aborted) return;
       setError(e instanceof Error ? e.message : "That file could not be read.");
     }
   }

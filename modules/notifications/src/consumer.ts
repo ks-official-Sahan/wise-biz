@@ -1,11 +1,9 @@
 import { z } from "zod";
 
-import { notify, sendPendingEmails } from "./notify.ts";
-import { sendPendingPushes } from "./push.ts";
+import { markDeliveries } from "./delivery.ts";
+import { notify } from "./notify.ts";
 
 import type { Kind } from "./kinds.ts";
-import type { MailPort } from "./notify.ts";
-import type { PushPort } from "./push.ts";
 import type { PoolClient } from "pg";
 
 export const NOTIFICATIONS_CONSUMER = "notifications.fanout";
@@ -19,10 +17,8 @@ const EVENTS = [
 ] as const;
 
 export interface NotificationsDeps {
-  /** Omit to keep notifications in the app only (tests, and deployments without a mailer). */
-  readonly mail?: MailPort;
-  /** Omit to skip phone push (tests, and deployments without one). */
-  readonly push?: PushPort;
+  /** Which channels stage 1 flags for delivery (the worker loop sends them; see runDeliveries). Omit for in-app only. */
+  readonly channels?: { readonly email?: boolean; readonly push?: boolean };
   /** Active people who hold a permission (the owner always counts). Built from tenancy at the composition root. */
   readonly holders: (
     client: PoolClient,
@@ -90,11 +86,9 @@ const Expiring = z.object({
  * screen, never to a URL outside the app.
  */
 export function createNotificationsConsumer(deps: NotificationsDeps): NotificationsConsumer {
-  /** Email and phone push for the notifications this event stored; each remembers what it already sent. */
-  const deliver = async (client: PoolClient, tenantId: string, eventId: string): Promise<void> => {
-    if (deps.mail !== undefined) await sendPendingEmails(client, deps.mail, tenantId, eventId);
-    if (deps.push !== undefined) await sendPendingPushes(client, deps.push, tenantId, eventId);
-  };
+  /** Flags what this event's notifications need sent; the delivery loop does the sending outside any transaction. */
+  const deliver = (client: PoolClient, tenantId: string, eventId: string): Promise<void> =>
+    markDeliveries(client, tenantId, eventId, deps.channels ?? {});
 
   const tell = async (
     client: PoolClient,

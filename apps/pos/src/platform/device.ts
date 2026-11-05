@@ -12,8 +12,27 @@ export interface DeviceIdentity {
   readonly deviceId: string;
   readonly tenantId: string;
   readonly branchId: string;
-  /** Raw 32-byte Ed25519 secret, base64. */
-  readonly secretKey: string;
+  /** Raw 32-byte Ed25519 secret, base64. Absent when the key lives in the vault's keyring (see `keyId`). */
+  readonly secretKey?: string;
+  /** Names a key the keyring holds and never hands out; the identity then carries no secret at all. */
+  readonly keyId?: string;
+}
+
+/** Signs for the device without exposing the key. */
+export interface DeviceSigner {
+  readonly publicKey: Uint8Array;
+  readonly sign: (message: Uint8Array) => Promise<Uint8Array>;
+}
+
+/**
+ * Keys that never leave their holder: a non-extractable WebCrypto key on the web, the main process on desktop. Script
+ * running in the page can ask for signatures while it runs, but cannot copy the key out and use it elsewhere.
+ */
+export interface DeviceKeyring {
+  /** Rejects when the platform cannot keep a key this way (the caller then falls back to the plain secret). */
+  readonly generate: (keyId: string) => Promise<DeviceSigner>;
+  readonly open: (keyId: string) => Promise<DeviceSigner | undefined>;
+  readonly remove: (keyId: string) => Promise<void>;
 }
 
 /**
@@ -21,6 +40,8 @@ export interface DeviceIdentity {
  * key in IndexedDB on web (low trust: such terminals are flagged), safeStorage on Electron.
  */
 export interface DeviceVault {
+  /** When present, new enrollments keep their key here and the identity stores no secret. */
+  keyring?: DeviceKeyring;
   load: () => Promise<DeviceIdentity | undefined>;
   save: (identity: DeviceIdentity) => Promise<void>;
   clear: () => Promise<void>;
@@ -52,54 +73,93 @@ export interface EnrolledDevice {
  * the vault only after the server accepted it (a failed enrollment leaves nothing behind).
  */
 export async function enrollDevice(opts: EnrollOptions): Promise<EnrolledDevice> {
-  const keys = generateKeyPair();
   const deviceId = uuidv7();
-  const signed = createSignedFetch({
-    baseUrl: opts.baseUrl,
-    deviceId,
-    secretKey: () => keys.secretKey,
-    fetch: opts.fetch,
-    ...(opts.now ? { now: opts.now } : {}),
-  });
-  const { body } = await signed<EnrolledDevice>("POST", "/v1/devices/enroll", {
-    body: {
-      code: opts.code,
+  // A key the platform keeps to itself if it can; otherwise the plain secret in the vault (the previous behaviour).
+  const held = await opts.vault.keyring?.generate(deviceId).catch(() => undefined);
+  const key =
+    held === undefined
+      ? plainKey()
+      : {
+          publicKey: held.publicKey,
+          auth: { sign: held.sign },
+          stored: { keyId: deviceId },
+        };
+  // From here on a failure of any step (the request, a refusal, the save) must not leave the held key behind.
+  try {
+    const signed = createSignedFetch({
+      baseUrl: opts.baseUrl,
       deviceId,
-      publicKey: toBase64url(keys.publicKey),
-      platform: opts.platform,
-      appVersion: opts.appVersion,
-    },
-  });
-  await opts.vault.save({
-    deviceId,
-    tenantId: body.tenantId,
-    branchId: body.branchId,
-    secretKey: toBase64(keys.secretKey),
-  });
-  return body;
+      ...key.auth,
+      fetch: opts.fetch,
+      ...(opts.now ? { now: opts.now } : {}),
+    });
+    const { body } = await signed<EnrolledDevice>("POST", "/v1/devices/enroll", {
+      body: {
+        code: opts.code,
+        deviceId,
+        publicKey: toBase64url(key.publicKey),
+        platform: opts.platform,
+        appVersion: opts.appVersion,
+      },
+    });
+    await opts.vault.save({
+      deviceId,
+      tenantId: body.tenantId,
+      branchId: body.branchId,
+      ...key.stored,
+    });
+    return body;
+  } catch (err) {
+    if (held !== undefined) await opts.vault.keyring?.remove(deviceId).catch(() => undefined);
+    throw err;
+  }
 }
 
-/** The `KeyStore` the sync package signs commands with, backed by the vault identity. */
-export function createKeyStore(identity: DeviceIdentity): KeyStore {
-  const secret = fromBase64(identity.secretKey);
-  const pub = publicKeyFrom(secret);
+function plainKey() {
+  const pair = generateKeyPair();
   return {
-    publicKey: () => Promise.resolve(pub),
+    publicKey: pair.publicKey,
+    auth: { secretKey: () => pair.secretKey },
+    stored: { secretKey: toBase64(pair.secretKey) },
+  };
+}
+
+/**
+ * The signer for a stored identity: the keyring's held key, or the plain secret from the vault. Undefined means the key
+ * is gone (the keyring was cleared): the terminal has to enrol again.
+ */
+export async function openSigner(
+  identity: DeviceIdentity,
+  vault: DeviceVault,
+): Promise<DeviceSigner | undefined> {
+  if (identity.keyId !== undefined) return vault.keyring?.open(identity.keyId);
+  if (identity.secretKey === undefined) return undefined;
+  const secret = fromBase64(identity.secretKey);
+  return {
+    publicKey: publicKeyFrom(secret),
     sign: (message) => Promise.resolve(sign(message, secret)),
+  };
+}
+
+/** The `KeyStore` the sync package signs commands with. */
+export function createKeyStore(signer: DeviceSigner): KeyStore {
+  return {
+    publicKey: () => Promise.resolve(signer.publicKey),
+    sign: (message) => signer.sign(message),
   };
 }
 
 export function signedFetchFor(
   identity: DeviceIdentity,
+  signer: DeviceSigner,
   baseUrl: string,
   fetchFn: FetchLike,
   now?: () => number,
 ): SignedFetch {
-  const secret = fromBase64(identity.secretKey);
   return createSignedFetch({
     baseUrl,
     deviceId: identity.deviceId,
-    secretKey: () => secret,
+    sign: signer.sign,
     fetch: fetchFn,
     ...(now ? { now } : {}),
   });

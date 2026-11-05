@@ -1,0 +1,123 @@
+name: Desktop
+
+# Builds the POS desktop terminal installers (apps/desktop, electron-builder) on a release tag: Windows (NSIS, signed),
+# macOS (dmg and zip, signed and notarized) and Linux (AppImage and deb; not code-signed, there is no signing step). The installers and the update-feed files (`latest*.yml`) are
+# attached to the run as artifacts; copying them to the update origin (WISE_BIZ_UPDATE_URL) is a separate, deliberate step
+# until that host exists (docs/architecture/deployment.md).
+#
+# Configuration, GitHub environment `desktop-release` (Settings > Environments):
+#   variables: WISE_BIZ_API_URL (https API origin the terminal talks to), WISE_BIZ_UPDATE_URL (https update feed origin)
+#   Limit the environment to the v*.*.* tags (deployment tags rule), so only a release tag can reach the signing secrets.
+#   secrets:   WIN_CSC_LINK, WIN_CSC_KEY_PASSWORD (Windows code signing certificate),
+#              CSC_LINK, CSC_KEY_PASSWORD, APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID (macOS Developer ID and notarization)
+
+on:
+  push:
+    tags: ["v*.*.*"]
+
+permissions: {}
+
+concurrency:
+  group: desktop-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build ${{ matrix.os }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    # The signing secrets live in the protected environment.
+    environment: desktop-release
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows
+            runner: windows-2025
+          - os: macos
+            runner: macos-15
+          - os: linux
+            runner: ubuntu-24.04
+    env:
+      LEFTHOOK: 0
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      - name: Setup Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Refuse a tag that is not the desktop package version
+        shell: bash
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          PKG="$(node -p "require('./apps/desktop/package.json').version")"
+          [[ "$TAG" == "v$PKG" ]] || { echo "Tag $TAG does not match apps/desktop version $PKG (the installers and update feed take the package version)" >&2; exit 1; }
+
+      - name: Refuse a release build with no signing or no endpoints
+        shell: bash
+        env:
+          API_URL: ${{ vars.WISE_BIZ_API_URL }}
+          UPDATE_URL: ${{ vars.WISE_BIZ_UPDATE_URL }}
+          WIN_CERT: ${{ secrets.WIN_CSC_LINK }}
+          MAC_CERT: ${{ secrets.CSC_LINK }}
+          NOTARY_ID: ${{ secrets.APPLE_ID }}
+          NOTARY_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          NOTARY_TEAM: ${{ secrets.APPLE_TEAM_ID }}
+          MATRIX_OS: ${{ matrix.os }}
+        run: |
+          [[ "$API_URL" == https://* ]] || { echo "WISE_BIZ_API_URL must be an https URL" >&2; exit 1; }
+          [[ "$UPDATE_URL" == https://* ]] || { echo "WISE_BIZ_UPDATE_URL must be an https URL" >&2; exit 1; }
+          if [[ "$MATRIX_OS" == windows && -z "$WIN_CERT" ]]; then echo "WIN_CSC_LINK is not set: never ship an unsigned installer" >&2; exit 1; fi
+          if [[ "$MATRIX_OS" == macos && ( -z "$MAC_CERT" || -z "$NOTARY_ID" || -z "$NOTARY_PASSWORD" || -z "$NOTARY_TEAM" ) ]]; then echo "macOS signing or notarization is not configured" >&2; exit 1; fi
+
+      - name: Export the POS web app (the terminal's renderer)
+        run: pnpm -F @wise-biz/pos export:web
+        env:
+          EXPO_PUBLIC_API_URL: ${{ vars.WISE_BIZ_API_URL }}
+
+      - name: Build the app and the installers (release)
+        run: pnpm -F @wise-biz/desktop dist
+        env:
+          WISE_BIZ_API_URL: ${{ vars.WISE_BIZ_API_URL }}
+          WISE_BIZ_UPDATE_URL: ${{ vars.WISE_BIZ_UPDATE_URL }}
+          WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+      - name: Smoke test the unpacked app (fuses set, the app starts)
+        if: matrix.os == 'windows'
+        run: pnpm -F @wise-biz/desktop package:smoke
+
+      - name: Upload the installers and update feed files
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: desktop-${{ matrix.os }}
+          if-no-files-found: error
+          retention-days: 30
+          path: |
+            apps/desktop/release/*.exe
+            apps/desktop/release/*.dmg
+            apps/desktop/release/*.zip
+            apps/desktop/release/*.AppImage
+            apps/desktop/release/*.deb
+            apps/desktop/release/latest*.yml
+            apps/desktop/release/*.blockmap
