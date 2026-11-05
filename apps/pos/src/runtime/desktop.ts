@@ -116,7 +116,7 @@ const isIdentity = (v: unknown): v is DeviceIdentity => {
     typeof o.deviceId === "string" &&
     typeof o.tenantId === "string" &&
     typeof o.branchId === "string" &&
-    typeof o.secretKey === "string"
+    (typeof o.secretKey === "string" || typeof o.keyId === "string")
   );
 };
 

@@ -1,8 +1,10 @@
 export { createServerClock } from "./clock.ts";
 export type { ServerClock } from "./clock.ts";
-export { createKeyStore, enrollDevice, signedFetchFor } from "./device.ts";
+export { createKeyStore, enrollDevice, openSigner, signedFetchFor } from "./device.ts";
 export type {
   DeviceIdentity,
+  DeviceKeyring,
+  DeviceSigner,
   DeviceVault,
   EnrolledDevice,
   EnrollOptions,

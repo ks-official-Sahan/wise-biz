@@ -12,6 +12,7 @@ import {
   heartbeat,
   pinLogin,
   pinLogout,
+  openSigner,
   signedFetchFor,
 } from "../platform/index.ts";
 import { sessionSlice } from "../state/slices.ts";
@@ -105,11 +106,14 @@ export function createController(deps: ControllerDeps) {
   }
 
   async function begin(id: DeviceIdentity): Promise<void> {
-    signed = signedFetchFor(id, deps.baseUrl, deps.fetch, clock.now);
+    const signer = await openSigner(id, vault);
+    if (signer === undefined)
+      throw new Error("The device key is gone; this terminal must enrol again.");
+    signed = signedFetchFor(id, signer, deps.baseUrl, deps.fetch, clock.now);
     const db = await openLocalDb(await deps.openStorage(id.deviceId));
     client = createSyncClient({
       db,
-      keys: createKeyStore(id),
+      keys: createKeyStore(signer),
       hlc: createHlc({ node: id.deviceId, now: clock.now }),
       ids: { uuidv7 },
       push: createPushTransport(signed),
@@ -194,7 +198,12 @@ export function createController(deps: ControllerDeps) {
     clock,
     /** Reads the vault and decides where the app starts. */
     async boot(): Promise<void> {
-      const id = await vault.load();
+      let id = await vault.load();
+      // An identity whose key is gone (the browser cleared its key store) cannot sign anything: start again at enrolment.
+      if (id !== undefined && (await openSigner(id, vault)) === undefined) {
+        await vault.clear();
+        id = undefined;
+      }
       dispatch(
         sessionSlice.actions.booted({
           device:

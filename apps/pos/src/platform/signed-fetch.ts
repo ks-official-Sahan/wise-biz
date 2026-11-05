@@ -1,4 +1,4 @@
-import { signRequest } from "@wise-biz/http-signatures";
+import { signRequest, signRequestWith } from "@wise-biz/http-signatures";
 import { TransportError } from "@wise-biz/sync";
 
 export type FetchLike = (
@@ -14,7 +14,9 @@ export interface SignedFetchOptions {
   baseUrl: string;
   deviceId: string;
   /** The device's Ed25519 secret key (raw 32 bytes), read from the platform vault when needed. */
-  secretKey: () => Uint8Array | Promise<Uint8Array>;
+  secretKey?: () => Uint8Array | Promise<Uint8Array>;
+  /** Or a signer that keeps the key to itself (a non-extractable key, another process): give this or `secretKey`. */
+  sign?: (message: Uint8Array) => Promise<Uint8Array>;
   fetch: FetchLike;
   /** Corrected server time in ms (see ServerClock): the server rejects a signature more than 5 min off. */
   now?: () => number;
@@ -55,16 +57,24 @@ export function createSignedFetch(opts: SignedFetchOptions): SignedFetch {
     const pathOnly = cut < 0 ? path : path.slice(0, cut);
     const query = cut < 0 ? "" : path.slice(cut + 1);
     const body = options.body === undefined ? undefined : JSON.stringify(options.body);
+    const request = {
+      method,
+      path: pathOnly,
+      query,
+      body,
+      deviceId: opts.deviceId,
+      now: Math.floor(now() / 1000),
+    };
+    const signature =
+      opts.sign !== undefined
+        ? await signRequestWith(request, opts.sign)
+        : opts.secretKey !== undefined
+          ? signRequest({ ...request, secretKey: await opts.secretKey() })
+          : undefined;
+    if (signature === undefined)
+      throw new Error("createSignedFetch needs a secretKey or a sign function");
     const headers: Record<string, string> = {
-      ...signRequest({
-        method,
-        path: pathOnly,
-        query,
-        body,
-        deviceId: opts.deviceId,
-        secretKey: await opts.secretKey(),
-        now: Math.floor(now() / 1000),
-      }),
+      ...signature,
       accept: "application/json",
       ...(body === undefined ? {} : { "content-type": "application/json" }),
       ...options.headers,

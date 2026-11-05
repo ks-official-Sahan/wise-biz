@@ -7,6 +7,7 @@ export {
   contentDigest,
   fromBase64,
   signRequest,
+  signRequestWith,
   signatureBase,
   toBase64,
   verifyRequest,

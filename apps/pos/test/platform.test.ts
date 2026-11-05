@@ -1,4 +1,4 @@
-import { fromBase64url, generateKeyPair, verify } from "@wise-biz/crypto";
+import { fromBase64url, generateKeyPair, sign, verify } from "@wise-biz/crypto";
 import { fromBase64, signatureBase, verifyRequest } from "@wise-biz/http-signatures";
 import { uuidv7 } from "@wise-biz/ids";
 import { TransportError } from "@wise-biz/sync";
@@ -12,13 +12,20 @@ import {
   createSignedFetch,
   createTicketSource,
   enrollDevice,
+  openSigner,
   heartbeat,
   pinLogin,
   pinLogout,
   signedFetchFor,
 } from "../src/platform/index.ts";
 
-import type { DeviceIdentity, DeviceVault, FetchLike } from "../src/platform/index.ts";
+import type {
+  DeviceIdentity,
+  DeviceKeyring,
+  DeviceSigner,
+  DeviceVault,
+  FetchLike,
+} from "../src/platform/index.ts";
 
 interface Seen {
   url: string;
@@ -60,6 +67,10 @@ const identity: DeviceIdentity = {
   branchId: uuidv7(),
   secretKey: Buffer.from(keys.secretKey).toString("base64"),
 };
+const plainSigner: DeviceSigner = {
+  publicKey: keys.publicKey,
+  sign: (m) => Promise.resolve(sign(m, keys.secretKey)),
+};
 const BASE = "https://api.test/";
 
 async function verifies(req: Seen, publicKey: Uint8Array, nowMs: number) {
@@ -79,7 +90,7 @@ async function verifies(req: Seen, publicKey: Uint8Array, nowMs: number) {
 describe("signed fetch", () => {
   it("signs the query apart from the path, and the server verifies both", async () => {
     const api = fakeApi(() => ({ status: 200, body: {} }));
-    const f = signedFetchFor(identity, BASE, api.fetchFn, () => 1_800_000_000_000);
+    const f = signedFetchFor(identity, plainSigner, BASE, api.fetchFn, () => 1_800_000_000_000);
     await f("GET", "/v1/sync/changes?dataset=catalog&cursor=5");
     const req = first(api.seen);
     expect(req.url).toBe("https://api.test/v1/sync/changes?dataset=catalog&cursor=5");
@@ -90,7 +101,7 @@ describe("signed fetch", () => {
 
   it("signs method, path, body digest, time and nonce exactly as the server verifies", async () => {
     const api = fakeApi(() => ({ status: 200, body: { ok: true } }));
-    const f = signedFetchFor(identity, BASE, api.fetchFn, () => 1_800_000_000_000);
+    const f = signedFetchFor(identity, plainSigner, BASE, api.fetchFn, () => 1_800_000_000_000);
     const res = await f<{ ok: boolean }>("POST", "/v1/sync/commands", { body: { commands: [] } });
     expect(res).toMatchObject({ status: 200, body: { ok: true } });
     const req = first(api.seen);
@@ -112,7 +123,7 @@ describe("signed fetch", () => {
 
   it("uses fresh nonces and sends no body header on a GET", async () => {
     const api = fakeApi(() => ({ status: 200 }));
-    const f = signedFetchFor(identity, BASE, api.fetchFn);
+    const f = signedFetchFor(identity, plainSigner, BASE, api.fetchFn);
     await f("GET", "/v1/devices");
     await f("GET", "/v1/devices");
     expect(api.seen[0]?.headers["content-type"]).toBeUndefined();
@@ -125,7 +136,7 @@ describe("signed fetch", () => {
       body: { code: "RATE_LIMITED", detail: "slow down" },
       headers: { "retry-after": "12" },
     }));
-    const f = signedFetchFor(identity, BASE, api.fetchFn);
+    const f = signedFetchFor(identity, plainSigner, BASE, api.fetchFn);
     const err = await f("GET", "/x").catch((e: unknown) => e);
     expect(err).toBeInstanceOf(TransportError);
     expect(err).toMatchObject({
@@ -145,7 +156,7 @@ describe("signed fetch", () => {
     });
     await expect(down("GET", "/x")).rejects.toMatchObject({ status: 0 });
     const html = fakeApi(() => ({ status: 502, headers: {} }));
-    const f = signedFetchFor(identity, BASE, (u, i) =>
+    const f = signedFetchFor(identity, plainSigner, BASE, (u, i) =>
       html
         .fetchFn(u, i)
         .then((r) => ({ ...r, text: () => Promise.resolve("<html>bad gateway</html>") })),
@@ -156,14 +167,16 @@ describe("signed fetch", () => {
       message: "HTTP 502",
     });
     const weird = fakeApi(() => ({ status: 500, headers: { "retry-after": "soon" } }));
-    await expect(signedFetchFor(identity, BASE, weird.fetchFn)("GET", "/x")).rejects.toMatchObject({
+    await expect(
+      signedFetchFor(identity, plainSigner, BASE, weird.fetchFn)("GET", "/x"),
+    ).rejects.toMatchObject({
       retryAfterMs: undefined,
     });
   });
 
   it("returns a 304 only when the caller accepts it", async () => {
     const api = fakeApi(() => ({ status: 304, headers: { etag: 'W/"a"' } }));
-    const f = signedFetchFor(identity, BASE, api.fetchFn);
+    const f = signedFetchFor(identity, plainSigner, BASE, api.fetchFn);
     expect(await f("GET", "/x", { accept304: true })).toMatchObject({ status: 304, etag: 'W/"a"' });
     await expect(f("GET", "/x")).rejects.toMatchObject({ status: 304 });
   });
@@ -173,7 +186,7 @@ describe("transports", () => {
   it("pushes commands and returns the server's answer as is", async () => {
     const answer = { acks: [{ seq: 0, status: "applied" }], stopped: null, lastSeq: 0 };
     const api = fakeApi(() => ({ status: 200, body: answer }));
-    const t = createPushTransport(signedFetchFor(identity, BASE, api.fetchFn));
+    const t = createPushTransport(signedFetchFor(identity, plainSigner, BASE, api.fetchFn));
     const cmd = {
       type: "open_shift",
       body: { meta: { deviceSeq: 0, prevHash: "a", hash: "b", signature: "c" } },
@@ -195,7 +208,7 @@ describe("transports", () => {
       };
     });
     const t = createPullTransport({
-      signed: signedFetchFor(identity, BASE, api.fetchFn),
+      signed: signedFetchFor(identity, plainSigner, BASE, api.fetchFn),
       download: () => Promise.resolve(new Uint8Array()),
     });
     const first = await t.changes("prices", "c0", 100);
@@ -218,7 +231,7 @@ describe("transports", () => {
       headers: { etag: 'W/"busy"' },
     }));
     const t = createPullTransport({
-      signed: signedFetchFor(identity, BASE, api.fetchFn),
+      signed: signedFetchFor(identity, plainSigner, BASE, api.fetchFn),
       download: () => Promise.resolve(new Uint8Array()),
     });
     await t.changes("tax", "c1", 10);
@@ -232,7 +245,7 @@ describe("transports", () => {
         ? { status: 200, body: { cursor: "c9", url: "https://files.test/s.gz" } }
         : { status: 200, body: { token: "t", url: "https://rt.test" } },
     );
-    const signed = signedFetchFor(identity, BASE, api.fetchFn);
+    const signed = signedFetchFor(identity, plainSigner, BASE, api.fetchFn);
     const t = createPullTransport({ signed, download: () => Promise.resolve(new Uint8Array([1])) });
     expect(await t.bootstrap("catalog")).toEqual({ cursor: "c9", url: "https://files.test/s.gz" });
     expect(api.seen[0]?.url).toBe("https://api.test/v1/sync/bootstrap?dataset=catalog");
@@ -308,14 +321,131 @@ describe("enrollment", () => {
   });
 });
 
+describe("enrollment with a key the platform keeps", () => {
+  /** A keyring like the web one: the secret lives in this closure and is never handed out. */
+  const fakeKeyring = (opts: { failGenerate?: boolean } = {}) => {
+    const held = new Map<string, DeviceSigner>();
+    const removed: string[] = [];
+    const keyring: DeviceKeyring = {
+      generate: (keyId) => {
+        if (opts.failGenerate === true)
+          return Promise.reject(new Error("Ed25519 is not supported"));
+        const k = generateKeyPair();
+        const signer: DeviceSigner = {
+          publicKey: k.publicKey,
+          sign: (m) => Promise.resolve(sign(m, k.secretKey)),
+        };
+        held.set(keyId, signer);
+        return Promise.resolve(signer);
+      },
+      open: (keyId) => Promise.resolve(held.get(keyId)),
+      remove: (keyId) => {
+        removed.push(keyId);
+        held.delete(keyId);
+        return Promise.resolve();
+      },
+    };
+    return { keyring, held, removed };
+  };
+  const vaultWith = (keyring: DeviceKeyring, failSave = false) => {
+    let saved: DeviceIdentity | undefined;
+    const vault: DeviceVault = {
+      keyring,
+      load: () => Promise.resolve(saved),
+      save: (i) => {
+        if (failSave) return Promise.reject(new Error("disk full"));
+        saved = i;
+        return Promise.resolve();
+      },
+      clear: () => Promise.resolve(),
+    };
+    return { vault, saved: () => saved };
+  };
+  const accepted = () => {
+    let body: { publicKey: string; deviceId: string } | undefined;
+    const api = fakeApi((req) => {
+      body = JSON.parse(req.body ?? "{}") as typeof body;
+      return {
+        status: 201,
+        body: {
+          deviceId: body?.deviceId,
+          tenantId: uuidv7(),
+          branchId: uuidv7(),
+          name: "T",
+          status: "active",
+        },
+      };
+    });
+    return { api, body: () => body };
+  };
+  const enrol = (vault: DeviceVault, fetch: FetchLike) =>
+    enrollDevice({
+      baseUrl: BASE,
+      code: "ABCD-2345",
+      platform: "web",
+      appVersion: "1",
+      vault,
+      fetch,
+      now: () => 1_800_000_000_000,
+    });
+
+  it("signs with the held key and stores an identity that has no secret", async () => {
+    const { keyring, held } = fakeKeyring();
+    const v = vaultWith(keyring);
+    const srv = accepted();
+    await enrol(v.vault, srv.api.fetchFn);
+    const id = v.saved();
+    expect(id?.secretKey).toBeUndefined();
+    expect(id?.keyId).toBe(srv.body()?.deviceId);
+    const pub = fromBase64url(srv.body()?.publicKey ?? "");
+    expect(held.get(id?.keyId ?? "")?.publicKey).toEqual(pub);
+    expect(await verifies(first(srv.api.seen), pub, 1_800_000_000_000)).toMatchObject({ ok: true });
+  });
+
+  it("opens the held signer for a stored identity, or reports the key gone", async () => {
+    const { keyring } = fakeKeyring();
+    const v = vaultWith(keyring);
+    await enrol(v.vault, accepted().api.fetchFn);
+    const id = v.saved();
+    if (id === undefined) throw new Error("not saved");
+    expect(await openSigner(id, v.vault)).toBeDefined();
+    expect(await openSigner({ ...id, keyId: uuidv7() }, v.vault)).toBeUndefined();
+    const withoutKey: DeviceIdentity = {
+      deviceId: id.deviceId,
+      tenantId: id.tenantId,
+      branchId: id.branchId,
+    };
+    expect(await openSigner(withoutKey, v.vault)).toBeUndefined();
+    const plain = await openSigner(identity, v.vault);
+    expect(plain?.publicKey).toEqual(keys.publicKey);
+  });
+
+  it("falls back to the plain secret when the platform cannot hold the key", async () => {
+    const { keyring } = fakeKeyring({ failGenerate: true });
+    const v = vaultWith(keyring);
+    const srv = accepted();
+    await enrol(v.vault, srv.api.fetchFn);
+    expect(v.saved()?.keyId).toBeUndefined();
+    expect(fromBase64(v.saved()?.secretKey ?? "")).toHaveLength(32);
+  });
+
+  it("forgets the held key when the identity cannot be saved", async () => {
+    const { keyring, held, removed } = fakeKeyring();
+    const v = vaultWith(keyring, true);
+    await expect(enrol(v.vault, accepted().api.fetchFn)).rejects.toThrow("disk full");
+    expect(removed).toHaveLength(1);
+    expect(held.size).toBe(0);
+  });
+});
+
 describe("key store, clock, session", () => {
   it("signs commands with the vault key; the signature verifies under the public key", async () => {
-    const ks = createKeyStore(identity);
+    const ks = createKeyStore(plainSigner);
     const msg = new Uint8Array([1, 2, 3]);
     const sig = await ks.sign(msg);
     expect(verify(sig, msg, await ks.publicKey())).toBe(true);
     expect(await ks.publicKey()).toEqual(keys.publicKey);
-    expect(fromBase64(identity.secretKey)).toHaveLength(32);
+    expect(fromBase64(identity.secretKey ?? "")).toHaveLength(32);
   });
 
   it("learns the server clock offset from heartbeats and applies it", async () => {
@@ -326,7 +456,7 @@ describe("key store, clock, session", () => {
       status: 200,
       body: { status: "active", serverTime: new Date(1_000_000 + 420_000).toISOString() },
     }));
-    const signed = signedFetchFor(identity, BASE, api.fetchFn, clock.now);
+    const signed = signedFetchFor(identity, plainSigner, BASE, api.fetchFn, clock.now);
     const reply = await heartbeat(signed, clock, { appVersion: "1.0.0", unsyncedCount: 3 });
     expect(reply.status).toBe("active");
     expect(clock.offsetMs()).toBe(420_000);
@@ -348,7 +478,7 @@ describe("key store, clock, session", () => {
         ? { status: 201, body: { sessionId: "s1", userId, expiresAt: "2026-01-01T12:00:00Z" } }
         : { status: 204 },
     );
-    const signed = signedFetchFor(identity, BASE, api.fetchFn);
+    const signed = signedFetchFor(identity, plainSigner, BASE, api.fetchFn);
     expect(await pinLogin(signed, userId, "4821")).toMatchObject({ sessionId: "s1", userId });
     expect(JSON.parse(api.seen[0]?.body ?? "{}")).toEqual({ userId, pin: "4821" });
     await pinLogout(signed);

@@ -1,7 +1,12 @@
 import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
 
-import type { DeviceIdentity, DeviceVault } from "../platform/index.ts";
+import type {
+  DeviceIdentity,
+  DeviceKeyring,
+  DeviceSigner,
+  DeviceVault,
+} from "../platform/index.ts";
 import type { KeyValue } from "../state/store.ts";
 
 const IDENTITY_KEY = "wb.pos.identity.v1";
@@ -13,9 +18,83 @@ const isIdentity = (v: unknown): v is DeviceIdentity => {
     typeof o.deviceId === "string" &&
     typeof o.tenantId === "string" &&
     typeof o.branchId === "string" &&
-    typeof o.secretKey === "string"
+    (typeof o.secretKey === "string" || typeof o.keyId === "string")
   );
 };
+
+const KEY_DB = "wb-device-keys";
+const KEY_STORE = "keys";
+
+function keyDb(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const req = globalThis.indexedDB.open(KEY_DB, 1);
+    req.onupgradeneeded = () => {
+      req.result.createObjectStore(KEY_STORE);
+    };
+    req.onsuccess = () => {
+      resolve(req.result);
+    };
+    req.onerror = () => {
+      reject(req.error ?? new Error("key store unavailable"));
+    };
+  });
+}
+
+async function keyTx<T>(
+  mode: IDBTransactionMode,
+  run: (s: IDBObjectStore) => IDBRequest<T>,
+): Promise<T> {
+  const db = await keyDb();
+  try {
+    return await new Promise<T>((resolve, reject) => {
+      const req = run(db.transaction(KEY_STORE, mode).objectStore(KEY_STORE));
+      req.onsuccess = () => {
+        resolve(req.result);
+      };
+      req.onerror = () => {
+        reject(req.error ?? new Error("key store failed"));
+      };
+    });
+  } finally {
+    db.close();
+  }
+}
+
+async function signerOf(pair: CryptoKeyPair): Promise<DeviceSigner> {
+  const publicKey = new Uint8Array(await globalThis.crypto.subtle.exportKey("raw", pair.publicKey));
+  return {
+    publicKey,
+    sign: async (message) =>
+      new Uint8Array(
+        await globalThis.crypto.subtle.sign("Ed25519", pair.privateKey, message as BufferSource),
+      ),
+  };
+}
+
+/**
+ * The web terminal's key as a non-extractable WebCrypto Ed25519 key in IndexedDB: script on the page can ask it to sign
+ * while it runs, but nothing can read the key out and carry it away (unlike a secret in localStorage). Where the browser
+ * has no Ed25519 in WebCrypto, `generate` rejects and enrolment keeps the plain secret as before.
+ */
+export function createWebKeyring(): DeviceKeyring {
+  return {
+    generate: async (keyId) => {
+      const pair = await globalThis.crypto.subtle.generateKey("Ed25519", false, ["sign", "verify"]);
+      await keyTx("readwrite", (s) => s.put(pair, keyId));
+      return signerOf(pair);
+    },
+    open: async (keyId) => {
+      const found: unknown = await keyTx("readonly", (s) => s.get(keyId) as IDBRequest<unknown>);
+      return found === undefined ? undefined : signerOf(found as CryptoKeyPair);
+    },
+    remove: async (keyId) => {
+      await keyTx("readwrite", (s) => s.delete(keyId));
+    },
+  };
+}
+
+const hasWebKeys = (): boolean =>
+  typeof globalThis.indexedDB !== "undefined" && typeof globalThis.crypto.subtle !== "undefined";
 
 /**
  * Where the device key lives. Native: Keychain / Android Keystore through expo-secure-store (hardware-backed where the
@@ -26,15 +105,18 @@ export const isLowTrustPlatform = Platform.OS === "web";
 
 export function createVault(): DeviceVault {
   if (Platform.OS === "web") {
+    const keyring = hasWebKeys() ? createWebKeyring() : undefined;
     return {
+      ...(keyring === undefined ? {} : { keyring }),
       load: () => Promise.resolve(parse(globalThis.localStorage.getItem(IDENTITY_KEY))),
       save: (i) => {
         globalThis.localStorage.setItem(IDENTITY_KEY, JSON.stringify(i));
         return Promise.resolve();
       },
-      clear: () => {
+      clear: async () => {
+        const id = parse(globalThis.localStorage.getItem(IDENTITY_KEY));
         globalThis.localStorage.removeItem(IDENTITY_KEY);
-        return Promise.resolve();
+        if (id?.keyId !== undefined) await keyring?.remove(id.keyId).catch(() => undefined);
       },
     };
   }
