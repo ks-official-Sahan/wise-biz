@@ -23,6 +23,8 @@ export interface EdgeEnv {
 export const MAX_BODY_BYTES = 2 * 1024 * 1024;
 const UNSAFE = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 const SHORT_CODE = /^[0-9A-Za-z_-]{3,32}$/;
+/** The business a short link belongs to (ADR 0020): a UUID in the path, the same value the API uses as tenant id. */
+const TENANT_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 /** Headers that say where a request came from: the edge sets them itself and never forwards the client's. */
 const FORGEABLE = [
   "x-forwarded-for",
@@ -58,10 +60,11 @@ function isHttpsUrl(value: string): boolean {
   }
 }
 
-async function shortlink(code: string, env: EdgeEnv): Promise<Response> {
-  // TODO(tenant): this key has no tenant part. Decide how a public short link carries its business (path segment or
-  // host) and use it here and in the writer, before anything writes to this KV namespace.
-  const target = SHORT_CODE.test(code) ? await env.SHORTLINKS?.get(`s:${code}`) : null;
+/** `/s/:tenant/:code`. The KV key carries the business, so two businesses can use the same code (ADR 0020). */
+async function shortlink(rest: string, env: EdgeEnv): Promise<Response> {
+  const [tenant = "", code = "", extra] = rest.split("/");
+  const valid = extra === undefined && TENANT_ID.test(tenant) && SHORT_CODE.test(code);
+  const target = valid ? await env.SHORTLINKS?.get(`s:${tenant}:${code}`) : null;
   // A target that is not https (or not a URL) is never followed: the KV is a data store, not a trusted redirect list.
   if (target === null || target === undefined || !isHttpsUrl(target))
     return new Response("Not found", { status: 404, headers: { "cache-control": "no-store" } });

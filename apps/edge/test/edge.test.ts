@@ -184,6 +184,9 @@ describe("limits", () => {
   });
 });
 
+const T1 = "0198f3a2-aaaa-7bbb-8ccc-1234567890ab";
+const T2 = "0198f3a2-aaaa-7bbb-8ccc-1234567890ac";
+
 describe("short links", () => {
   const kv = (map: Record<string, string>): EdgeEnv => ({
     ...env,
@@ -192,7 +195,10 @@ describe("short links", () => {
 
   it("redirects a known code to its https target", async () => {
     const { edge, seen } = harness();
-    const res = await edge(req("/s/abc123"), kv({ "s:abc123": "https://shop.example/promo" }));
+    const res = await edge(
+      req(`/s/${T1}/abc123`),
+      kv({ [`s:${T1}:abc123`]: "https://shop.example/promo" }),
+    );
     expect(res.status).toBe(302);
     expect(res.headers.get("location")).toBe("https://shop.example/promo");
     expect(seen).toHaveLength(0);
@@ -201,20 +207,38 @@ describe("short links", () => {
   it("404s an unknown code, a malformed code, a missing namespace and a non-https target", async () => {
     const { edge } = harness();
     const map = {
-      "s:abc123": "https://shop.example/",
-      "s:bad000": "javascript:alert(1)",
-      "s:http00": "http://x.example/",
+      [`s:${T1}:abc123`]: "https://shop.example/",
+      [`s:${T1}:bad000`]: "javascript:alert(1)",
+      [`s:${T1}:http00`]: "http://x.example/",
     };
-    expect((await edge(req("/s/zzz999"), kv(map))).status).toBe(404);
-    expect((await edge(req("/s/a%2Fb"), kv(map))).status).toBe(404);
-    expect((await edge(req("/s/abc123"), env)).status).toBe(404);
-    expect((await edge(req("/s/bad000"), kv(map))).status).toBe(404);
-    expect((await edge(req("/s/http00"), kv(map))).status).toBe(404);
+    expect((await edge(req(`/s/${T1}/zzz999`), kv(map))).status).toBe(404);
+    expect((await edge(req(`/s/${T1}/a%2Fb`), kv(map))).status).toBe(404);
+    expect((await edge(req(`/s/${T1}/abc123`), env)).status).toBe(404);
+    expect((await edge(req(`/s/${T1}/bad000`), kv(map))).status).toBe(404);
+    expect((await edge(req(`/s/${T1}/http00`), kv(map))).status).toBe(404);
+  });
+
+  it("keeps businesses apart: the same code in another business is another link, and a path with no business is refused", async () => {
+    const { edge } = harness();
+    const map = {
+      [`s:${T1}:promo1`]: "https://one.example/",
+      [`s:${T2}:promo1`]: "https://two.example/",
+      "s:promo1": "https://legacy.example/",
+    };
+    expect((await edge(req(`/s/${T1}/promo1`), kv(map))).headers.get("location")).toBe(
+      "https://one.example/",
+    );
+    expect((await edge(req(`/s/${T2}/promo1`), kv(map))).headers.get("location")).toBe(
+      "https://two.example/",
+    );
+    expect((await edge(req("/s/promo1"), kv(map))).status).toBe(404);
+    expect((await edge(req(`/s/not-a-tenant/promo1`), kv(map))).status).toBe(404);
+    expect((await edge(req(`/s/${T1}/promo1/extra`), kv(map))).status).toBe(404);
   });
 
   it("only answers GET and HEAD", async () => {
     const { edge } = harness();
-    expect((await edge(req("/s/abc123", { method: "POST" }), env)).status).toBe(405);
+    expect((await edge(req(`/s/${T1}/abc123`, { method: "POST" }), env)).status).toBe(405);
   });
 });
 
@@ -231,7 +255,7 @@ describe("defaults", () => {
 
   it("does not follow a target that is not a URL", async () => {
     const { edge } = harness();
-    const res = await edge(req("/s/abc123"), {
+    const res = await edge(req(`/s/${T1}/abc123`), {
       ...env,
       SHORTLINKS: { get: () => Promise.resolve("not a url") },
     });
