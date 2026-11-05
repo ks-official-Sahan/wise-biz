@@ -19,11 +19,16 @@ const shutdown = (signal: string, code = 0): void => {
     process.exit(1);
   }, FORCE_EXIT_MS).unref();
   rt.stop()
-    .then(() => stopTelemetry?.())
     .then(
-      () => process.exit(code),
-      () => process.exit(1),
-    );
+      () => 0,
+      () => 1,
+    )
+    // Flush telemetry after a failed stop too; keep the failure as the exit code.
+    .then(async (failed) => {
+      await stopTelemetry?.().catch(() => undefined);
+      process.exit(failed === 0 ? code : 1);
+    })
+    .catch(() => process.exit(1));
 };
 process.on("unhandledRejection", (reason) => {
   rt.logger.fatal({ err: reason }, "unhandled rejection: stopping realtime");

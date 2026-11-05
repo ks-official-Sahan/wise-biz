@@ -436,6 +436,16 @@ describe("enrollment with a key the platform keeps", () => {
     expect(removed).toHaveLength(1);
     expect(held.size).toBe(0);
   });
+
+  it("forgets the held key when the server refuses the code", async () => {
+    const { keyring, held, removed } = fakeKeyring();
+    const v = vaultWith(keyring);
+    const refusing = fakeApi(() => ({ status: 404, body: { code: "NOT_FOUND", detail: "no" } }));
+    await expect(enrol(v.vault, refusing.fetchFn)).rejects.toMatchObject({ status: 404 });
+    expect(removed).toHaveLength(1);
+    expect(held.size).toBe(0);
+    expect(v.saved()).toBeUndefined();
+  });
 });
 
 describe("key store, clock, session", () => {

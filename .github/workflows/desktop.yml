@@ -1,12 +1,13 @@
 name: Desktop
 
-# Builds the POS desktop terminal installers (apps/desktop, electron-builder) on a release tag: Windows (NSIS), macOS
-# (dmg and zip, notarized) and Linux (AppImage and deb). The installers and the update-feed files (`latest*.yml`) are
+# Builds the POS desktop terminal installers (apps/desktop, electron-builder) on a release tag: Windows (NSIS, signed),
+# macOS (dmg and zip, signed and notarized) and Linux (AppImage and deb; not code-signed, there is no signing step). The installers and the update-feed files (`latest*.yml`) are
 # attached to the run as artifacts; copying them to the update origin (WISE_BIZ_UPDATE_URL) is a separate, deliberate step
 # until that host exists (docs/architecture/deployment.md).
 #
 # Configuration, GitHub environment `desktop-release` (Settings > Environments):
 #   variables: WISE_BIZ_API_URL (https API origin the terminal talks to), WISE_BIZ_UPDATE_URL (https update feed origin)
+#   Limit the environment to the v*.*.* tags (deployment tags rule), so only a release tag can reach the signing secrets.
 #   secrets:   WIN_CSC_LINK, WIN_CSC_KEY_PASSWORD (Windows code signing certificate),
 #              CSC_LINK, CSC_KEY_PASSWORD, APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID (macOS Developer ID and notarization)
 
@@ -59,6 +60,14 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Refuse a tag that is not the desktop package version
+        shell: bash
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          PKG="$(node -p "require('./apps/desktop/package.json').version")"
+          [[ "$TAG" == "v$PKG" ]] || { echo "Tag $TAG does not match apps/desktop version $PKG (the installers and update feed take the package version)" >&2; exit 1; }
+
       - name: Refuse a release build with no signing or no endpoints
         shell: bash
         env:
@@ -67,15 +76,19 @@ jobs:
           WIN_CERT: ${{ secrets.WIN_CSC_LINK }}
           MAC_CERT: ${{ secrets.CSC_LINK }}
           NOTARY_ID: ${{ secrets.APPLE_ID }}
+          NOTARY_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          NOTARY_TEAM: ${{ secrets.APPLE_TEAM_ID }}
           MATRIX_OS: ${{ matrix.os }}
         run: |
           [[ "$API_URL" == https://* ]] || { echo "WISE_BIZ_API_URL must be an https URL" >&2; exit 1; }
           [[ "$UPDATE_URL" == https://* ]] || { echo "WISE_BIZ_UPDATE_URL must be an https URL" >&2; exit 1; }
           if [[ "$MATRIX_OS" == windows && -z "$WIN_CERT" ]]; then echo "WIN_CSC_LINK is not set: never ship an unsigned installer" >&2; exit 1; fi
-          if [[ "$MATRIX_OS" == macos && ( -z "$MAC_CERT" || -z "$NOTARY_ID" ) ]]; then echo "macOS signing or notarization is not configured" >&2; exit 1; fi
+          if [[ "$MATRIX_OS" == macos && ( -z "$MAC_CERT" || -z "$NOTARY_ID" || -z "$NOTARY_PASSWORD" || -z "$NOTARY_TEAM" ) ]]; then echo "macOS signing or notarization is not configured" >&2; exit 1; fi
 
       - name: Export the POS web app (the terminal's renderer)
         run: pnpm -F @wise-biz/pos export:web
+        env:
+          EXPO_PUBLIC_API_URL: ${{ vars.WISE_BIZ_API_URL }}
 
       - name: Build the app and the installers (release)
         run: pnpm -F @wise-biz/desktop dist

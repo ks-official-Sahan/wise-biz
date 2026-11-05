@@ -40,6 +40,8 @@ export function createExpoPush(
               ? {}
               : { authorization: `Bearer ${opts.accessToken}` }),
           },
+          // A hung connection must not hold a delivery pass (and its lease) open.
+          signal: AbortSignal.timeout(15_000),
           body: JSON.stringify(
             batch.map((m) => ({
               to: m.to,

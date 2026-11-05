@@ -31,3 +31,21 @@ it("starts the SDK under the service name and returns its shutdown", async () =>
   await stop?.();
   expect(calls).toEqual(["new wise-biz-workers", "start", "shutdown"]);
 });
+
+it("starts for a traces-specific endpoint on its own", async () => {
+  let started = false;
+  class FakeSdk {
+    start(): void {
+      started = true;
+    }
+    shutdown(): Promise<void> {
+      return Promise.resolve();
+    }
+  }
+  const stop = await startTelemetry(
+    { OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: "http://collector:4318/v1/traces" },
+    () => Promise.resolve({ NodeSDK: FakeSdk }),
+  );
+  expect(started).toBe(true);
+  expect(stop).toBeTypeOf("function");
+});

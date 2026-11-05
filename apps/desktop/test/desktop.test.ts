@@ -69,6 +69,7 @@ describe("forbidden start-up switches", () => {
         "--inspect=0.0.0.0:9229",
         "--inspect-brk",
         "--no-sandbox",
+        "--disable-gpu-sandbox",
         "--disable-web-security",
       ]),
     ).toEqual([
@@ -78,6 +79,7 @@ describe("forbidden start-up switches", () => {
       "--inspect",
       "--inspect-brk",
       "--no-sandbox",
+      "--disable-gpu-sandbox",
       "--disable-web-security",
     ]);
   });

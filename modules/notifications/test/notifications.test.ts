@@ -762,3 +762,120 @@ describe("preferences and push tokens", () => {
     expect(gone).toEqual({ n: 0 });
   });
 });
+
+describe("delivery limits", () => {
+  const prefs = (a: ReturnType<typeof appFor>) =>
+    a.request(
+      ...argsOf(
+        put("/v1/notifications/preferences", {
+          preferences: [{ kind: "low_stock", inApp: true, email: true }],
+        }),
+      ),
+    );
+  const addTokens = (t: string, u: string, n: number, tag: string) =>
+    withTenantTx(admin, ctx(t, u), (tx) =>
+      tx.query(
+        `INSERT INTO notifications.push_tokens (tenant_id, user_id, token, platform)
+         SELECT $1, $2, 'ExponentPushToken[' || $3 || g || ']', 'android' FROM generate_series(1, $4::int) g`,
+        [t, u, tag, n],
+      ),
+    );
+  const mailTo = (sink: string[], ms = 0): MailPort => ({
+    consoleUrl: "https://console.example.test",
+    send: async (m) => {
+      if (ms > 0) await new Promise((r) => setTimeout(r, ms));
+      sink.push(m.to);
+    },
+  });
+  const pending = async (t: string, u: string) =>
+    (
+      await withTenantTx(admin, ctx(t, u), (tx) =>
+        tx.query(
+          "SELECT email_pending, push_pending FROM notifications.notifications WHERE user_id = $1",
+          [u],
+        ),
+      )
+    ).rows[0];
+
+  it("leaves an email owed, not marked sent, when this worker has no mail port", async () => {
+    const t = uuidv7();
+    const u = uuidv7();
+    await prefs(appFor(t, u));
+    await addTokens(t, u, 1, "solo");
+    const push: PushPort = { send: (ms) => Promise.resolve(ms.map(() => ({ ok: true }))) };
+    await deliver(t, [u], "inventory.balance.low", LOW, uuidv7(), mailTo([]), push);
+    await runDeliveries({ pool: worker, push, leaseMs: 0 });
+    expect(await pending(t, u)).toEqual({ email_pending: true, push_pending: false });
+    const sent: string[] = [];
+    await runDeliveries({ pool: worker, mail: mailTo(sent), leaseMs: 0 });
+    expect(sent).toEqual(["person@example.test"]);
+  });
+
+  it("reports the business with every failure", async () => {
+    const t = uuidv7();
+    const u = uuidv7();
+    await prefs(appFor(t, u));
+    await deliver(t, [u], "inventory.balance.low", LOW, uuidv7(), mailTo([]));
+    const seen: [string, string][] = [];
+    await runDeliveries({
+      pool: worker,
+      mail: { consoleUrl: "x", send: () => Promise.reject(new Error("down")) },
+      leaseMs: 0,
+      onError: (_e, tenantId, _id, channel) => seen.push([tenantId, channel]),
+    });
+    expect(seen).toEqual([[t, "email"]]);
+  });
+
+  it("stops sending when a send could outlive the lease, and the rest go out on the next pass", async () => {
+    const t = uuidv7();
+    const people = [uuidv7(), uuidv7(), uuidv7(), uuidv7()];
+    for (const [i, u] of people.entries())
+      await prefs(appFor(t, u, { email: `p${String(i)}@example.test`, emailVerified: true }));
+    await deliver(t, people, "inventory.balance.low", LOW, uuidv7(), mailTo([]));
+    const sent: string[] = [];
+    const opts = { pool: worker, mail: mailTo(sent, 150), leaseMs: 400, sendTimeoutMs: 200 };
+    await runDeliveries(opts);
+    expect(sent.length).toBeGreaterThan(0);
+    expect(sent.length).toBeLessThan(4);
+    await new Promise((r) => setTimeout(r, 450));
+    await runDeliveries(opts);
+    expect([...sent].sort()).toEqual(people.map((_, i) => `p${String(i)}@example.test`));
+  });
+
+  it("gives up on a push that never answers and keeps it owed", async () => {
+    const t = uuidv7();
+    const u = uuidv7();
+    await addTokens(t, u, 1, "hang");
+    const hang: PushPort = { send: () => new Promise(() => undefined) };
+    await deliver(t, [u], "inventory.balance.low", LOW, uuidv7(), undefined, hang);
+    const errors: unknown[] = [];
+    await runDeliveries({
+      pool: worker,
+      push: hang,
+      leaseMs: 0,
+      sendTimeoutMs: 50,
+      onError: (e) => errors.push(e),
+    });
+    expect(String(errors[0])).toMatch(/timed out/);
+    expect((await pending(t, u))?.push_pending).toBe(true);
+  });
+
+  it("marks each push group when it is sent, so a later failure leaves only that group owed", async () => {
+    const t = uuidv7();
+    const [a, b] = [uuidv7(), uuidv7()];
+    await addTokens(t, a, 60, "ga");
+    await addTokens(t, b, 60, "gb");
+    let calls = 0;
+    const second: PushPort = {
+      send: (ms) =>
+        ++calls === 2
+          ? Promise.reject(new Error("push service answered 503"))
+          : Promise.resolve(ms.map(() => ({ ok: true }))),
+    };
+    await deliver(t, [a, b], "inventory.balance.low", LOW, uuidv7(), undefined, second);
+    await runDeliveries({ pool: worker, push: second, leaseMs: 0 });
+    const states = [(await pending(t, a))?.push_pending, (await pending(t, b))?.push_pending];
+    expect(states.filter((s) => s === true)).toHaveLength(1);
+    expect(calls).toBe(2);
+  });
+});

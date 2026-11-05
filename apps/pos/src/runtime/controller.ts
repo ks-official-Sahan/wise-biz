@@ -75,6 +75,21 @@ async function gunzip(bytes: Uint8Array): Promise<Uint8Array> {
  * the heartbeat, and turns server verdicts (revoked, quarantined) into session state. Screens only dispatch to it and
  * read the store; nothing else talks to the network.
  */
+async function openSignerWithRetry(
+  id: DeviceIdentity,
+  vault: DeviceVault,
+  attempts = 3,
+): ReturnType<typeof openSigner> {
+  for (let i = 1; ; i++) {
+    try {
+      return await openSigner(id, vault);
+    } catch (err) {
+      if (i >= attempts) throw err;
+      await new Promise((r) => setTimeout(r, 150 * i));
+    }
+  }
+}
+
 export function createController(deps: ControllerDeps) {
   const { store, vault } = deps;
   const dispatch = store.dispatch;
@@ -200,7 +215,9 @@ export function createController(deps: ControllerDeps) {
     async boot(): Promise<void> {
       let id = await vault.load();
       // An identity whose key is gone (the browser cleared its key store) cannot sign anything: start again at enrolment.
-      if (id !== undefined && (await openSigner(id, vault)) === undefined) {
+      // A storage error (a blocked or busy IndexedDB) is retried a few times and never treated as a missing key: the
+      // identity stays, and the failure surfaces so a restart can recover. Only a clean "no such key" clears it.
+      if (id !== undefined && (await openSignerWithRetry(id, vault)) === undefined) {
         await vault.clear();
         id = undefined;
       }

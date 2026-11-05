@@ -59,6 +59,8 @@ function isHttpsUrl(value: string): boolean {
 }
 
 async function shortlink(code: string, env: EdgeEnv): Promise<Response> {
+  // TODO(tenant): this key has no tenant part. Decide how a public short link carries its business (path segment or
+  // host) and use it here and in the writer, before anything writes to this KV namespace.
   const target = SHORT_CODE.test(code) ? await env.SHORTLINKS?.get(`s:${code}`) : null;
   // A target that is not https (or not a URL) is never followed: the KV is a data store, not a trusted redirect list.
   if (target === null || target === undefined || !isHttpsUrl(target))
@@ -73,11 +75,30 @@ async function shortlink(code: string, env: EdgeEnv): Promise<Response> {
   });
 }
 
+/** Passes the body through and errors the stream once it is longer than `max`, so a chunked upload has no way round the cap. */
+function capBody(body: ReadableStream<Uint8Array>, max: number, onExceed: () => void) {
+  let seen = 0;
+  return body.pipeThrough(
+    new TransformStream<Uint8Array, Uint8Array>({
+      transform(chunk, controller) {
+        seen += chunk.byteLength;
+        if (seen > max) {
+          onExceed();
+          controller.error(new Error("body too large"));
+          return;
+        }
+        controller.enqueue(chunk);
+      },
+    }),
+  );
+}
+
 async function toOrigin(
   request: Request,
   url: URL,
   env: EdgeEnv,
   fetcher: Fetcher,
+  exceeded: { value: boolean },
 ): Promise<Response> {
   const origin = new URL(env.API_ORIGIN);
   const upstream = new URL(url.pathname + url.search, origin);
@@ -95,7 +116,10 @@ async function toOrigin(
     redirect: "manual",
     duplex: "half",
   };
-  if (request.method !== "GET" && request.method !== "HEAD") init.body = request.body;
+  if (request.method !== "GET" && request.method !== "HEAD" && request.body !== null)
+    init.body = capBody(request.body, MAX_BODY_BYTES, () => {
+      exceeded.value = true;
+    });
   return fetcher(new Request(upstream, init));
 }
 
@@ -117,10 +141,17 @@ export function createEdge(fetcher: Fetcher = (r) => fetch(r)) {
     const toApi = path === "/v1" || path.startsWith("/v1/");
     if (!toApi && !path.startsWith("/r/")) return problem(404, "NOT_FOUND", "Not found");
 
-    if (toApi && UNSAFE.has(request.method)) {
-      const length = Number(request.headers.get("content-length") ?? "0");
-      if (length > MAX_BODY_BYTES)
-        return problem(413, "PAYLOAD_TOO_LARGE", "Request body too large");
+    // Every forwarded unsafe request (the /v1 API and the /r routes) passes the same two guards.
+    if (UNSAFE.has(request.method)) {
+      // A declared length is refused up front; a body with none (chunked) is counted as it streams, in toOrigin.
+      const declared = request.headers.get("content-length");
+      if (declared !== null) {
+        const length = Number(declared);
+        if (!Number.isSafeInteger(length) || length < 0)
+          return problem(400, "BAD_REQUEST", "Invalid Content-Length");
+        if (length > MAX_BODY_BYTES)
+          return problem(413, "PAYLOAD_TOO_LARGE", "Request body too large");
+      }
       const ip = request.headers.get("cf-connecting-ip");
       if (env.RATE_LIMITER !== undefined && ip !== null) {
         const verdict = await env.RATE_LIMITER.limit({ key: ip });
@@ -129,9 +160,11 @@ export function createEdge(fetcher: Fetcher = (r) => fetch(r)) {
       }
     }
 
+    const exceeded = { value: false };
     try {
-      return await toOrigin(request, url, env, fetcher);
+      return await toOrigin(request, url, env, fetcher, exceeded);
     } catch {
+      if (exceeded.value) return problem(413, "PAYLOAD_TOO_LARGE", "Request body too large");
       return problem(502, "ORIGIN_UNAVAILABLE", "The service is temporarily unavailable", {
         "retry-after": "5",
       });

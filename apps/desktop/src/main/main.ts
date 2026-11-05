@@ -56,6 +56,8 @@ if (!dev) {
     process.stderr.write(`Refusing to start with ${refused.join(", ")}
 `);
     app.exit(2);
+    // app.exit() returns: stop here so nothing below (sandbox, protocol, lock, windows) runs.
+    process.exit(2);
   }
 }
 

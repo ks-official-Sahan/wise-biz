@@ -11,7 +11,8 @@ name: Mobile
 #   1. `eas init` in apps/pos writes extra.eas.projectId into app.json; commit it.
 #   2. In the Expo project, set EXPO_PUBLIC_API_URL (https) and EXPO_PUBLIC_RECEIPT_BASE_URL in the `preview` and
 #      `production` environments. The app refuses to sign requests without EXPO_PUBLIC_API_URL.
-#   3. GitHub environment `mobile-release`: secret EXPO_TOKEN. iOS signing credentials live in EAS.
+#   3. GitHub environment `mobile-release`: secret EXPO_TOKEN. iOS signing credentials live in EAS. Limit the environment
+#      to master and the v*.*.* tags (deployment branches and tags rule) and require a reviewer for production.
 #   4. EAS Update additionally needs `expo-updates` in apps/pos (check its bundle size first) and the repository
 #      variable EAS_UPDATES_ENABLED=true; the `update` job is skipped until then.
 
@@ -72,13 +73,22 @@ jobs:
         run: |
           grep -q '"projectId"' apps/pos/app.json || { echo "apps/pos/app.json has no extra.eas.projectId (run eas init and commit it)" >&2; exit 1; }
 
+      - name: Refuse a build when the Expo environment has no API URL
+        working-directory: apps/pos
+        run: |
+          if [ "$PROFILE" = production ]; then ENV=production; else ENV=preview; fi
+          eas env:exec "$ENV" 'test -n "$EXPO_PUBLIC_API_URL" || { echo "EXPO_PUBLIC_API_URL is not set in the Expo environment" >&2; exit 1; }' --non-interactive
+
       - name: Start the Android and iOS builds
         working-directory: apps/pos
         run: eas build --platform all --profile "$PROFILE" --non-interactive --no-wait
 
   update:
     name: EAS update (${{ inputs.action == 'update-production' && 'production' || 'staging' }})
-    if: startsWith(inputs.action, 'update-') && vars.EAS_UPDATES_ENABLED == 'true'
+    # A production update goes out only from master, so a branch cannot reach production through a manual run.
+    if: >-
+      startsWith(inputs.action, 'update-') && vars.EAS_UPDATES_ENABLED == 'true' &&
+      (inputs.action != 'update-production' || github.ref == 'refs/heads/master')
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     environment: mobile-release
@@ -111,8 +121,13 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Refuse an update when expo-updates is not declared
+        run: |
+          grep -q '"expo-updates"' apps/pos/package.json || { echo "apps/pos/package.json does not declare expo-updates" >&2; exit 1; }
+
       - name: Publish the update to the channel
         working-directory: apps/pos
         run: |
           if [ "$CHANNEL" = production ]; then ENV=production; else ENV=preview; fi
+          eas env:exec "$ENV" 'test -n "$EXPO_PUBLIC_API_URL" || { echo "EXPO_PUBLIC_API_URL is not set in the Expo environment" >&2; exit 1; }' --non-interactive
           eas update --channel "$CHANNEL" --environment "$ENV" --message "${GITHUB_SHA::7}" --non-interactive

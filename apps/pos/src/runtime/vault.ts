@@ -47,13 +47,25 @@ async function keyTx<T>(
   const db = await keyDb();
   try {
     return await new Promise<T>((resolve, reject) => {
-      const req = run(db.transaction(KEY_STORE, mode).objectStore(KEY_STORE));
-      req.onsuccess = () => {
-        resolve(req.result);
+      const tx = db.transaction(KEY_STORE, mode);
+      const req = run(tx.objectStore(KEY_STORE));
+      const failed = (): void => {
+        reject(req.error ?? tx.error ?? new Error("key store failed"));
       };
-      req.onerror = () => {
-        reject(req.error ?? new Error("key store failed"));
-      };
+      if (mode === "readonly") {
+        req.onsuccess = () => {
+          resolve(req.result);
+        };
+        req.onerror = failed;
+      } else {
+        // A write is done when its transaction commits, not when the request succeeds: a commit can still fail (quota)
+        // and roll the write back, and enrolment must not go on with a key that was never stored.
+        tx.oncomplete = () => {
+          resolve(req.result);
+        };
+        tx.onerror = failed;
+        tx.onabort = failed;
+      }
     });
   } finally {
     db.close();

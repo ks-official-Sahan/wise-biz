@@ -1,4 +1,4 @@
-import { parseCsv } from "./catalog.ts";
+import { parseCsv } from "./csv.ts";
 
 /** Parses a CSV off the main thread: a 20 MB file would otherwise freeze the page for seconds. */
 self.onmessage = (e: MessageEvent<string>) => {

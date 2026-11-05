@@ -37,7 +37,14 @@ export interface DeliveryDeps {
   readonly batch?: number;
   /** After this many claims a row is given up on, so a poisoned address cannot be retried forever. */
   readonly maxAttempts?: number;
-  readonly onError?: (err: unknown, notificationId: string, channel: "email" | "push") => void;
+  /** A single email or push send gets this long before it counts as failed (the message may still arrive). */
+  readonly sendTimeoutMs?: number;
+  readonly onError?: (
+    err: unknown,
+    tenantId: string,
+    notificationId: string,
+    channel: "email" | "push",
+  ) => void;
 }
 
 interface Claimed {
@@ -51,10 +58,26 @@ interface Claimed {
   tokens: string[];
 }
 
-const TENANTS_SQL = `SELECT DISTINCT tenant_id FROM notifications.notifications
+/** Businesses with due rows, the one waiting longest first (ids are UUIDv7, so the smallest id is the oldest row). */
+const TENANTS_SQL = `SELECT tenant_id FROM notifications.notifications
   WHERE ((email_pending AND $1) OR (push_pending AND $2))
     AND (delivery_lease_until IS NULL OR delivery_lease_until < now())
-  LIMIT 50`;
+  GROUP BY tenant_id ORDER BY min(id::text) LIMIT 50`;
+
+/** Messages per push request the service accepts; a group of notifications is sent and marked together up to this. */
+const PUSH_GROUP = 100;
+
+function withTimeout<T>(work: Promise<T>, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const late = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      reject(new Error(`send timed out after ${String(ms)} ms`));
+    }, ms);
+  });
+  return Promise.race([work, late]).finally(() => {
+    clearTimeout(timer);
+  });
+}
 
 /** Claim = lease + attempt count in one statement. A row past its attempts stops being pending (given up on). */
 const CLAIM_SQL = `
@@ -96,6 +119,9 @@ export async function runDeliveries(deps: DeliveryDeps): Promise<number> {
 
 async function deliverTenant(deps: DeliveryDeps, tenantId: string): Promise<number> {
   const scope = { tenantId, requestId: "notifications-delivery" };
+  const leaseMs = deps.leaseMs ?? 120_000;
+  const sendMs = deps.sendTimeoutMs ?? 10_000;
+  const claimedAt = Date.now();
   const claimed = await withTenantTx(
     deps.pool,
     scope,
@@ -104,52 +130,81 @@ async function deliverTenant(deps: DeliveryDeps, tenantId: string): Promise<numb
         await tx.query<Claimed>(CLAIM_SQL, [
           tenantId,
           deps.batch ?? 50,
-          deps.leaseMs ?? 120_000,
+          leaseMs,
           deps.maxAttempts ?? 5,
           deps.mail !== undefined,
           deps.push !== undefined,
         ])
       ).rows,
   );
+  // The lease covers the whole batch. Stop sending once a send could outlive it: the rest stay pending and are claimed
+  // again after the lease, so another worker never sends a row this one is still sending.
+  const budget = Math.max(leaseMs - sendMs, sendMs);
+  const hasTime = (): boolean => Date.now() - claimedAt < budget;
   let sent = 0;
-  const mark = (id: string, channel: "email" | "push") =>
+  const markEmail = (id: string) =>
     withTenantTx(deps.pool, scope, (tx) =>
       tx.query(
-        channel === "email"
-          ? "UPDATE notifications.notifications SET email_pending = false, emailed_at = now() WHERE tenant_id = $1 AND id = $2"
-          : "UPDATE notifications.notifications SET push_pending = false, pushed_at = now() WHERE tenant_id = $1 AND id = $2",
+        "UPDATE notifications.notifications SET email_pending = false, emailed_at = now() WHERE tenant_id = $1 AND id = $2",
         [tenantId, id],
+      ),
+    );
+  const markPush = (ids: readonly string[]) =>
+    withTenantTx(deps.pool, scope, (tx) =>
+      tx.query(
+        "UPDATE notifications.notifications SET push_pending = false, pushed_at = now() WHERE tenant_id = $1 AND id = ANY($2::uuid[])",
+        [tenantId, ids],
       ),
     );
 
   for (const n of claimed) {
-    if (!n.email_pending) continue;
-    if (deps.mail === undefined || n.email_to === null) {
-      // Nothing to send to (the address was cleared since): done, not retried.
-      await mark(n.id, "email");
+    // No mail port: leave the row pending (this worker cannot send it); never mark an email done that was not sent.
+    if (!n.email_pending || deps.mail === undefined) continue;
+    if (n.email_to === null) {
+      // The address was cleared since: nothing to send to, done, not retried.
+      await markEmail(n.id);
       continue;
     }
+    if (!hasTime()) break;
     const where = n.link === null ? "" : `\n\nOpen it: ${deps.mail.consoleUrl}${n.link}`;
     try {
-      await deps.mail.send({
-        to: n.email_to,
-        subject: n.title,
-        text: `${n.body}${where}\n\nChange what you are emailed about in the console under Notifications.`,
-      });
-      await mark(n.id, "email");
+      await withTimeout(
+        deps.mail.send({
+          to: n.email_to,
+          subject: n.title,
+          text: `${n.body}${where}\n\nChange what you are emailed about in the console under Notifications.`,
+        }),
+        sendMs,
+      );
+      await markEmail(n.id);
       sent++;
     } catch (err) {
-      deps.onError?.(err, n.id, "email");
+      deps.onError?.(err, tenantId, n.id, "email");
     }
   }
 
-  const pushes = claimed.filter((n) => n.push_pending);
-  if (pushes.length > 0 && deps.push !== undefined) {
-    const messages: PushMessage[] = pushes.flatMap((n) =>
+  if (deps.push === undefined) return sent;
+  const push = deps.push;
+  // Groups of whole notifications up to one push request of messages, each sent and then marked on its own: a failure in
+  // a later group leaves only that group pending, never the groups that already reached phones.
+  const groups: Claimed[][] = [];
+  let size = 0;
+  for (const n of claimed) {
+    if (!n.push_pending) continue;
+    if (groups.length === 0 || size + n.tokens.length > PUSH_GROUP) {
+      groups.push([]);
+      size = 0;
+    }
+    groups[groups.length - 1]?.push(n);
+    size += n.tokens.length;
+  }
+  for (const group of groups) {
+    if (!hasTime()) break;
+    const messages: PushMessage[] = group.flatMap((n) =>
       n.tokens.map((token) => ({ to: token, title: n.title, body: n.body, link: n.link })),
     );
     try {
-      const results = messages.length === 0 ? [] : await deps.push.send(messages);
+      const results = messages.length === 0 ? [] : await withTimeout(push.send(messages), sendMs);
       const dead = messages.filter((_, i) => {
         const r = results[i];
         return r !== undefined && !r.ok && r.unregistered;
@@ -161,10 +216,10 @@ async function deliverTenant(deps: DeliveryDeps, tenantId: string): Promise<numb
             [tenantId, dead.map((m) => m.to)],
           ),
         );
-      for (const n of pushes) await mark(n.id, "push");
+      await markPush(group.map((n) => n.id));
       sent += messages.length;
     } catch (err) {
-      for (const n of pushes) deps.onError?.(err, n.id, "push");
+      for (const n of group) deps.onError?.(err, tenantId, n.id, "push");
     }
   }
   return sent;

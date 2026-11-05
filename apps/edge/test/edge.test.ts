@@ -98,7 +98,54 @@ describe("limits", () => {
     expect(seen).toHaveLength(0);
   });
 
-  it("returns 429 with Retry-After when the limiter refuses, only for unsafe /v1 requests", async () => {
+  it("refuses a chunked body that grows past the cap, even with no Content-Length", async () => {
+    const { edge, seen } = harness(async () => {
+      // The origin reads the whole body, as a real one would.
+      await seen[0]?.arrayBuffer();
+      return new Response("api");
+    });
+    const chunk = new Uint8Array(512 * 1024);
+    const body = new ReadableStream<Uint8Array>({
+      pull(c) {
+        c.enqueue(chunk);
+      },
+    });
+    const res = await edge(
+      new Request("https://pos.example.test/v1/sales", {
+        method: "POST",
+        body,
+        duplex: "half",
+      } as RequestInit),
+      env,
+    );
+    expect(res.status).toBe(413);
+  });
+
+  it("refuses a Content-Length that is not a number", async () => {
+    const { edge, seen } = harness();
+    const res = await edge(
+      req("/v1/sales", { method: "POST", headers: { "content-length": "abc" } }),
+      env,
+    );
+    expect(res.status).toBe(400);
+    expect(seen).toHaveLength(0);
+  });
+
+  it("applies the same guards to unsafe /r requests", async () => {
+    const limited: EdgeEnv = {
+      ...env,
+      RATE_LIMITER: { limit: () => Promise.resolve({ success: false }) },
+    };
+    const { edge, seen } = harness();
+    const res = await edge(
+      req("/r/ABC123", { method: "POST", headers: { "cf-connecting-ip": "1.2.3.4" } }),
+      limited,
+    );
+    expect(res.status).toBe(429);
+    expect(seen).toHaveLength(0);
+  });
+
+  it("returns 429 with Retry-After when the limiter refuses, only for unsafe requests", async () => {
     const limited: EdgeEnv = {
       ...env,
       RATE_LIMITER: { limit: () => Promise.resolve({ success: false }) },

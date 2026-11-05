@@ -220,9 +220,9 @@ export function startWorker(
                 pool,
                 mail: ports.mail,
                 push: ports.push,
-                onError: (err, notificationId, channel) => {
+                onError: (err, tenantId, notificationId, channel) => {
                   logger.warn(
-                    { err, notificationId, channel },
+                    { err, tenant_id: tenantId, notificationId, channel },
                     "notification delivery failed; retried after the lease",
                   );
                 },

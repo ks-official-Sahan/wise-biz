@@ -38,72 +38,22 @@ for (const [fuse, state] of Object.entries(expect)) {
   }
 }
 
+// No debugging port here: a packaged terminal refuses --remote-debugging-port on purpose (see forbiddenSwitches). The
+// rendered page and the bridge are covered by the Playwright run against the unpacked build; this checks that the
+// packaged app starts and stays up.
 const profile = fs.mkdtempSync(path.join(os.tmpdir(), "wb-packaged-"));
-const debugPort = 9333;
-const child = spawn(
-  exe,
-  [`--user-data-dir=${profile}`, `--remote-debugging-port=${String(debugPort)}`],
-  {
-    stdio: "ignore",
-  },
-);
-let exited = false;
-child.on("exit", () => {
-  exited = true;
+const child = spawn(exe, [`--user-data-dir=${profile}`], { stdio: "ignore" });
+let exitCode = null;
+child.on("exit", (code) => {
+  exitCode = code ?? -1;
 });
 await new Promise((r) => setTimeout(r, 8000));
-const alive = !exited;
-
-// Ask the page itself (Chromium's debugging port, which the Node inspector fuse does not cover) what it rendered.
-let page = "";
-if (alive) {
-  try {
-    const targets = await (await fetch(`http://127.0.0.1:${String(debugPort)}/json/list`)).json();
-    const target = targets.find((t) => t.type === "page" && String(t.url).startsWith("app://pos/"));
-    if (target === undefined) page = "no page at app://pos/";
-    else {
-      const ws = new WebSocket(target.webSocketDebuggerUrl);
-      await new Promise((r) => ws.addEventListener("open", r, { once: true }));
-      const answer = new Promise((resolve) => {
-        ws.addEventListener("message", (m) => {
-          const d = JSON.parse(String(m.data));
-          if (d.id === 1) resolve(d.result?.result?.value);
-        });
-      });
-      ws.send(
-        JSON.stringify({
-          id: 1,
-          method: "Runtime.evaluate",
-          params: {
-            expression:
-              "JSON.stringify({ text: document.body.innerText.length, bridge: typeof window.wiseDesktop?.db?.open })",
-            returnByValue: true,
-          },
-        }),
-      );
-      page = String(await answer);
-      ws.close();
-    }
-  } catch (e) {
-    page = e instanceof Error ? e.message : "debug port error";
-  }
-}
+const alive = exitCode === null;
 child.kill();
 await new Promise((r) => setTimeout(r, 500));
 fs.rmSync(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 300 });
 if (!alive) {
-  console.error("The packaged app exited within 8 seconds.");
+  console.error(`The packaged app exited within 8 seconds (code ${String(exitCode)}).`);
   process.exit(1);
 }
-const seen = (() => {
-  try {
-    return JSON.parse(page);
-  } catch {
-    return undefined;
-  }
-})();
-if (seen === undefined || seen.text === 0 || seen.bridge !== "function") {
-  console.error(`The packaged page did not render with the bridge: ${page}`);
-  process.exit(1);
-}
-console.log("Packaged app: fuses set, rendered the POS with the bridge, stayed up.");
+console.log("Packaged app: fuses set, stayed up.");

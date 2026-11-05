@@ -59,7 +59,7 @@ export function resolveAsset(root: string, pathname: string): string | undefined
 export const needsHtmlFallback = (pathname: string): boolean => path.extname(pathname) === "";
 
 const FORBIDDEN_SWITCH =
-  /^--(?:remote-debugging-(?:port|pipe)|remote-allow-origins|inspect(?:-brk|-port)?|no-sandbox|disable-web-security|disable-site-isolation-trials)(?:=|$)/;
+  /^--(?:remote-debugging-(?:port|pipe)|remote-allow-origins|inspect(?:-brk|-port)?|no-sandbox|disable-gpu-sandbox|disable-web-security|disable-site-isolation-trials)(?:=|$)/;
 
 /**
  * Command-line switches a packaged terminal must not run with. `--remote-debugging-port` hands any local process full

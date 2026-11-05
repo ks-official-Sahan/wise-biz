@@ -76,41 +76,52 @@ export async function enrollDevice(opts: EnrollOptions): Promise<EnrolledDevice>
   const deviceId = uuidv7();
   // A key the platform keeps to itself if it can; otherwise the plain secret in the vault (the previous behaviour).
   const held = await opts.vault.keyring?.generate(deviceId).catch(() => undefined);
-  const plain = held === undefined ? generateKeyPair() : undefined;
-  const publicKey = held?.publicKey ?? plain?.publicKey;
-  if (publicKey === undefined) throw new Error("no device key");
-  const signed = createSignedFetch({
-    baseUrl: opts.baseUrl,
-    deviceId,
-    ...(held === undefined
-      ? { secretKey: () => (plain ?? generateKeyPair()).secretKey }
-      : { sign: held.sign }),
-    fetch: opts.fetch,
-    ...(opts.now ? { now: opts.now } : {}),
-  });
-  const { body } = await signed<EnrolledDevice>("POST", "/v1/devices/enroll", {
-    body: {
-      code: opts.code,
-      deviceId,
-      publicKey: toBase64url(publicKey),
-      platform: opts.platform,
-      appVersion: opts.appVersion,
-    },
-  });
+  const key =
+    held === undefined
+      ? plainKey()
+      : {
+          publicKey: held.publicKey,
+          auth: { sign: held.sign },
+          stored: { keyId: deviceId },
+        };
+  // From here on a failure of any step (the request, a refusal, the save) must not leave the held key behind.
   try {
+    const signed = createSignedFetch({
+      baseUrl: opts.baseUrl,
+      deviceId,
+      ...key.auth,
+      fetch: opts.fetch,
+      ...(opts.now ? { now: opts.now } : {}),
+    });
+    const { body } = await signed<EnrolledDevice>("POST", "/v1/devices/enroll", {
+      body: {
+        code: opts.code,
+        deviceId,
+        publicKey: toBase64url(key.publicKey),
+        platform: opts.platform,
+        appVersion: opts.appVersion,
+      },
+    });
     await opts.vault.save({
       deviceId,
       tenantId: body.tenantId,
       branchId: body.branchId,
-      ...(held === undefined
-        ? { secretKey: toBase64(plain?.secretKey ?? new Uint8Array()) }
-        : { keyId: deviceId }),
+      ...key.stored,
     });
+    return body;
   } catch (err) {
-    await opts.vault.keyring?.remove(deviceId).catch(() => undefined);
+    if (held !== undefined) await opts.vault.keyring?.remove(deviceId).catch(() => undefined);
     throw err;
   }
-  return body;
+}
+
+function plainKey() {
+  const pair = generateKeyPair();
+  return {
+    publicKey: pair.publicKey,
+    auth: { secretKey: () => pair.secretKey },
+    stored: { secretKey: toBase64(pair.secretKey) },
+  };
 }
 
 /**
