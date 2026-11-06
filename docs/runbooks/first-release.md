@@ -122,13 +122,19 @@ Optional: `R2_LIMIT_STORAGE_BYTES`, `R2_LIMIT_CLASS_A`, `R2_LIMIT_CLASS_B` chang
 
 **Check:** both buckets exist and are private; you hold, per environment, the endpoint, bucket, key id and secret; you hold the usage token and the account id; the **R2 usage** workflow ran and its summary shows three rows under the caps.
 
-### 2b. Email (Resend)
+### 2b. Email (Brevo and Resend, both free)
 
-Where: resend.com, signed in. **Domains**, **Add Domain**, enter your sending domain (for example `yourdomain.com`), pick the region nearest you. Resend lists DNS records (SPF and DKIM, a few `TXT` or `MX` rows). Add them at your domain's DNS page. If the domain is on Cloudflare: dash.cloudflare.com, the domain, **DNS**, **Records**, **Add record**; copy type, name and value exactly; set the proxy to **DNS only** (grey cloud). Back in Resend click **Verify DNS Records**; it can take minutes to an hour until it shows **Verified**. Then **API Keys**, **Create API Key**, permission **Sending access**, your domain. Copy the key (shown once).
-- `RESEND_API_KEY` is that key.
-- `MAIL_FROM` is an address on that domain, for example `wise-biz <no-reply@yourdomain.com>`.
+Free plans: **Brevo** 300 mails a day, **Resend** 100 a day (3,000 a month). wise-biz can use both: with `EMAIL_PROVIDER=auto` it tries the Brevo API, then Resend, then Brevo SMTP, and moves to the next when one fails (bad key, no credits, daily limit). It also stops sending through a provider for the day when its own count reaches the free limit (`BREVO_DAILY_LIMIT`, `RESEND_DAILY_LIMIT`; counted per running instance, so it is a hint, not a guarantee; neither provider bills overage on a free plan, they refuse).
 
-**Check:** the domain shows Verified; you hold the key and the `MAIL_FROM` text.
+**Resend.** Where: resend.com, signed in. **Domains**, **Add Domain**, enter your sending domain, pick the region nearest you. Add the DNS records Resend lists (SPF, DKIM) at your domain's DNS page (on Cloudflare: the domain, **DNS**, **Records**, **Add record**, proxy **DNS only**). Click **Verify DNS Records** until it shows **Verified**. **API Keys**, **Create API Key**, permission **Sending access**. Values: `RESEND_API_KEY`, and `RESEND_EMAIL_SENDER_EMAIL` = an address on the verified domain.
+
+**Brevo.** Where: app.brevo.com. **Senders, Domains & dedicated IPs**, add and verify your sender address (or domain). **SMTP & API**: the **API keys** tab gives `BREVO_API_KEY` (starts `xkeysib-`); the **SMTP** tab gives the host `smtp-relay.brevo.com`, port `587`, the login (`BREVO_EMAIL_HOST_USER`) and an SMTP key (`BREVO_EMAIL_HOST_PASSWORD`, starts `xsmtpsib-`). `BREVO_EMAIL_SENDER_USER` = the verified sender address. Brevo only delivers from a verified sender; mail from an unverified one is refused or lands in spam.
+
+**Copies (CC and BCC).** `MAIL_CC_EMAILS` and `MAIL_BCC_EMAILS` (comma separated, up to 10 each) apply to every mail on every provider. Mail carries invite links, verification links and one-time codes, so by default (`MAIL_COPY_MODE=redacted`) copies arrive as a separate mail, sent to the sender address with all copy addresses hidden, with links and 6 to 8 digit codes removed. Set `MAIL_COPY_MODE=full` only if you accept that whoever reads the copy mailbox can use those links and codes; then CC and BCC are real headers on the one mail.
+
+**Sender addresses.** `MAIL_FROM` is a plain address (`no-reply@yourdomain.com`, no display name). Each provider can have its own sender (`RESEND_EMAIL_SENDER_EMAIL`, `BREVO_EMAIL_SENDER_USER`); they fall back to `MAIL_FROM`. Production must not set `MAIL_SMTP_HOST` (that is the local Mailpit relay) unless you mean to use a relay.
+
+**Check:** the Resend domain shows Verified; the Brevo sender is validated; send yourself one mail through each provider by setting `EMAIL_PROVIDER` to `resend`, `brevo-api` and `brevo-smtp` in turn locally.
 
 ## 3. Google Cloud (Cloud Run, Artifact Registry, Secret Manager, workload identity)
 
@@ -224,8 +230,17 @@ put CONSOLE_URL        "https://app.example.com"
 put AUTH_URL           "https://app.example.com"
 put CORS_ORIGINS       "https://app.example.com"
 put AUTH_RP_ID         "app.example.com"
-put MAIL_FROM          "wise-biz <no-reply@example.com>"
+put MAIL_FROM          "no-reply@example.com"
+put EMAIL_PROVIDER     "auto"
+put MAIL_CC_EMAILS     "<optional, comma separated>"
+put MAIL_BCC_EMAILS    "<optional, comma separated>"
 put RESEND_API_KEY     "<from Resend>"
+put RESEND_EMAIL_SENDER_EMAIL "<verified address>"
+put BREVO_API_KEY      "<from Brevo>"
+put BREVO_EMAIL_SENDER_USER "<verified address>"
+put BREVO_EMAIL_HOST   "smtp-relay.brevo.com"
+put BREVO_EMAIL_HOST_USER "<Brevo SMTP login>"
+put BREVO_EMAIL_HOST_PASSWORD "<Brevo SMTP key>"
 put REDIS_URL          "<rediss:// URL from part 2>"
 put STORAGE_BUCKET     "<bucket>"
 put STORAGE_ACCESS_KEY_ID     "<key id>"
@@ -249,7 +264,7 @@ Required per service (from the code; run `node scripts/service-env.mts <api|work
 - **realtime**: `REDIS_URL`
 - **migrate job**: `DATABASE_MIGRATOR_URL`
 
-Also set the optional ones you want: `RESEND_API_KEY` or `MAIL_SMTP_HOST` and `MAIL_SMTP_PORT`, `DATABASE_READ_URL`, `AUTH_RP_ID`, `CORS_ORIGINS`, `TRUST_PROXY_HOPS`, `CLOUDFLARE_ANALYTICS_TOKEN`, `R2_PERIOD_ANCHOR_DAY`, `R2_LIMIT_*`, `REALTIME_TICKET_SECRET`, `REALTIME_URL`, `SENTRY_DSN` (part 8), `OTEL_EXPORTER_OTLP_ENDPOINT`. `TRUST_PROXY_HOPS` is how many proxies sit in front of the API; on Cloud Run behind the console proxy start at `1` and check in the first request log that the client address is a real client, not a Google address, before trusting rate limits. `INVITE_SECRET`, `AUTH_SECRET` and `PIN_PEPPER` must be at least 32 characters and must never change without following `docs/runbooks/rotate-secrets.md` (changing `PIN_PEPPER` invalidates every PIN).
+Also set the optional ones you want: `EMAIL_PROVIDER`, `EMAIL_PROVIDER_ORDER`, `MAIL_CC_EMAILS`, `MAIL_BCC_EMAILS`, `MAIL_COPY_MODE`, at least one provider (`RESEND_API_KEY`, `BREVO_API_KEY`, or the three `BREVO_EMAIL_HOST*` values), `DATABASE_READ_URL`, `AUTH_RP_ID`, `CORS_ORIGINS`, `TRUST_PROXY_HOPS`, `CLOUDFLARE_ANALYTICS_TOKEN`, `R2_PERIOD_ANCHOR_DAY`, `R2_LIMIT_*`, `REALTIME_TICKET_SECRET`, `REALTIME_URL`, `SENTRY_DSN` (part 8), `OTEL_EXPORTER_OTLP_ENDPOINT`. `TRUST_PROXY_HOPS` is how many proxies sit in front of the API; on Cloud Run behind the console proxy start at `1` and check in the first request log that the client address is a real client, not a Google address, before trusting rate limits. `INVITE_SECRET`, `AUTH_SECRET` and `PIN_PEPPER` must be at least 32 characters and must never change without following `docs/runbooks/rotate-secrets.md` (changing `PIN_PEPPER` invalidates every PIN).
 
 Check: `gcloud secrets list --format='value(name)' | grep wb-staging-` lists them all.
 

@@ -1,15 +1,36 @@
 {
   "expo": {
     "name": "wise-biz POS",
-    "slug": "wise-biz-pos",
+    "slug": "wise-biz",
     "scheme": "wisebizpos",
     "version": "0.2.1",
     "orientation": "default",
     "userInterfaceStyle": "automatic",
     "plugins": ["expo-router", "expo-secure-store", "expo-sqlite"],
-    "android": { "package": "biz.wise.pos" },
-    "ios": { "bundleIdentifier": "biz.wise.pos" },
-    "web": { "bundler": "metro", "output": "single" },
-    "experiments": { "typedRoutes": false, "tsconfigPaths": false }
+    "android": {
+      "package": "biz.wise.pos"
+    },
+    "ios": {
+      "bundleIdentifier": "biz.wise.pos"
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    },
+    "experiments": {
+      "typedRoutes": false,
+      "tsconfigPaths": false
+    },
+    "extra": {
+      "router": {
+        "asyncRoutes": {
+          "web": true
+        }
+      },
+      "eas": {
+        "projectId": "15897eb3-c48c-4ea6-a9c5-81be8d7e35bc"
+      }
+    },
+    "owner": "sahansac"
   }
 }

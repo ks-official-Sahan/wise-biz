@@ -3,7 +3,13 @@ import { createServer } from "node:net";
 import fc from "fast-check";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { MailError, createCaptureMailer, createMailer } from "../src/index.ts";
+import {
+  MailError,
+  createCaptureMailer,
+  createMailer,
+  mailerLogHooks,
+  redactCopy,
+} from "../src/index.ts";
 import { smtpTransportOptions } from "../src/mailer.ts";
 
 import type { MailEnv } from "../src/index.ts";
@@ -299,5 +305,244 @@ describe("SMTP transport security", () => {
       secure: false,
       requireTLS: false,
     });
+  });
+});
+
+const ok = (id: string) => Promise.resolve(Response.json({ id, messageId: id }, { status: 200 }));
+const fail = (status: number, name = "error") =>
+  Promise.resolve(Response.json({ name, code: name, message: "x" }, { status }));
+const urlOf = (call: unknown[]) => String(call[0]);
+const bodyOf = (call: unknown[]) =>
+  JSON.parse((call[1] as RequestInit).body as string) as Record<string, unknown>;
+
+describe("providers and fallback", () => {
+  it("sends through the Brevo API with the Brevo sender", async () => {
+    const fetchMock = vi.fn(() => ok("b1"));
+    vi.stubGlobal("fetch", fetchMock);
+    const mailer = createMailer({
+      ...base,
+      BREVO_API_KEY: "xkeysib-test",
+      BREVO_EMAIL_SENDER_USER: "support@wise-biz.local",
+    });
+    await mailer.send(msg);
+    const call = fetchMock.mock.calls[0] as unknown as unknown[];
+    expect(urlOf(call)).toBe("https://api.brevo.com/v3/smtp/email");
+    expect(new Headers((call[1] as RequestInit).headers).get("api-key")).toBe("xkeysib-test");
+    expect(JSON.stringify(bodyOf(call))).toContain("support@wise-biz.local");
+  });
+
+  it("in auto mode moves to the next provider when one fails for an account reason", async () => {
+    const fetchMock = vi.fn((url: string) =>
+      url.includes("brevo.com") ? fail(401, "unauthorized") : ok("r1"),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const onFallback = vi.fn();
+    const mailer = createMailer(
+      { ...base, BREVO_API_KEY: "xkeysib-bad", RESEND_API_KEY: "re_test_key" },
+      { onFallback },
+    );
+    await mailer.send(msg);
+    expect(fetchMock.mock.calls.map((c) => urlOf(c as unknown[]))).toEqual([
+      "https://api.brevo.com/v3/smtp/email",
+      "https://api.resend.com/emails",
+    ]);
+    expect(onFallback).toHaveBeenCalledWith("brevo-api", expect.any(String));
+  });
+
+  it("stops at a failure about the message itself instead of trying every provider", async () => {
+    const fetchMock = vi.fn(() => fail(400, "invalid_parameter"));
+    vi.stubGlobal("fetch", fetchMock);
+    const mailer = createMailer({
+      ...base,
+      BREVO_API_KEY: "xkeysib-test",
+      RESEND_API_KEY: "re_test_key",
+    });
+    const error = await rejection(mailer.send(msg));
+    expect((error as MailError).retryable).toBe(false);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("uses only the named provider when EMAIL_PROVIDER names one", async () => {
+    const fetchMock = vi.fn(() => ok("r1"));
+    vi.stubGlobal("fetch", fetchMock);
+    const mailer = createMailer({
+      ...base,
+      EMAIL_PROVIDER: "resend",
+      BREVO_API_KEY: "xkeysib-test",
+      RESEND_API_KEY: "re_test_key",
+    });
+    await mailer.send(msg);
+    expect(urlOf(fetchMock.mock.calls[0] as unknown[])).toBe("https://api.resend.com/emails");
+    const none = createMailer({ ...base, EMAIL_PROVIDER: "brevo-api", RESEND_API_KEY: "re_k" });
+    expect(((await rejection(none.send(msg))) as MailError).errorClass).toBe(
+      "no_provider_configured",
+    );
+  });
+
+  it("puts the providers in EMAIL_PROVIDER_ORDER first", async () => {
+    const fetchMock = vi.fn(() => ok("r1"));
+    vi.stubGlobal("fetch", fetchMock);
+    const mailer = createMailer({
+      ...base,
+      EMAIL_PROVIDER_ORDER: ["resend"],
+      BREVO_API_KEY: "xkeysib-test",
+      RESEND_API_KEY: "re_test_key",
+    });
+    await mailer.send(msg);
+    expect(urlOf(fetchMock.mock.calls[0] as unknown[])).toBe("https://api.resend.com/emails");
+  });
+
+  it("configures Brevo SMTP from the BREVO_EMAIL_* keys and falls back to it last", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => fail(401, "unauthorized")),
+    );
+    const mailer = createMailer({
+      ...base,
+      BREVO_API_KEY: "xkeysib-bad",
+      BREVO_EMAIL_HOST: "127.0.0.1",
+      BREVO_EMAIL_PORT: await freePort(),
+      BREVO_EMAIL_USE_TLS: false,
+      BREVO_EMAIL_HOST_USER: "user@smtp-brevo.com",
+      BREVO_EMAIL_HOST_PASSWORD: "xsmtpsib-test",
+    });
+    const error = await rejection(mailer.send(msg));
+    // the API was refused, then the SMTP attempt reached the unreachable relay
+    expect(error).toBeInstanceOf(MailError);
+    expect((error as MailError).errorClass).not.toBe("no_provider_configured");
+    expect(String(error)).not.toContain("xsmtpsib-test");
+  });
+
+  it("skips a provider that reached its daily limit", async () => {
+    const fetchMock = vi.fn((url: string) => ok(url.includes("brevo") ? "b" : "r"));
+    vi.stubGlobal("fetch", fetchMock);
+    const mailer = createMailer({
+      ...base,
+      BREVO_API_KEY: "xkeysib-test",
+      RESEND_API_KEY: "re_test_key",
+      BREVO_DAILY_LIMIT: 1,
+    });
+    await mailer.send(msg);
+    await mailer.send(msg);
+    expect(fetchMock.mock.calls.map((c) => urlOf(c as unknown[]))).toEqual([
+      "https://api.brevo.com/v3/smtp/email",
+      "https://api.resend.com/emails",
+    ]);
+  });
+
+  it("keeps mail in memory with EMAIL_PROVIDER=capture outside production", async () => {
+    const mailer = createMailer({ ...base, EMAIL_PROVIDER: "capture", NODE_ENV: "development" });
+    await mailer.send(msg);
+  });
+});
+
+describe("CC and BCC", () => {
+  const withCopies = {
+    MAIL_CC_EMAILS: ["boss@example.com"],
+    MAIL_BCC_EMAILS: ["audit@example.com"],
+  };
+
+  it("full mode puts real CC and BCC on the one mail, on any provider", async () => {
+    const smtp = await fakeSmtp();
+    await createMailer({
+      ...base,
+      ...withCopies,
+      MAIL_COPY_MODE: "full",
+      MAIL_SMTP_HOST: "127.0.0.1",
+      MAIL_SMTP_PORT: smtp.port,
+    }).send(msg);
+    expect(smtp.received).toHaveLength(1);
+    expect(smtp.rcpt).toEqual([
+      "RCPT TO:<jane@example.com>",
+      "RCPT TO:<boss@example.com>",
+      "RCPT TO:<audit@example.com>",
+    ]);
+    expect(smtp.received[0]).toContain("Open the link: https://x.test/v?t=SECRET");
+
+    const fetchMock = vi.fn(() => ok("r1"));
+    vi.stubGlobal("fetch", fetchMock);
+    await createMailer({
+      ...base,
+      ...withCopies,
+      MAIL_COPY_MODE: "full",
+      RESEND_API_KEY: "re_test_key",
+    }).send(msg);
+    expect(bodyOf(fetchMock.mock.calls[0] as unknown as unknown[])).toMatchObject({
+      to: ["jane@example.com"],
+      cc: ["boss@example.com"],
+      bcc: ["audit@example.com"],
+    });
+  });
+
+  it("redacted mode (the default) sends the original untouched and a separate copy with no link or code", async () => {
+    const smtp = await fakeSmtp();
+    await createMailer({
+      ...base,
+      ...withCopies,
+      MAIL_SMTP_HOST: "127.0.0.1",
+      MAIL_SMTP_PORT: smtp.port,
+    }).send({ ...msg, text: "Code 123456. Open https://x.test/v?t=SECRET" });
+    expect(smtp.received).toHaveLength(2);
+    expect(smtp.received[0]).toContain("https://x.test/v?t=SECRET");
+    // the original reaches only the real recipient
+    expect(smtp.rcpt.slice(0, 1)).toEqual(["RCPT TO:<jane@example.com>"]);
+    // the copy goes to the sender, with every copy address hidden in BCC
+    expect(smtp.rcpt.slice(1)).toEqual([
+      "RCPT TO:<no-reply@wise-biz.local>",
+      "RCPT TO:<boss@example.com>",
+      "RCPT TO:<audit@example.com>",
+    ]);
+    const copy = smtp.received[1] ?? "";
+    expect(copy).toContain("[Copy] Verify your email");
+    expect(copy).not.toContain("SECRET");
+    expect(copy).not.toContain("123456");
+    expect(copy).toContain("[link removed]");
+    expect(copy).toContain("[code removed]");
+  });
+
+  it("never fails the original mail when the copy fails", async () => {
+    let calls = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => (++calls === 1 ? ok("r1") : fail(500, "application_error"))),
+    );
+    const onCopyError = vi.fn();
+    const mailer = createMailer(
+      { ...base, ...withCopies, RESEND_API_KEY: "re_test_key" },
+      { onCopyError },
+    );
+    await mailer.send(msg);
+    expect(calls).toBe(2);
+    expect(onCopyError).toHaveBeenCalledWith(expect.stringMatching(/^resend_/));
+  });
+
+  it("sends no copy when none is configured", async () => {
+    const fetchMock = vi.fn(() => ok("r1"));
+    vi.stubGlobal("fetch", fetchMock);
+    await createMailer({ ...base, RESEND_API_KEY: "re_test_key" }).send(msg);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("redactCopy", () => {
+  it("removes links of any scheme and 6 to 8 digit codes, and keeps the rest", () => {
+    expect(redactCopy("Hi. Code 482913, link https://a.test/x?y=1 and wise://invite/9.")).toBe(
+      "Hi. Code [code removed], link [link removed] and [link removed]",
+    );
+    expect(redactCopy("Order 12345 in 2026")).toBe("Order 12345 in 2026");
+  });
+});
+
+describe("mailerLogHooks", () => {
+  it("logs labels only", () => {
+    const warn = vi.fn();
+    const hooks = mailerLogHooks({ warn });
+    hooks.onCopyError?.("smtp_ECONNREFUSED");
+    hooks.onFallback?.("resend", "http_401");
+    expect(warn).toHaveBeenCalledWith({ errorClass: "smtp_ECONNREFUSED" }, expect.any(String));
+    expect(warn).toHaveBeenCalledWith(
+      { provider: "resend", errorClass: "http_401" },
+      expect.any(String),
+    );
   });
 });

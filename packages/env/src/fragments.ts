@@ -58,20 +58,59 @@ export const storageEnv = {
 
 const resendApiKey = z.string().min(1).optional();
 
-export const emailEnv = {
-  EMAIL_PROVIDER: z.enum(["capture", "smtp", "resend", "brevo"]).default("capture"),
-  EMAIL_FROM: z.email(),
-  SMTP_URL: z.url().optional(),
-  RESEND_API_KEY: resendApiKey,
-  BREVO_API_KEY: z.string().min(1).optional(),
-};
+/** Comma-separated addresses to a validated list. An empty or missing value is an empty list; a bad address stops the start. */
+const addressList = z
+  .string()
+  .optional()
+  .transform((v) =>
+    (v ?? "")
+      .split(",")
+      .map((x) => x.trim())
+      .filter((x) => x !== ""),
+  )
+  .pipe(z.array(z.email()).max(10));
 
-/** Transactional mail (@wise-biz/mailer). SMTP wins when MAIL_SMTP_HOST is set, else Resend. */
+/**
+ * Transactional mail (@wise-biz/mailer), four providers: a local SMTP relay (MAIL_SMTP_HOST, Mailpit in development),
+ * the Brevo API, Resend, and Brevo SMTP. EMAIL_PROVIDER names one; `auto` tries every configured one in this order
+ * (EMAIL_PROVIDER_ORDER can move some first) and moves to the next when one fails for an account reason.
+ */
 export const mailEnv = {
+  EMAIL_PROVIDER: z
+    .enum(["auto", "smtp", "brevo-api", "resend", "brevo-smtp", "capture"])
+    .default("auto"),
+  EMAIL_PROVIDER_ORDER: z
+    .string()
+    .optional()
+    .transform((v) =>
+      (v ?? "")
+        .split(",")
+        .map((x) => x.trim())
+        .filter((x) => x !== ""),
+    )
+    .pipe(z.array(z.enum(["smtp", "brevo-api", "resend", "brevo-smtp"]))),
   MAIL_FROM: z.email(),
+  /** Copies of every mail. See MAIL_COPY_MODE for what a copy contains. */
+  MAIL_CC_EMAILS: addressList,
+  MAIL_BCC_EMAILS: addressList,
+  /** `redacted` (default): copies go in a separate mail with links and codes removed. `full`: real CC and BCC on the mail itself. */
+  MAIL_COPY_MODE: z.enum(["redacted", "full"]).default("redacted"),
   MAIL_SMTP_HOST: z.string().min(1).optional(),
   MAIL_SMTP_PORT: z.coerce.number().int().min(1).max(65535).optional(),
   RESEND_API_KEY: resendApiKey,
+  /** Sender for Resend (a verified domain). Defaults to MAIL_FROM. */
+  RESEND_EMAIL_SENDER_EMAIL: z.email().optional(),
+  BREVO_API_KEY: z.string().min(1).optional(),
+  /** Sender for Brevo, API and SMTP (a verified sender). Defaults to MAIL_FROM. */
+  BREVO_EMAIL_SENDER_USER: z.email().optional(),
+  BREVO_EMAIL_HOST: z.string().min(1).optional(),
+  BREVO_EMAIL_PORT: z.coerce.number().int().min(1).max(65535).default(587),
+  BREVO_EMAIL_USE_TLS: z.stringbool().default(true),
+  BREVO_EMAIL_HOST_USER: z.string().min(1).optional(),
+  BREVO_EMAIL_HOST_PASSWORD: z.string().min(1).optional(),
+  /** Free-tier daily sends: the provider is skipped past this (0 = no limit). Counted per process. */
+  BREVO_DAILY_LIMIT: z.coerce.number().int().min(0).default(300),
+  RESEND_DAILY_LIMIT: z.coerce.number().int().min(0).default(100),
 };
 
 /** HMAC key for invite tokens (tenancy). Never log it. */

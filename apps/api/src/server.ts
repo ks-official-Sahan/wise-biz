@@ -17,7 +17,7 @@ import {
   storageEnv,
   webauthnEnv,
 } from "@wise-biz/env";
-import { createMailer } from "@wise-biz/mailer";
+import { createMailer, mailerLogHooks } from "@wise-biz/mailer";
 import { SESSION_COOKIE_NAME, createIdentity } from "@wise-biz/module-identity";
 import { createTenancyPorts } from "@wise-biz/module-tenancy";
 import { captureError } from "@wise-biz/observability";
@@ -69,7 +69,7 @@ export async function startServer(
   const env = defineEnv(API_ENV, source);
   const logger = createLogger(env.LOG_LEVEL);
   // Transactional mail (verification, second factor, invites). Sends never block a request: see the callers.
-  const mailer = createMailer(env);
+  const mailer = createMailer(env, mailerLogHooks(logger));
   // CORS allowlist without wildcards: the same origins are WebAuthn origins and Better Auth trusted origins.
   const origins = env.CORS_ORIGINS.filter((o) => o !== "*");
 

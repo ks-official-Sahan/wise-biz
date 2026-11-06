@@ -18,7 +18,7 @@ import {
 } from "@wise-biz/env";
 import { createPgBus } from "@wise-biz/events";
 import { uuidv7 } from "@wise-biz/ids";
-import { createMailer } from "@wise-biz/mailer";
+import { createMailer, mailerLogHooks } from "@wise-biz/mailer";
 import {
   createAnchorJob,
   createAuditChainer,
@@ -105,7 +105,7 @@ export function startWorker(
     consumers ??
     (() => {
       const e = consumerEnv ?? defineEnv(CONSUMER_ENV, source);
-      const mailer = createMailer(e);
+      const mailer = createMailer(e, mailerLogHooks(logger));
       ports.mail = { send: (m) => mailer.send(m), consoleUrl: e.CONSOLE_URL };
       ports.push = createExpoPush();
       return createConsumers({
