@@ -81,9 +81,9 @@ Checks developers run: `pnpm check` (lint, types, tests).
 
 You already did the first three. Details for each are in `docs/runbooks/first-release.md`, which now starts with a short checklist.
 
-1. ✅ Neon project `Wise-Biz`, database `wise_biz`, read replica.
+1. ✅ Neon project `Wise-Biz`, database `wise_biz`, a read replica and a `staging` branch (all of `docs/runbooks/neon.md` parts 1 to 3).
 2. ✅ Tag `v0.2.1` (done: it makes the container images and the app builds start).
-3. **Create the database roles** on Neon (the script). This is the step you were stuck on; it is explained in `docs/runbooks/neon.md`, step 3, in plain words and takes five minutes.
+3. **Create the database roles** on Neon (`docs/runbooks/neon.md`, part 4): one command, first for the `staging` branch, in plain steps, about five minutes.
 4. **Rotate the credentials you pasted in chat** (see the warning below).
 5. Create the other accounts the server needs: Redis, object storage, email (`first-release.md`, part 2).
 6. Create the Google Cloud setup and the secrets (parts 3 and 4), then the GitHub environments (part 5).

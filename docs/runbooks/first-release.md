@@ -10,7 +10,7 @@ Read this first. Each line says **where** you do it, **what** you do and **when*
 
 | # | Where | What | When | Part below |
 |---|---|---|---|---|
-| 1 | Neon console, then PowerShell on your PC | Project, database `wise_biz`, replica, then run the role script and the migration check | first | 1 and `neon.md` |
+| 1 | Neon console, then PowerShell on your PC | Project, the two branches, settings, the role script and the migration check: follow `docs/runbooks/neon.md` start to end | first | 1 and `neon.md` |
 | 2 | Upstash, Cloudflare or AWS, Resend websites | Redis, a storage bucket, an email sender | after 1 | 2 |
 | 3 | Google Cloud console and a terminal with `gcloud` | Project, registry, service accounts, workload identity | after 2 | 3 |
 | 4 | A terminal with `gcloud` | Put every setting into Secret Manager | after 3 | 4 |
@@ -27,7 +27,7 @@ What you need to hold in the end:
 
 | Where | What |
 |---|---|
-| Neon | one project per environment (staging and production never share a database), database `wise_biz`, four roles, one read replica (optional) |
+| Neon | one project `Wise-Biz` with two branches, `production` and `staging` (they never share data), database `wise_biz` in each, five roles per branch, one read replica for production (optional) |
 | Google Cloud | one project, Cloud Run, Artifact Registry, Secret Manager, a deploy service account with workload identity |
 | Redis | one managed Redis (Upstash or similar) per environment |
 | Object storage | one S3-compatible bucket per environment (Cloudflare R2 or AWS S3) |
@@ -59,7 +59,7 @@ Check: you have the Redis URL, the bucket name with its two keys, and a verified
 
 ## 3. Google Cloud (Cloud Run, Artifact Registry, Secret Manager, workload identity)
 
-`deploy.yml` signs in with workload identity federation, so no long-lived key exists anywhere. Create one Google Cloud project per environment (or one for both with different secret prefixes; the secret names already carry `<ENV>`). Pick a region (for example `europe-west1`) and use it everywhere. Enable billing.
+`deploy.yml` signs in with workload identity federation, so no long-lived key exists anywhere. Create one Google Cloud project per environment (or one for both with different secret prefixes; the secret names already carry `<ENV>`). Pick a region and use it everywhere. Use `asia-southeast1` (Singapore) to sit next to the Neon database in `ap-southeast-1`. Enable billing.
 
 ```bash
 PROJECT=<your-project-id>   REGION=<your-region>   REPO=wise-biz
