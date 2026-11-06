@@ -19,15 +19,20 @@ const TIMEOUTS: Readonly<Record<string, readonly [string, string]>> = {
   wb_identity: ["15s", "30s"],
 };
 
+/** Extensions the migrations rely on (infra/docker/postgres/init/002-extensions.sql). Created by the owner: the migrator is not a superuser. */
+export const EXTENSIONS = ["pgcrypto", "pg_trgm", "vector", "pg_stat_statements"] as const;
+
+/** The databases a provisioning run must never be pointed at: the application lives in `wise_biz`. */
+export const WRONG_DATABASES = ["neondb", "postgres", "template1"] as const;
+
 /**
- * The statements of infra/neon/provision-roles.sql, with the passwords and the database name escaped by the caller's
- * functions (`pg` gives `escapeLiteral` and `escapeIdentifier`), because CREATE ROLE cannot take bind parameters.
- * Keep this and the .sql file in step: both are the role definition of ADR 0017.
+ * Step 1, once per Neon branch: the five roles and their per-role timeouts (the role part of
+ * infra/neon/provision-roles.sql). Passwords are escaped by the caller's `literal` (`pg` gives `escapeLiteral`), because
+ * CREATE ROLE cannot take bind parameters.
  */
-export function provisionStatements(
-  dbname: string,
+export function roleStatements(
   passwords: Passwords,
-  quote: { literal: (s: string) => string; identifier: (s: string) => string },
+  quote: { literal: (s: string) => string },
 ): string[] {
   const out: string[] = [];
   for (const r of SERVICE_ROLES) {
@@ -40,11 +45,34 @@ export function provisionStatements(
     out.push(`ALTER ROLE ${role} SET statement_timeout = '${statement}'`);
     out.push(`ALTER ROLE ${role} SET idle_in_transaction_session_timeout = '${idle}'`);
   }
-  const db = quote.identifier(dbname);
-  out.push(`ALTER DATABASE ${db} OWNER TO wb_migrator`);
-  out.push(`REVOKE CONNECT ON DATABASE ${db} FROM PUBLIC`);
-  out.push(`GRANT CONNECT ON DATABASE ${db} TO ${SERVICE_ROLES.map((r) => r.role).join(", ")}`);
   return out;
+}
+
+/**
+ * Step 2, for the database `wise_biz`, run while connected to it as the owner; safe to repeat. It is what the local Docker
+ * setup does in 001-roles-db.sql and 002-extensions.sql: extensions, the database owned by the migrator and closed to
+ * everyone else, the public schema owned by the migrator, and default privileges so that the app role gets
+ * DML (never DDL) on every table and sequence the migrator creates later.
+ */
+export function databaseStatements(
+  dbname: string,
+  quote: { identifier: (s: string) => string },
+): string[] {
+  const db = quote.identifier(dbname);
+  const all = SERVICE_ROLES.map((r) => r.role).join(", ");
+  return [
+    ...EXTENSIONS.map((e) => `CREATE EXTENSION IF NOT EXISTS ${e}`),
+    `ALTER DATABASE ${db} OWNER TO wb_migrator`,
+    `REVOKE ALL ON DATABASE ${db} FROM PUBLIC`,
+    `GRANT CONNECT ON DATABASE ${db} TO ${all}`,
+    `REVOKE TEMPORARY ON DATABASE ${db} FROM wb_app`,
+    `REVOKE TEMPORARY ON DATABASE ${db} FROM PUBLIC`,
+    "REVOKE CREATE ON SCHEMA public FROM PUBLIC",
+    "GRANT USAGE ON SCHEMA public TO wb_app",
+    "ALTER SCHEMA public OWNER TO wb_migrator",
+    "ALTER DEFAULT PRIVILEGES FOR ROLE wb_migrator GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO wb_app",
+    "ALTER DEFAULT PRIVILEGES FOR ROLE wb_migrator GRANT USAGE, SELECT ON SEQUENCES TO wb_app",
+  ];
 }
 
 /** `ep-name.region.aws.neon.tech` -> the same endpoint behind Neon's pooler: `ep-name-pooler.region.aws.neon.tech`. */

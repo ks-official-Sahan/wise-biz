@@ -56,18 +56,18 @@ Neon lists a setting that your plan does not include as locked; keep the default
 
 **Start with `staging`.**
 
-1. In the Neon console open **Connect** (button on the project dashboard). Choose **Branch** `staging`, **Database** `wise_biz`, **Role** `neondb_owner`, and **turn "Connection pooling" OFF**. Copy the connection string. It looks like `postgresql://neondb_owner:<password>@ep-xxxx.c-2.ap-southeast-1.aws.neon.tech/wise_biz?sslmode=require`. If the copied string ends in `&channel_binding=require`, delete that part. If the database in it is `neondb`, change it to `wise_biz`.
+1. In the Neon console open **Connect** (button on the project dashboard). Choose **Branch** `staging`, **Database** `wise_biz`, **Role** `neondb_owner`, and **turn "Connection pooling" OFF**. Copy the connection string. It looks like `postgresql://neondb_owner:<password>@ep-xxxx.c-2.ap-southeast-1.aws.neon.tech/wise_biz?sslmode=verify-full`. Make three edits to what Neon shows you: the database name must be **`wise_biz`** (Neon often shows `neondb`: change it; the script refuses `neondb`), the host must not contain `-pooler`, and the end must be `?sslmode=verify-full` (delete `&channel_binding=require`).
 2. In the same window, find the **read replica** host only for `production` (staging has none): Connect with the replica selected; the host is between `@` and `/`. Leave it out for staging.
 3. Run (put your string between the quotes):
 
    ```powershell
-   $env:OWNER_URL = "postgresql://neondb_owner:<password>@ep-xxxx.c-2.ap-southeast-1.aws.neon.tech/wise_biz?sslmode=require"
+   $env:OWNER_URL = "postgresql://neondb_owner:<password>@ep-xxxx.c-2.ap-southeast-1.aws.neon.tech/wise_biz?sslmode=verify-full"
    pnpm -F @wise-biz/db provision-neon staging
    ```
 
    For production, add the replica line before the last one: `$env:READ_HOST = "ep-yyyy.c-2.ap-southeast-1.aws.neon.tech"`, and use `production` as the last word. (Git Bash: `export OWNER_URL="..."` instead of `$env:OWNER_URL = "..."`.)
-4. It prints `Roles created on wise_biz` and the path of a file, `C:\Users\<you>\wise-biz-staging-database-urls.txt`. The file holds the application's connection strings and passwords, one per line (`DATABASE_URL`, `DATABASE_WORKER_URL`, `DATABASE_MIGRATOR_URL`, `DATABASE_CHAINER_URL`, `DATABASE_IDENTITY_URL`, and `DATABASE_READ_URL` for production). Keep it private. You copy its lines into Secret Manager later (`first-release.md`, part 4) and then delete it.
-5. If it says `Already provisioned`, the roles exist; nothing changed. If it fails, copy the error text (not the password) and ask for help.
+4. It prints `Roles created and database wise_biz set up` and the path of a file, `C:\Users\<you>\wise-biz-staging-database-urls.txt`. The file holds the application's connection strings and passwords, one per line (`DATABASE_URL`, `DATABASE_WORKER_URL`, `DATABASE_MIGRATOR_URL`, `DATABASE_CHAINER_URL`, `DATABASE_IDENTITY_URL`, and `DATABASE_READ_URL` for production). Keep it private. You copy its lines into Secret Manager later (`first-release.md`, part 4) and then delete it.
+5. The script is safe to run again. If the roles already exist it keeps them and their passwords, repeats only the database setup (extensions, ownership, privileges) and prints a note. Use this when a first run went to the wrong database: point `OWNER_URL` at `wise_biz` and run the same command. Your saved file then still ends in `/neondb`: change that part of each line to `/wise_biz`, for example in PowerShell `(Get-Content "$HOMEwise-biz-staging-database-urls.txt") -replace '/neondb?', '/wise_biz?' | Set-Content "$HOMEwise-biz-staging-database-urls.txt"`. If it fails, copy the error text (not the password) and ask for help.
 
 Then close the PowerShell window, so the owner string disappears from memory.
 
@@ -83,6 +83,8 @@ pnpm db:rls-check
 ```
 
 `db:migrate` lists the migrations it applied. `db:rls-check` must finish with no error. Both must pass before the first deploy.
+
+If `db:migrate` says `type "vector" does not exist` (or another extension is missing), the database setup did not run on `wise_biz`: run the script again with `OWNER_URL` pointing at `wise_biz`.
 
 ## 5. Which connection string goes where
 

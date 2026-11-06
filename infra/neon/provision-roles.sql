@@ -35,3 +35,20 @@ ALTER ROLE wb_identity SET idle_in_transaction_session_timeout = '30s';
 ALTER DATABASE :"dbname" OWNER TO wb_migrator;
 REVOKE CONNECT ON DATABASE :"dbname" FROM PUBLIC;
 GRANT CONNECT ON DATABASE :"dbname" TO wb_app, wb_worker, wb_chainer, wb_identity, wb_migrator;
+
+-- The rest of the database setup (what infra/docker/postgres/init/002-extensions.sql does locally). Run connected to the
+-- database as the owner. The extensions must be created by the owner: the migrator is not a superuser.
+connect :"dbname"
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+CREATE EXTENSION IF NOT EXISTS vector;
+CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
+REVOKE ALL ON DATABASE :"dbname" FROM PUBLIC;
+GRANT CONNECT ON DATABASE :"dbname" TO wb_app, wb_worker, wb_chainer, wb_identity, wb_migrator;
+REVOKE TEMPORARY ON DATABASE :"dbname" FROM wb_app;
+REVOKE TEMPORARY ON DATABASE :"dbname" FROM PUBLIC;
+REVOKE CREATE ON SCHEMA public FROM PUBLIC;
+GRANT USAGE ON SCHEMA public TO wb_app;
+ALTER SCHEMA public OWNER TO wb_migrator;
+ALTER DEFAULT PRIVILEGES FOR ROLE wb_migrator GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO wb_app;
+ALTER DEFAULT PRIVILEGES FOR ROLE wb_migrator GRANT USAGE, SELECT ON SEQUENCES TO wb_app;
