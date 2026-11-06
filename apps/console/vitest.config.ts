@@ -13,7 +13,7 @@ const config: ViteUserConfig = mergeConfig(
 );
 // mergeConfig concatenates arrays; the coverage scope must replace the shared default, not extend it.
 if (config.test?.coverage !== undefined) {
-  config.test.coverage.include = ["src/lib/{csp,nav,diff,permissions,safe-next}.ts"];
+  config.test.coverage.include = ["src/lib/{csp,nav,diff,permissions,safe-next,sentry}.ts"];
 }
 
 export default config;

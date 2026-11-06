@@ -222,11 +222,31 @@ describe("createUsageReader", () => {
       });
     await expect(mk(() => reply({}, 403))()).rejects.toThrow("403");
     await expect(mk(() => reply({ errors: [{ message: "denied" }] }))()).rejects.toThrow("denied");
-    expect(await mk(() => reply({ data: null, errors: null }))()).toEqual({
-      classA: 0,
-      classB: 0,
-      storageBytes: 0,
+    // errors: null is Cloudflare's normal success shape; an answer with no account is not zero usage
+    await expect(mk(() => reply({ data: null, errors: null }))()).rejects.toThrow("no account");
+    await expect(mk(() => reply({ data: { viewer: { accounts: [] } } }))()).rejects.toThrow(
+      "no account",
+    );
+    expect(await mk(() => reply({ data: { viewer: { accounts: [{}] } }, errors: null }))()).toEqual(
+      { classA: 0, classB: 0, storageBytes: 0 },
+    );
+  });
+});
+
+describe("createUsageReader timeout", () => {
+  it("gives every request a deadline", async () => {
+    let signal: AbortSignal | null | undefined;
+    const f = vi.fn((_u: unknown, init?: RequestInit) => {
+      signal = init?.signal;
+      return reply({ data: { viewer: { accounts: [{}] } } });
     });
+    await createUsageReader({
+      accountId: ACCOUNT,
+      apiToken: "t",
+      periodAnchorDay: 1,
+      fetch: f,
+    })();
+    expect(signal).toBeInstanceOf(AbortSignal);
   });
 });
 

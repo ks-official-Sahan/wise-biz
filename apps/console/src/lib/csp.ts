@@ -8,6 +8,8 @@ export function buildCsp(
   opts: {
     dev: boolean;
     /** Object-store origin that file uploads (imports, product images) go to with a presigned URL. */ uploadOrigin?: string;
+    /** Where browser error reports go (the Sentry ingest origin from the DSN; see sentryOrigin). */
+    reportOrigin?: string;
   },
 ): string {
   const directives: Record<string, string[]> = {
@@ -25,6 +27,7 @@ export function buildCsp(
       "'self'",
       ...(opts.dev ? ["ws:"] : []),
       ...(opts.uploadOrigin === undefined ? [] : [opts.uploadOrigin]),
+      ...(opts.reportOrigin === undefined ? [] : [opts.reportOrigin]),
     ],
     "frame-ancestors": ["'none'"],
     "base-uri": ["'none'"],

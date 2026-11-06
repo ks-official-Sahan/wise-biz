@@ -120,7 +120,7 @@ export function createQuotaGate(opts: QuotaOptions = {}): QuotaGate {
     const since = reading === undefined ? -Infinity : reading.at - lagMs;
     const sum = { classA: 0, classB: 0, bytes: 0 };
     for (const b of buckets) {
-      if (b.minute * MINUTE < since) continue;
+      if ((b.minute + 1) * MINUTE <= since) continue;
       sum.classA += b.classA;
       sum.classB += b.classB;
       sum.bytes += b.bytes;
@@ -193,7 +193,7 @@ export function createQuotaGate(opts: QuotaOptions = {}): QuotaGate {
       reading = { ...r, at: t };
       // Calls older than the lag window are in the reading now: forget them.
       const since = t - lagMs;
-      buckets = buckets.filter((b) => b.minute * MINUTE >= since);
+      buckets = buckets.filter((b) => (b.minute + 1) * MINUTE > since);
       notify(compute());
     },
     status() {
@@ -245,6 +245,8 @@ export function guardStore(store: ObjectStore, gate: QuotaGate): ObjectStore {
 }
 
 // --- Reading usage from Cloudflare (GraphQL Analytics API) ---
+
+const REQUEST_TIMEOUT_MS = 10_000;
 
 const FREE_ACTIONS = new Set([
   "DeleteObject",
@@ -305,6 +307,7 @@ export function createUsageReader(cfg: UsageSourceConfig): () => Promise<UsageRe
   const now = cfg.now ?? (() => new Date());
   const query = async <T>(q: string, from: Date, to: Date, field: string): Promise<T[]> => {
     const res = await doFetch("https://api.cloudflare.com/client/v4/graphql", {
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       method: "POST",
       headers: { authorization: `Bearer ${cfg.apiToken}`, "content-type": "application/json" },
       body: JSON.stringify({
@@ -316,7 +319,10 @@ export function createUsageReader(cfg: UsageSourceConfig): () => Promise<UsageRe
     const body = (await res.json()) as GraphQlReply<T>;
     if (body.errors != null && body.errors.length > 0)
       throw new Error(`cloudflare analytics: ${body.errors[0]?.message ?? "error"}`);
-    return body.data?.viewer?.accounts?.[0]?.[field] ?? [];
+    // An answer without the viewer is not "zero usage": refuse it, so the gate keeps its last reading.
+    const account = body.data?.viewer?.accounts?.[0];
+    if (account === undefined) throw new Error("cloudflare analytics: no account in the answer");
+    return account[field] ?? [];
   };
   return async () => {
     const t = now();
@@ -448,9 +454,15 @@ export function guardFromEnv(
     ...(deps.fetch && { fetch: deps.fetch }),
   });
   let timer: ReturnType<typeof setInterval> | undefined;
-  const refresh = () =>
-    read().then(
+  let started = 0;
+  let applied = 0;
+  const refresh = () => {
+    const mine = ++started;
+    return read().then(
       (r) => {
+        // Only a refresh that started after the last applied one may replace the reading.
+        if (mine < applied) return;
+        applied = mine;
         gate.apply(r);
       },
       (err: unknown) => {
@@ -458,6 +470,7 @@ export function guardFromEnv(
         deps.logger.warn({ err }, "could not read R2 usage from Cloudflare");
       },
     );
+  };
   return {
     store: guarded,
     gate,

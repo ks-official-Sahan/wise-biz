@@ -25,6 +25,10 @@ const EXCEPTIONS = new Map<string, string>([
   ["caniuse-lite", "CC-BY-4.0"],
   // js-yaml dependency pulled in by Expo CLI config tooling; PSF-style permissive license, build-time only.
   ["argparse", "Python-2.0"],
+  // Sentry command line tool, pulled in by @sentry/nextjs for source-map upload. Functional Source License: every use is
+  // allowed except offering a competing error-tracking product, and it converts to MIT after two years. Build-time only,
+  // not in any bundle, and its install script is not run (docs/adr/0025-sentry-in-the-console.md).
+  ["@sentry/cli", "FSL-1.1-MIT"],
 ]);
 
 type LicenseEntry = { name: string; versions?: string[] };

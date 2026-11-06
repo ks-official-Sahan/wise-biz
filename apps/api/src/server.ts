@@ -20,7 +20,7 @@ import {
 import { createMailer, mailerLogHooks } from "@wise-biz/mailer";
 import { SESSION_COOKIE_NAME, createIdentity } from "@wise-biz/module-identity";
 import { createTenancyPorts } from "@wise-biz/module-tenancy";
-import { captureError } from "@wise-biz/observability";
+import { captureQuotaBlocked } from "@wise-biz/observability";
 import { guardFromEnv, storeFromEnv } from "@wise-biz/storage";
 import { createClient } from "redis";
 
@@ -147,6 +147,7 @@ export async function startServer(
     }
   };
 
+  let runningGuard: { stop(): void } | undefined;
   try {
     // Not awaited: with an unreachable Redis connect() never settles. The client keeps reconnecting in the background.
     const connecting = redis.connect().catch((err: unknown) => {
@@ -162,10 +163,9 @@ export async function startServer(
     // Keeps object storage under the Cloudflare R2 free tier (ADR 0023); a plain store when the endpoint is not R2.
     const guard = guardFromEnv(storeFromEnv(env), env, {
       logger,
-      onBlocked: (metric) => {
-        captureError(new Error(`R2 cap reached: ${metric}`));
-      },
+      onBlocked: captureQuotaBlocked,
     });
+    runningGuard = guard;
     await guard.start();
 
     const identity = createIdentity({
@@ -238,6 +238,7 @@ export async function startServer(
       })());
     return { port, close };
   } catch (err) {
+    runningGuard?.stop();
     await teardown();
     throw err;
   }

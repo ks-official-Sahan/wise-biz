@@ -359,7 +359,9 @@ Do the same for `EXPO_PUBLIC_RECEIPT_BASE_URL` if you use public receipt links.
 4. Server: put the Node project's DSN in Secret Manager as `wb-<ENV>-SENTRY_DSN` and roll the services (re-run the deploy). The server starts the reporter only when `SENTRY_DSN` is set. It sends no personal data (see `docs/adr/0022-sentry-server-error-reporting.md`).
 5. Alert rules: create an alert on new issues, and one on error rate, and send them to your email or a chat webhook.
 
-The client apps (console, POS, desktop) are not wired to Sentry yet: each needs an SDK, and the POS app needs a bundle-size check first. Keep their DSNs for when they are added.
+6. **Console** (wired, `docs/adr/0025-sentry-in-the-console.md`): create a second project of type **Next.js**, copy its DSN, and set `NEXT_PUBLIC_SENTRY_DSN` (and optionally `NEXT_PUBLIC_SENTRY_ENVIRONMENT`) as an environment variable of the console host (Vercel: Project, Settings, Environment Variables) **before** the deploy: the browser reads it at build time. Nothing is sent without it.
+
+The POS app and the desktop shell are not wired to Sentry yet: the POS app needs a bundle-size check first. Keep their DSNs for when they are added.
 
 ## 10. Before real customers: the P1-16 gate
 

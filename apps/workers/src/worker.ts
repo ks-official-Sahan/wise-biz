@@ -34,6 +34,7 @@ import {
 } from "@wise-biz/module-inventory";
 import { createExpoPush, runDeliveries } from "@wise-biz/module-notifications";
 import { runDailyDigests, runExports } from "@wise-biz/module-reporting";
+import { captureQuotaBlocked } from "@wise-biz/observability";
 import { createMemoryStore, guardFromEnv, storeFromEnv } from "@wise-biz/storage";
 
 import { createConsumers } from "./consumers.ts";
@@ -95,7 +96,10 @@ export function startWorker(
   const guard =
     consumerEnv === undefined
       ? undefined
-      : guardFromEnv(storeFromEnv(consumerEnv), consumerEnv, { logger });
+      : guardFromEnv(storeFromEnv(consumerEnv), consumerEnv, {
+          logger,
+          onBlocked: captureQuotaBlocked,
+        });
   void guard?.start();
   const store = guard?.store ?? createMemoryStore();
   // The default consumer set needs the mailer, and so does the delivery loop that sends what its notifications flagged
@@ -105,7 +109,7 @@ export function startWorker(
     consumers ??
     (() => {
       const e = consumerEnv ?? defineEnv(CONSUMER_ENV, source);
-      const mailer = createMailer(e, mailerLogHooks(logger));
+      const mailer = createMailer({ ...e, NODE_ENV: env.NODE_ENV }, mailerLogHooks(logger));
       ports.mail = { send: (m) => mailer.send(m), consoleUrl: e.CONSOLE_URL };
       ports.push = createExpoPush();
       return createConsumers({
