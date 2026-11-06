@@ -14,13 +14,20 @@ import {
 // Local runs read the repository .env (CI sets the variables itself); values already in the environment win.
 try {
   process.loadEnvFile(new URL("../../../.env", import.meta.url));
-} catch {
-  // no .env: use the environment as it is
+} catch (error) {
+  // no .env: use the environment as it is. Any other failure (unreadable file) must not fall back to default limits.
+  if ((error as { code?: string }).code !== "ENOENT") throw error;
 }
 
 const num = (name: string, fallback: number): number => {
   const v = process.env[name];
-  return v === undefined || v === "" ? fallback : Number(v);
+  if (v === undefined || v === "") return fallback;
+  const n = Number(v);
+  if (!Number.isFinite(n) || n < 0) {
+    console.error(`${name} must be a non-negative number.`);
+    process.exit(2);
+  }
+  return n;
 };
 
 const account =

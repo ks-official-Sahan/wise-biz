@@ -333,7 +333,7 @@ describe("providers and fallback", () => {
 
   it("in auto mode moves to the next provider when one fails for an account reason", async () => {
     const fetchMock = vi.fn((url: string) =>
-      url.includes("brevo.com") ? fail(401, "unauthorized") : ok("r1"),
+      new URL(url).hostname === "api.brevo.com" ? fail(401, "unauthorized") : ok("r1"),
     );
     vi.stubGlobal("fetch", fetchMock);
     const onFallback = vi.fn();
@@ -409,12 +409,14 @@ describe("providers and fallback", () => {
     const error = await rejection(mailer.send(msg));
     // the API was refused, then the SMTP attempt reached the unreachable relay
     expect(error).toBeInstanceOf(MailError);
-    expect((error as MailError).errorClass).not.toBe("no_provider_configured");
+    expect((error as MailError).errorClass).toMatch(/^smtp_/);
     expect(String(error)).not.toContain("xsmtpsib-test");
   });
 
   it("skips a provider that reached its daily limit", async () => {
-    const fetchMock = vi.fn((url: string) => ok(url.includes("brevo") ? "b" : "r"));
+    const fetchMock = vi.fn((url: string) =>
+      ok(new URL(url).hostname === "api.brevo.com" ? "b" : "r"),
+    );
     vi.stubGlobal("fetch", fetchMock);
     const mailer = createMailer({
       ...base,
@@ -544,5 +546,77 @@ describe("mailerLogHooks", () => {
       { provider: "resend", errorClass: "http_401" },
       expect.any(String),
     );
+  });
+});
+
+describe("review fixes", () => {
+  it("does not fall back after a permanent recipient refusal from the relay", async () => {
+    const smtp = await fakeSmtp(true);
+    const fetchMock = vi.fn(() => ok("r1"));
+    vi.stubGlobal("fetch", fetchMock);
+    const mailer = createMailer({
+      ...base,
+      MAIL_SMTP_HOST: "127.0.0.1",
+      MAIL_SMTP_PORT: smtp.port,
+      RESEND_API_KEY: "re_test_key",
+    });
+    const error = await rejection(mailer.send(msg));
+    expect((error as MailError).retryable).toBe(false);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("counts Brevo API and Brevo SMTP against one daily limit", async () => {
+    const fetchMock = vi.fn(() => ok("b"));
+    vi.stubGlobal("fetch", fetchMock);
+    const mailer = createMailer({
+      ...base,
+      BREVO_API_KEY: "xkeysib-test",
+      BREVO_EMAIL_HOST: "127.0.0.1",
+      BREVO_EMAIL_PORT: await freePort(),
+      BREVO_EMAIL_USE_TLS: false,
+      BREVO_EMAIL_HOST_USER: "user@smtp-brevo.com",
+      BREVO_EMAIL_HOST_PASSWORD: "xsmtpsib-test",
+      BREVO_DAILY_LIMIT: 1,
+    });
+    await mailer.send(msg);
+    const error = await rejection(mailer.send(msg));
+    // the API used the one allowed send, so the second mail finds the shared limit reached on both transports
+    expect((error as MailError).errorClass).toBe("daily_limit");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("reports a fallback only when another provider will be tried", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => fail(401, "unauthorized")),
+    );
+    const onFallback = vi.fn();
+    await rejection(
+      createMailer({ ...base, BREVO_API_KEY: "xkeysib-bad" }, { onFallback }).send(msg),
+    );
+    expect(onFallback).not.toHaveBeenCalled();
+  });
+
+  it("refuses a full-mode copy list that does not fit the recipient limit", () => {
+    const many = Array.from({ length: 10 }, (_, i) => `c${String(i)}@example.com`);
+    expect(() =>
+      createMailer({
+        ...base,
+        MAIL_COPY_MODE: "full",
+        MAIL_CC_EMAILS: many,
+        RESEND_API_KEY: "re_k",
+      }),
+    ).toThrow(MailError);
+  });
+
+  it("redacts the subject of the copy", async () => {
+    const smtp = await fakeSmtp();
+    await createMailer({
+      ...base,
+      MAIL_BCC_EMAILS: ["audit@example.com"],
+      MAIL_SMTP_HOST: "127.0.0.1",
+      MAIL_SMTP_PORT: smtp.port,
+    }).send({ ...msg, subject: "Code 123456 for you" });
+    expect(smtp.received[1]).toContain("Subject: [Copy] Code [code removed] for you");
   });
 });

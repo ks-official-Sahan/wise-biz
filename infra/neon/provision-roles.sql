@@ -38,7 +38,6 @@ GRANT CONNECT ON DATABASE :"dbname" TO wb_app, wb_worker, wb_chainer, wb_identit
 
 -- The rest of the database setup (what infra/docker/postgres/init/002-extensions.sql does locally). Run connected to the
 -- database as the owner. The extensions must be created by the owner: the migrator is not a superuser.
-connect :"dbname"
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 CREATE EXTENSION IF NOT EXISTS vector;

@@ -37,12 +37,25 @@ if (ownerUrl === undefined || ownerUrl === "") {
   );
   process.exit(2);
 }
-const dbname = new URL(ownerUrl).pathname.replace(/^\//, "");
+const dbname = decodeURIComponent(new URL(ownerUrl).pathname.replace(/^\//, ""));
 if (dbname === "" || (WRONG_DATABASES as readonly string[]).includes(dbname)) {
   console.error(
     `OWNER_URL points at the database "${dbname}". The application lives in "wise_biz": change the end of the string to /wise_biz?sslmode=verify-full`,
   );
   process.exit(2);
+}
+
+function saveUrls(env: string, owner: string, db: string, pw: Passwords): string {
+  const urls = connectionUrls(owner, db, pw, process.env["READ_HOST"]);
+  const path = join(homedir(), `wise-biz-${env}-database-urls.txt`);
+  writeFileSync(
+    path,
+    Object.entries(urls)
+      .map(([k, v]) => `${k}=${String(v)}`)
+      .join("\n") + "\n",
+    { mode: 0o600 },
+  );
+  return path;
 }
 
 const passwords = Object.fromEntries(
@@ -52,6 +65,7 @@ const passwords = Object.fromEntries(
 const client = new pg.Client({ connectionString: ownerUrl });
 await client.connect();
 let created = false;
+let urlsFile: string | undefined;
 try {
   const existing = await client.query<{ rolname: string }>(
     "SELECT rolname FROM pg_roles WHERE rolname = ANY($1)",
@@ -62,6 +76,9 @@ try {
       await client.query(sql);
     }
     created = true;
+    // Write the new passwords now: if the database setup below fails, a re-run finds the roles and keeps their
+    // passwords, so without this file they would be lost.
+    urlsFile = saveUrls(environment, ownerUrl, dbname, passwords);
   } else if (existing.rows.length !== SERVICE_ROLES.length) {
     console.error(
       `Only some roles exist (${existing.rows.map((r) => r.rolname).join(", ")}). Remove them or ask for help; nothing changed.`,
@@ -73,6 +90,13 @@ try {
   for (const sql of databaseStatements(dbname, { identifier: (s) => client.escapeIdentifier(s) })) {
     await client.query(sql);
   }
+} catch (error) {
+  if (urlsFile !== undefined) {
+    console.error(
+      `Database setup failed. The new role passwords are saved in ${urlsFile}; run this command again.`,
+    );
+  }
+  throw error;
 } finally {
   await client.end();
 }
@@ -86,15 +110,7 @@ if (!created) {
   );
   process.exit(0);
 }
-const urls = connectionUrls(ownerUrl, dbname, passwords, process.env["READ_HOST"]);
-const file = join(homedir(), `wise-biz-${environment}-database-urls.txt`);
-writeFileSync(
-  file,
-  Object.entries(urls)
-    .map(([k, v]) => `${k}=${String(v)}`)
-    .join("\n") + "\n",
-  { mode: 0o600 },
-);
+const file = urlsFile ?? "";
 console.log(`Roles created and database ${dbname} set up.`);
 console.log(`Connection strings written to ${file}`);
 console.log(

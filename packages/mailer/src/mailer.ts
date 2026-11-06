@@ -5,6 +5,7 @@ import {
   createDailyQuota,
   createMemoryQuotaStore,
   escapeHtml,
+  MAX_RECIPIENTS,
   maskAddress,
   prepareMessage,
 } from "@sahan-sac/email-kit";
@@ -155,7 +156,7 @@ function localSmtp(
     name: "smtp",
     async send(message) {
       try {
-        await transport.sendMail({
+        const info = (await transport.sendMail({
           from,
           to: message.to,
           cc: message.cc,
@@ -163,11 +164,18 @@ function localSmtp(
           subject: message.subject,
           text: message.text,
           html: message.html,
-        });
+        })) as { accepted?: unknown[] };
+        // Copy recipients may be refused without harm; the person the mail is for must have been accepted.
+        const first = message.to[0];
+        if (info.accepted !== undefined && first !== undefined && !info.accepted.includes(first)) {
+          return { ok: false, errorClass: "smtp_recipient_refused", retryable: false };
+        }
         return { ok: true };
       } catch (error) {
-        const code = String((error as { code?: string }).code);
-        return { ok: false, errorClass: `smtp_${code}`, retryable: true };
+        const { code, responseCode } = error as { code?: string; responseCode?: number };
+        // 550 to 554 on the recipient or the message is about the mail, not the relay: another provider would refuse it too.
+        const permanent = responseCode !== undefined && responseCode >= 550 && responseCode <= 554;
+        return { ok: false, errorClass: `smtp_${String(code)}`, retryable: !permanent };
       }
     },
   };
@@ -254,15 +262,17 @@ function selectChain(env: MailEnv, production: boolean): NamedProvider[] {
   return chain;
 }
 
+/** The quota a provider counts against: Brevo's API and SMTP share one daily allowance. */
+const quotaName = (name: MailProviderName): ProviderName | undefined =>
+  name === "smtp" ? undefined : name === "brevo-smtp" ? "brevo-api" : name;
+
 /** Free-tier daily limits per provider (0 turns one off). Counted in this process only: a hint, never a guarantee. */
 function dailyQuota(env: MailEnv) {
   const limits: Partial<Record<ProviderName, number>> = {};
   const brevo = env.BREVO_DAILY_LIMIT ?? 300;
   const resend = env.RESEND_DAILY_LIMIT ?? 100;
-  if (brevo > 0) {
-    limits["brevo-api"] = brevo;
-    limits["brevo-smtp"] = brevo;
-  }
+  // Brevo counts the API and SMTP together: both are accounted under "brevo-api" (see quotaName).
+  if (brevo > 0) limits["brevo-api"] = brevo;
   if (resend > 0) limits.resend = resend;
   return createDailyQuota({ limits, store: createMemoryQuotaStore() });
 }
@@ -298,24 +308,29 @@ export function createMailer(env: MailEnv, opts: MailerOptions = {}): Mailer {
   const bcc = env.MAIL_BCC_EMAILS ?? [];
   const hasCopies = cc.length + bcc.length > 0;
   const full = env.MAIL_COPY_MODE === "full";
+  if (full && cc.length + bcc.length + 1 > MAX_RECIPIENTS) {
+    throw new MailError("too_many_copy_recipients", false);
+  }
 
   const deliver = async (message: PreparedMessage): Promise<void> => {
     let last: MailError | undefined;
-    for (const p of chain) {
-      if (p.name !== "smtp" && !(await quota.allow(p.name))) {
+    for (const [i, p] of chain.entries()) {
+      const q = quotaName(p.name);
+      const next = i < chain.length - 1;
+      if (q !== undefined && !(await quota.allow(q))) {
         last = new MailError("daily_limit", true);
-        opts.onFallback?.(p.name, "daily_limit");
+        if (next) opts.onFallback?.(p.name, "daily_limit");
         continue;
       }
       const outcome = await p.send(message);
       if (outcome.ok) {
-        if (p.name !== "smtp") await quota.record(p.name);
+        if (q !== undefined) await quota.record(q);
         return;
       }
       last = new MailError(outcome.errorClass, outcome.retryable);
       // A problem with the message itself would fail at every provider: stop. An account problem moves on.
       if (!outcome.retryable) break;
-      opts.onFallback?.(p.name, outcome.errorClass);
+      if (next) opts.onFallback?.(p.name, outcome.errorClass);
     }
     throw last ?? new MailError("no_provider_configured", false);
   };
@@ -332,7 +347,7 @@ export function createMailer(env: MailEnv, opts: MailerOptions = {}): Mailer {
           prepareMessage({
             to: from,
             bcc: [...cc, ...bcc],
-            subject: `[Copy] ${msg.subject}`,
+            subject: `[Copy] ${redactCopy(msg.subject)}`,
             text: note + redacted,
             html: toHtml(note + redacted),
             category: CATEGORY,

@@ -1,6 +1,12 @@
 import { afterEach, describe, expect, it } from "vitest";
 
-import { captureError, resetSentryForTests, scrubEvent, startSentry } from "../src/index.ts";
+import {
+  captureError,
+  captureQuotaBlocked,
+  resetSentryForTests,
+  scrubEvent,
+  startSentry,
+} from "../src/index.ts";
 
 import type { SentryEventLike, SentryModule } from "../src/index.ts";
 
@@ -143,5 +149,12 @@ describe("scrubEvent", () => {
     expect(scrub({ exception: { values: [{ type: "E" }] } }).exception?.values).toEqual([
       { type: "E" },
     ]);
+  });
+
+  it("reports a reached storage cap as an error that names the metric only", async () => {
+    const { mod, calls } = fake();
+    await startSentry({ SENTRY_DSN: DSN }, () => Promise.resolve(mod), "x");
+    captureQuotaBlocked("classA");
+    expect(String((calls.captured[0] as unknown[])[0])).toBe("Error: R2 cap reached: classA");
   });
 });

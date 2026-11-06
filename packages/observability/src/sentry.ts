@@ -113,6 +113,11 @@ export function captureError(err: unknown, tags?: { requestId?: string }): void 
   );
 }
 
+/** Reports that object storage refused a call because a monthly cap was reached. */
+export function captureQuotaBlocked(metric: string): void {
+  captureError(new Error(`R2 cap reached: ${metric}`));
+}
+
 /** For tests: forget the started client. */
 export function resetSentryForTests(): void {
   active = undefined;

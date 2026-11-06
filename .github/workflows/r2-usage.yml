@@ -30,3 +30,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_ANALYTICS_TOKEN: ${{ secrets.CLOUDFLARE_ANALYTICS_TOKEN }}
           R2_PERIOD_ANCHOR_DAY: ${{ vars.R2_PERIOD_ANCHOR_DAY }}
+          # Must equal the limits the servers run with (their R2_LIMIT_* values); unset = the defaults.
+          R2_LIMIT_STORAGE_BYTES: ${{ vars.R2_LIMIT_STORAGE_BYTES }}
+          R2_LIMIT_CLASS_A: ${{ vars.R2_LIMIT_CLASS_A }}
+          R2_LIMIT_CLASS_B: ${{ vars.R2_LIMIT_CLASS_B }}
