@@ -54,6 +54,11 @@ export const storageEnv = {
   R2_PERIOD_ANCHOR_DAY: z.coerce.number().int().min(1).max(28).default(1),
   /** API token with Account Analytics: Read; lets the cap see all usage, not only this process. */
   CLOUDFLARE_ANALYTICS_TOKEN: z.string().min(1).optional(),
+  /** Cloudflare account id (32 hex characters). The r2-usage script reads it; otherwise it is taken from STORAGE_ENDPOINT. */
+  CLOUDFLARE_ACCOUNT_ID: z
+    .string()
+    .regex(/^[0-9a-f]{32}$/)
+    .optional(),
 };
 
 const resendApiKey = z.string().min(1).optional();
