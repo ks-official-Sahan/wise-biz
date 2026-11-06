@@ -23,6 +23,8 @@ Read this first. Each line says **where** you do it, **what** you do and **when*
 | 9 | sentry.io | Error reports | any time after 6 | 9 |
 | 10 | Real devices and a staging shop | The P1-16 checks before real customers | last | 10 |
 
+**Where this project stands (6 November 2026).** Done by the owner: Neon (project, roles, migrations and the RLS check pass), Upstash Redis, the two R2 buckets with their keys, `eas init` (the Expo project id is committed in `apps/pos/app.json`). Still to do: the hosting (part 3 to 6, or the free path), the Sentry projects and DSNs (part 9), `EXPO_TOKEN` and the Expo environment values (part 8), the desktop variables (part 7) and the P1-16 checks (part 10). The two Neon owner and role passwords that were pasted into a chat during setup must be rotated before production (`docs/runbooks/rotate-secrets.md`).
+
 You can stop after line 6 and use the staging console in a browser; lines 7 to 10 are for when you want installers, phones and customers.
 
 What you need to hold in the end:
@@ -289,7 +291,7 @@ No GitHub secret is needed for the deploy: the images come from GHCR with the wo
 
 ## 6. Release and first deploy
 
-1. Merge to `master` with a green CI. If you also release the desktop and mobile apps from this tag, merge the `eas init` commit from part 8 first (`mobile.yml` reads `app.json` on the tagged commit, and a later commit does not change a tag). The desktop workflow needs `WISE_BIZ_API_URL` and `WISE_BIZ_UPDATE_URL`, which come from the deployed console, so for the very first release expect its run to fail and re-run it after step 3 once those variables exist.
+1. Merge to `master` with a green CI. The `eas init` commit (the Expo project id in `apps/pos/app.json`) is already on `master`; `mobile.yml` reads `app.json` on the tagged commit, so tag only after it. The desktop workflow needs `WISE_BIZ_API_URL` and `WISE_BIZ_UPDATE_URL`, which come from the deployed console, so for the very first release expect its run to fail and re-run it after step 3 once those variables exist.
 2. Tag a release (`vX.Y.Z`) on that commit and push the tag. `images.yml` builds the four service images, scans them (HIGH and CRITICAL fail the run) and pushes them to GHCR. If the scan fails, read its table and fix the finding before you go on; do not skip the scan.
 3. Actions, Deploy, Run workflow: version `vX.Y.Z`, environment `staging`. It copies the images to Artifact Registry, runs the migration job (must succeed), rolls the services and runs a smoke test on `/ready`.
 4. Open the console URL, create the first account, create a business, go through onboarding. Check the logs of `wb-workers-staging` and `wb-api-staging` in Cloud Logging for errors.
@@ -303,13 +305,17 @@ If anything goes wrong after step 3, follow `docs/runbooks/rollback.md`. Do not 
 
 `desktop.yml` runs on a release tag, builds the installers for the three systems in the GitHub environment `desktop-release` and attaches them to the run as artifacts. The tag must equal the version in `apps/desktop/package.json` (tag `v0.2.1` needs `"version": "0.2.1"`); the workflow stops before building if they differ.
 
+The workflow has two jobs that use the `desktop-release` environment: a short **plan** job (it reads `DESKTOP_UNSIGNED` to choose the systems) and then one **build** job per system. If you added required reviewers or a wait timer to the environment, each of those jobs waits for its own approval, so approve the plan job first and then each build job; the release is complete only when all of them have run.
+
+**No certificates yet? Release unsigned.** Add the variable `DESKTOP_UNSIGNED` = `true` to the `desktop-release` environment (Settings, Environments, `desktop-release`, Environment variables). The plan job then builds **Windows and Linux only** (macOS is skipped, because a Mac will not run an app that is not signed and notarized), the signing checks are skipped, and every run prints a warning that the installer is not signed. Windows shows **SmartScreen** ("Windows protected your PC"): click **More info**, **Run anyway**. Remove the variable, add the secrets below, and tag again when the certificates exist. Do not serve auto-updates from a host you do not control while the app is unsigned: the update file is then the only protection. `DESKTOP_UNSIGNED` is read by the workflow from the GitHub environment; putting it in `.env` does nothing.
+
 **Accounts and certificates**
 - **Windows**: buy a code signing certificate from a certificate authority (an OV or EV certificate; neither removes the SmartScreen warning at once, because Microsoft builds reputation for the signed file and certificate over the first downloads). Export it as a `.pfx` with a password. Encode it: `base64 -w0 cert.pfx` (on Windows PowerShell: `[Convert]::ToBase64String([IO.File]::ReadAllBytes("cert.pfx"))`).
 - **macOS**: join the Apple Developer Program (paid, yearly). In Certificates, create a **Developer ID Application** certificate, export it from Keychain Access as a `.p12` with a password and base64 it the same way. Create an app-specific password at appleid.apple.com (Sign-In and Security, App-Specific Passwords). Your Team ID is in the membership page.
 - **Linux**: no signing step; the AppImage and deb are unsigned.
 
 **GitHub environment `desktop-release`** (Settings, Environments): restrict it to the `v*.*.*` tags, and set
-- variables: `WISE_BIZ_API_URL` (the https API/console origin the terminal talks to, from part 6) and `WISE_BIZ_UPDATE_URL` (the https origin that serves the update feed, below);
+- variables: `WISE_BIZ_API_URL` (the https API/console origin the terminal talks to, from part 6), `WISE_BIZ_UPDATE_URL` (the https origin that serves the update feed, below) and, for an unsigned release, `DESKTOP_UNSIGNED` = `true`;
 - secrets: `WIN_CSC_LINK` (the base64 `.pfx`), `WIN_CSC_KEY_PASSWORD`, `CSC_LINK` (the base64 `.p12`), `CSC_KEY_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`.
 
 **Update feed**: any https static host works. The simplest is a public R2 bucket or a Cloud Storage bucket behind a domain such as `https://updates.yourdomain/pos`. After a successful run, download the artifacts (installers, `latest*.yml`, `.blockmap` files) and upload them to that location. The installed terminals check `latest*.yml` there and update themselves. Copying the files is deliberately manual until you decide who may publish an update.
@@ -322,15 +328,14 @@ Check: the Windows build runs the packaged smoke test (`package:smoke`: fuses se
 
 `mobile.yml` starts EAS builds on a release tag and returns; the build itself runs on Expo's machines, and you follow it in the Expo dashboard.
 
-**One time, on your machine**
+**One time, on your machine.** `eas init` is **done** for this repository (project `@sahansac/wise-biz`; its id is in `apps/pos/app.json`). Only on a fresh fork do you repeat it:
 ```bash
 npm install -g eas-cli
 eas login
 cd apps/pos
 eas init                      # creates the Expo project and writes extra.eas.projectId into app.json
-git add app.json && git commit -m "chore(pos): add the Expo project id"
 ```
-Open a pull request with that commit. The workflow refuses to build while `app.json` has no `projectId`.
+Commit `app.json` through a pull request. The workflow refuses to build while `app.json` has no `projectId`.
 
 Set the app's API address in both Expo environments (the app refuses to sign requests without it, and release bundles throw at start without it):
 ```bash
@@ -343,7 +348,7 @@ Do the same for `EXPO_PUBLIC_RECEIPT_BASE_URL` if you use public receipt links.
 - **Apple Developer Program** (the same membership as the desktop). The bundle id is `biz.wise.pos` (`app.json`). EAS creates and stores the certificates and provisioning profiles for you the first time (`eas build --platform ios` asks you to sign in to your Apple account).
 - **Google Play Console** (one-time fee). Create the app with the package name `biz.wise.pos`. EAS creates the upload keystore. Google requires the **first** upload of an app to be made by hand in the console; after that `eas submit` can upload.
 
-**Expo access token** for the workflow: expo.dev, Account settings, Access tokens, create one. In GitHub create the environment `mobile-release`, restrict it to `master` and the `v*.*.*` tags, require a reviewer for production, and add the secret `EXPO_TOKEN`.
+**Expo access token** (`EXPO_TOKEN`) for the workflow. Where: expo.dev, signed in as the account that owns the project (`sahansac`). Click your avatar, **Account settings**, **Access tokens**, **Create token**. Name it `wise-biz-github`, choose a role that can start builds (Developer or higher), create it and copy the token at once: it is shown **once**. In GitHub: Settings, Environments, New environment `mobile-release`, restrict it to `master` and the `v*.*.*` tags, require yourself as reviewer for production, then **Add environment secret**, name `EXPO_TOKEN`, paste the token. Check: Actions, **Mobile**, run on a tag; the first step that calls Expo must not say `Authentication error`.
 
 **Try it before you tag**: from `apps/pos`, `eas build --platform android --profile staging` (an internal-distribution build you can install on a phone). Fix anything the build says before relying on the tag.
 
@@ -359,7 +364,9 @@ Do the same for `EXPO_PUBLIC_RECEIPT_BASE_URL` if you use public receipt links.
 4. Server: put the Node project's DSN in Secret Manager as `wb-<ENV>-SENTRY_DSN` and roll the services (re-run the deploy). The server starts the reporter only when `SENTRY_DSN` is set. It sends no personal data (see `docs/adr/0022-sentry-server-error-reporting.md`).
 5. Alert rules: create an alert on new issues, and one on error rate, and send them to your email or a chat webhook.
 
-6. **Console** (wired, `docs/adr/0025-sentry-in-the-console.md`): create a second project of type **Next.js**, copy its DSN, and set `NEXT_PUBLIC_SENTRY_DSN` (and optionally `NEXT_PUBLIC_SENTRY_ENVIRONMENT`) as an environment variable of the console host (Vercel: Project, Settings, Environment Variables) **before** the deploy: the browser reads it at build time. Nothing is sent without it.
+6. **Console** (wired, `docs/adr/0025-sentry-in-the-console.md`): create a second project of type **Next.js**, copy its DSN, and set `NEXT_PUBLIC_SENTRY_DSN` (and optionally `NEXT_PUBLIC_SENTRY_ENVIRONMENT`) as an environment variable of the console host (Vercel: Project, Settings, Environment Variables) **before** the deploy: the browser reads it at build time, so a DSN added after a build needs a new build. For a Docker image pass it as a build argument: `docker build --build-arg NEXT_PUBLIC_SENTRY_DSN=... -f infra/docker/console.Dockerfile .`. Only an https `sentry.io` DSN is accepted; anything else leaves reporting off and the page's security policy unchanged. Nothing is sent without it.
+7. **Check:** the free Developer plan allows about 5,000 errors a month. Trigger one on purpose in staging (for the server: a request that fails with a 500; for the console: open a page that throws) and see it in the Sentry **Issues** list within a minute. The event must show no email, no user and no query string.
+8. **Free hosting (Render):** put the server project's DSN in the Render service as `SENTRY_DSN` (`docs/runbooks/free-hosting.md`).
 
 The POS app and the desktop shell are not wired to Sentry yet: the POS app needs a bundle-size check first. Keep their DSNs for when they are added.
 
@@ -388,3 +395,11 @@ Record results in `docs/reports/P1-gate.md` with a go or no-go for pilots.
 | Mobile workflow: `has no extra.eas.projectId` | run `eas init` and commit `app.json` |
 | Mobile workflow: `EXPO_PUBLIC_API_URL is not set in the Expo environment` | `eas env:set` it for `production` and `preview` |
 | Sign-in works, passkeys fail | `AUTH_RP_ID` is not the console hostname |
+| Uploads or downloads answer 503 `STORAGE_QUOTA_EXCEEDED` | an R2 free-tier cap was reached (part 2a); it clears when the period resets on the 6th or when files are deleted |
+| `r2-usage` says "Set CLOUDFLARE_ACCOUNT_ID" | an empty value counts as unset: fill it, or set `STORAGE_ENDPOINT` so the id is read from it |
+| `provision-neon` writes a second credentials file | the first one still exists; the new file has a timestamp in its name. Keep the one that matches the roles now in Neon and delete the other |
+| `provision-roles.sql` stops with "wrong database" | you are connected to `neondb`; connect to `wise_biz` and run it again. Nothing was changed |
+| No Sentry events from the console | `NEXT_PUBLIC_SENTRY_DSN` was not set when the console was built; set it and build again |
+| Desktop run waits twice | the `desktop-release` environment has required reviewers; approve the plan job, then each build job |
+| Windows warns "Windows protected your PC" | the installer is unsigned (`DESKTOP_UNSIGNED=true`); click More info, Run anyway, or add a signing certificate |
+| Render service is slow on the first request | the free plan sleeps after about 15 minutes; the keep-alive workflow pings it when `SERVER_URL` is set (`free-hosting.md`) |

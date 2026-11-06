@@ -410,6 +410,7 @@ export function guardFromEnv(
     onBlocked?: (metric: QuotaMetric, status: MetricStatus) => void;
     fetch?: typeof fetch;
     everyMs?: number;
+    now?: () => Date;
   },
 ): GuardedStore {
   const account = r2AccountOf(env.STORAGE_ENDPOINT);
@@ -453,17 +454,22 @@ export function guardFromEnv(
     periodAnchorDay: env.R2_PERIOD_ANCHOR_DAY,
     ...(deps.fetch && { fetch: deps.fetch }),
   });
+  const clock = deps.now ?? (() => new Date());
   let timer: ReturnType<typeof setInterval> | undefined;
   let started = 0;
   let applied = 0;
   const refresh = () => {
     const mine = ++started;
+    const began = billingPeriod(clock(), env.R2_PERIOD_ANCHOR_DAY).start.getTime();
     return read().then(
       (r) => {
         // Only a refresh that started after the last applied one may replace the reading.
         if (mine < applied) return;
         applied = mine;
-        gate.apply(r);
+        // The operation counts belong to the period the read began in. If the period turned meanwhile they are last
+        // period's: keep the storage level (it does not reset) and start this period's operations from zero.
+        const same = billingPeriod(clock(), env.R2_PERIOD_ANCHOR_DAY).start.getTime() === began;
+        gate.apply(same ? r : { ...r, classA: 0, classB: 0 });
       },
       (err: unknown) => {
         // Keep the last reading: the gate keeps adding this process's calls on top, so it only gets stricter.

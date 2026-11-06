@@ -22,7 +22,7 @@ export function sentryOrigin(dsn: string | undefined): string | undefined {
 }
 
 /**
- * Sentry options for the console (browser, Node server and edge share them): errors only, no tracing, no replay, no
+ * Sentry options for the console (browser, Node server and edge share them): errors only, no tracing (no tracesSampleRate or sampler is set, so no spans exist even if a caller sends a sampled trace header), no replay, no
  * breadcrumbs, no default PII, and every event goes through the same scrubber as the servers (ADR 0022). Returns
  * undefined, so nothing starts, unless the DSN is a valid Sentry DSN.
  */
@@ -36,7 +36,6 @@ export function consoleSentryOptions(
     ...(env.environment === undefined ? {} : { environment: env.environment }),
     ...(env.release === undefined ? {} : { release: env.release }),
     sendDefaultPii: false,
-    tracesSampleRate: 0,
     maxBreadcrumbs: 0,
     beforeSend: (event: SentryEventLike) => scrubEvent(event),
   };

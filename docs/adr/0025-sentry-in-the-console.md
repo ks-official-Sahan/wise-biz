@@ -14,11 +14,11 @@ organization and wants console errors reported, on the free Developer plan (abou
 1. `@sentry/nextjs` 10.76.2 (MIT), set up by hand (no `withSentryConfig`, so no source-map upload and no build step that needs
    an auth token): `src/instrumentation-client.ts` for the browser, `src/instrumentation.ts` for the Node and edge runtimes plus
    `onRequestError` for Server Components and route handlers, `src/app/global-error.tsx` for a failed root layout.
-2. Same rules as the servers: errors only, `tracesSampleRate` 0, no replay, no breadcrumbs, `sendDefaultPii` false, and every
+2. Same rules as the servers: errors only, tracing off (no `tracesSampleRate` or `tracesSampler`; `tracesSampleRate: 0` would still honor an incoming sampled `sentry-trace`), no replay, no breadcrumbs, `sendDefaultPii` false, and every
    event passes `scrubEvent` from `@wise-biz/observability` (no user, no extra data, request reduced to method and path,
    ids and emails masked).
 3. Off unless `NEXT_PUBLIC_SENTRY_DSN` is set and is an https `sentry.io` DSN (`consoleSentryOptions`). It is read at build time
-   for the browser, so it must be set when the console is built (Vercel: an environment variable before the deploy).
+   for the browser, so it must be set when the console is built (Vercel: an environment variable before the deploy; Docker: `--build-arg NEXT_PUBLIC_SENTRY_DSN=...`). Runtime injection into the browser is not done: it needs a server-rendered config endpoint, which is not worth it for a public, rarely changed value.
    `NEXT_PUBLIC_SENTRY_ENVIRONMENT` names the environment.
 4. The CSP `connect-src` gains the DSN's ingest origin and nothing else (`sentryOrigin`: https and a `sentry.io` host only, so a
    wrong value cannot widen the policy).

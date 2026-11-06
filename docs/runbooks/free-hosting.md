@@ -42,7 +42,8 @@ Both must pass before you deploy a new version. (They already did for staging.)
    - `REDIS_URL`, the `STORAGE_*` values, the mail values (`MAIL_FROM`, `EMAIL_PROVIDER`, the provider keys): from your `.env`.
    - `CONSOLE_URL`, `AUTH_URL`, `CORS_ORIGINS`: your console address from step 3. You do not have it yet: type `https://placeholder.invalid` now and fix it after step 3 (Render, the service, **Environment**).
    - `AUTH_RP_ID`: the console host name only, for example `wise-biz-console.vercel.app` (no `https://`). Changing it later invalidates every passkey.
-   - Leave the optional ones empty.
+   - `SENTRY_DSN` (error reports, optional): the DSN of a **Node** project at sentry.io (`first-release.md` part 9). Empty means no reports. Add `R2_PERIOD_ANCHOR_DAY` = `6` and `CLOUDFLARE_ANALYTICS_TOKEN` so the R2 free-tier gate reads Cloudflare's numbers (`first-release.md` part 2a).
+   - Leave the other optional ones empty.
 3. Click **Apply**. The first build takes several minutes. When it shows **Live**, open `https://<service>.onrender.com/health`: it must answer ok. Copy the service address.
 4. Where: the service, **Settings**, **Auto-Deploy**: it is off on purpose; deploy by **Manual Deploy**, **Deploy latest commit**, after you ran the migrations (step 1).
 

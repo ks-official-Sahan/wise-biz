@@ -9,7 +9,7 @@
 // Safe to run again: if the roles exist it skips creating them (their passwords stay as they are, nothing is written)
 // and repeats the database setup, which is what to do when a first run was pointed at the wrong database.
 import { randomBytes } from "node:crypto";
-import { writeFileSync } from "node:fs";
+import { chmodSync, existsSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
@@ -47,14 +47,20 @@ if (dbname === "" || (WRONG_DATABASES as readonly string[]).includes(dbname)) {
 
 function saveUrls(env: string, owner: string, db: string, pw: Passwords): string {
   const urls = connectionUrls(owner, db, pw, process.env["READ_HOST"]);
-  const path = join(homedir(), `wise-biz-${env}-database-urls.txt`);
+  // Never overwrite an earlier file: it may hold the only copy of passwords that are still in use.
+  let path = join(homedir(), `wise-biz-${env}-database-urls.txt`);
+  if (existsSync(path)) {
+    path = join(homedir(), `wise-biz-${env}-database-urls-${String(Date.now())}.txt`);
+  }
+  // flag "wx" creates the file private (0600) and fails if it exists; chmod covers file systems that ignore the mode.
   writeFileSync(
     path,
     Object.entries(urls)
       .map(([k, v]) => `${k}=${String(v)}`)
       .join("\n") + "\n",
-    { mode: 0o600 },
+    { mode: 0o600, flag: "wx" },
   );
+  chmodSync(path, 0o600);
   return path;
 }
 

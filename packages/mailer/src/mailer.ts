@@ -166,8 +166,13 @@ function localSmtp(
           html: message.html,
         })) as { accepted?: unknown[] };
         // Copy recipients may be refused without harm; the person the mail is for must have been accepted.
-        const first = message.to[0];
-        if (info.accepted !== undefined && first !== undefined && !info.accepted.includes(first)) {
+        // Compare case-insensitively: the relay may report the address in a different case than it was sent.
+        const first = message.to[0]?.toLowerCase();
+        if (
+          info.accepted !== undefined &&
+          first !== undefined &&
+          !info.accepted.some((a) => String(a).toLowerCase() === first)
+        ) {
           return { ok: false, errorClass: "smtp_recipient_refused", retryable: false };
         }
         return { ok: true };
