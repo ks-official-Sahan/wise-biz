@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  EXTENSIONS,
   SERVICE_ROLES,
+  WRONG_DATABASES,
   connectionUrls,
+  databaseStatements,
   directHost,
   pooledHost,
-  provisionStatements,
+  roleStatements,
 } from "../src/provision.ts";
 
 import type { Passwords } from "../src/provision.ts";
@@ -15,8 +18,8 @@ const passwords = Object.fromEntries(
 ) as Passwords;
 const quote = { literal: (s: string) => `'${s}'`, identifier: (s: string) => `"${s}"` };
 
-describe("provisionStatements", () => {
-  const sql = provisionStatements("wise_biz", passwords, quote);
+describe("roleStatements", () => {
+  const sql = roleStatements(passwords, quote);
 
   it("creates the five roles without superuser or RLS bypass, with the connection limits", () => {
     const creates = sql.filter((s) => s.startsWith("CREATE ROLE"));
@@ -30,14 +33,43 @@ describe("provisionStatements", () => {
     expect(creates.find((c) => c.includes("wb_migrator"))).not.toContain("CONNECTION LIMIT");
   });
 
-  it("sets the timeouts, hands the database to the migrator and closes it to everyone else", () => {
+  it("sets the per-role timeouts", () => {
     expect(sql).toContain("ALTER ROLE wb_app SET statement_timeout = '15s'");
     expect(sql).toContain("ALTER ROLE wb_worker SET idle_in_transaction_session_timeout = '60s'");
+  });
+});
+
+describe("databaseStatements", () => {
+  const sql = databaseStatements("wise_biz", quote);
+
+  it("creates the extensions the migrations need, first (the migrator cannot)", () => {
+    expect(sql.slice(0, EXTENSIONS.length)).toEqual(
+      EXTENSIONS.map((e) => `CREATE EXTENSION IF NOT EXISTS ${e}`),
+    );
+    expect(sql).toContain("CREATE EXTENSION IF NOT EXISTS vector");
+  });
+
+  it("hands the database to the migrator and closes it to everyone else", () => {
     expect(sql).toContain('ALTER DATABASE "wise_biz" OWNER TO wb_migrator');
-    expect(sql).toContain('REVOKE CONNECT ON DATABASE "wise_biz" FROM PUBLIC');
+    expect(sql).toContain('REVOKE ALL ON DATABASE "wise_biz" FROM PUBLIC');
     expect(sql).toContain(
       'GRANT CONNECT ON DATABASE "wise_biz" TO wb_migrator, wb_app, wb_worker, wb_chainer, wb_identity',
     );
+    expect(sql).toContain('REVOKE TEMPORARY ON DATABASE "wise_biz" FROM wb_app');
+  });
+
+  it("owns the public schema by the migrator and gives the app role DML only on later objects", () => {
+    expect(sql).toContain("ALTER SCHEMA public OWNER TO wb_migrator");
+    expect(sql).toContain("GRANT USAGE ON SCHEMA public TO wb_app");
+    expect(sql).toContain(
+      "ALTER DEFAULT PRIVILEGES FOR ROLE wb_migrator GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO wb_app",
+    );
+    expect(sql.join("; ")).not.toMatch(/GRANT (ALL|CREATE)/);
+  });
+
+  it("refuses the wrong databases by name", () => {
+    expect(WRONG_DATABASES).toContain("neondb");
+    expect(WRONG_DATABASES).not.toContain("wise_biz");
   });
 });
 
