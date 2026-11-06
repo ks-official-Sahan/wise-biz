@@ -3,7 +3,13 @@ import { createServer } from "node:net";
 import fc from "fast-check";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { MailError, createCaptureMailer, createMailer, redactCopy } from "../src/index.ts";
+import {
+  MailError,
+  createCaptureMailer,
+  createMailer,
+  mailerLogHooks,
+  redactCopy,
+} from "../src/index.ts";
 import { smtpTransportOptions } from "../src/mailer.ts";
 
 import type { MailEnv } from "../src/index.ts";
@@ -524,5 +530,19 @@ describe("redactCopy", () => {
       "Hi. Code [code removed], link [link removed] and [link removed]",
     );
     expect(redactCopy("Order 12345 in 2026")).toBe("Order 12345 in 2026");
+  });
+});
+
+describe("mailerLogHooks", () => {
+  it("logs labels only", () => {
+    const warn = vi.fn();
+    const hooks = mailerLogHooks({ warn });
+    hooks.onCopyError?.("smtp_ECONNREFUSED");
+    hooks.onFallback?.("resend", "http_401");
+    expect(warn).toHaveBeenCalledWith({ errorClass: "smtp_ECONNREFUSED" }, expect.any(String));
+    expect(warn).toHaveBeenCalledWith(
+      { provider: "resend", errorClass: "http_401" },
+      expect.any(String),
+    );
   });
 });

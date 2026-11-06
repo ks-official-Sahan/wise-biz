@@ -1,4 +1,10 @@
-export { MailError, createCaptureMailer, createMailer, redactCopy } from "./mailer.ts";
+export {
+  MailError,
+  createCaptureMailer,
+  createMailer,
+  mailerLogHooks,
+  redactCopy,
+} from "./mailer.ts";
 export type {
   MailEnv,
   MailMessage,

@@ -274,6 +274,20 @@ export interface MailerOptions {
   onFallback?: (provider: MailProviderName, errorClass: string) => void;
 }
 
+/** Hooks that log fallbacks and copy failures (labels only, never an address). Pass the result to createMailer. */
+export function mailerLogHooks(logger: {
+  warn(fields: object, message: string): void;
+}): MailerOptions {
+  return {
+    onCopyError: (errorClass) => {
+      logger.warn({ errorClass }, "mail copy not delivered");
+    },
+    onFallback: (provider, errorClass) => {
+      logger.warn({ provider, errorClass }, "mail provider failed; trying the next");
+    },
+  };
+}
+
 /** Production mail sender. Pure apart from the network: no logging of bodies, subjects or addresses. */
 export function createMailer(env: MailEnv, opts: MailerOptions = {}): Mailer {
   const from = assertMailbox(env.MAIL_FROM, "MAIL_FROM");
