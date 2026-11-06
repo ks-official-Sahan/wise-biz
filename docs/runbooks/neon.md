@@ -4,8 +4,17 @@ Decision: ADR 0017. Do this once per environment (production, staging).
 
 ## Create
 1. Create a Neon project in the region closest to the container platform. Postgres 18. Keep compute always on in production (staging may scale to zero).
-2. Create the database `wise_biz` (console), then create the roles with `infra/neon/provision-roles.sql`: it takes every password as a psql variable (usage in the file header) and has no defaults. Generate each password with `openssl rand`, put it in Secret Manager as the matching `wb-<env>-DATABASE_*_URL`, and never run the dev init (`infra/docker/postgres/init/001-roles-db.sql`): it creates the same roles with passwords equal to their names.
-3. Passwords are rotated as in `docs/runbooks/rotate-secrets.md`.
+2. Create the database `wise_biz` (Neon console, Databases, New database) and a read replica for the production branch (Branches, the branch, Add read replica).
+3. Create the service roles with the script, not by hand. In the Neon console open Connect, pick the branch, the database `wise_biz` and the owner role, turn **Connection pooling off** (the script needs the direct host) and copy the string. Then, from the repository root (PowerShell):
+
+   ```powershell
+   $env:OWNER_URL = "<the string you copied>"
+   $env:READ_HOST = "<the read replica host, from Connect with the replica selected>"   # optional
+   pnpm -F @wise-biz/db provision-neon staging      # or: production
+   ```
+
+   (Git Bash: `export OWNER_URL="..."` instead of `$env:OWNER_URL = "..."`.) It creates the five roles with random passwords, hands the database to `wb_migrator`, writes the five connection strings (and `DATABASE_READ_URL` when you gave `READ_HOST`) to `~/wise-biz-<env>-database-urls.txt` outside the repository, and prints no password. It refuses to run twice. Put each line into Secret Manager as `wb-<env>-<NAME>` and delete the file. `infra/neon/provision-roles.sql` is the same definition for people who prefer `psql` (usage in its header). Never run the dev init (`infra/docker/postgres/init/001-roles-db.sql`): it creates the same roles with passwords equal to their names.
+4. Passwords are rotated as in `docs/runbooks/rotate-secrets.md`.
 
 ## Connection strings (the part that goes wrong)
 | Env var | Role | Host |

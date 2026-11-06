@@ -22,7 +22,7 @@ What you need to hold in the end:
 
 ## 1. Neon (database)
 
-Follow `docs/runbooks/neon.md` in full. It covers the project, the roles (`infra/neon/provision-roles.sql`), which connection string goes in which variable (pooled or direct host) and the read replica. Keep the four connection strings; they become the Secret Manager entries `DATABASE_URL`, `DATABASE_IDENTITY_URL`, `DATABASE_WORKER_URL`, `DATABASE_CHAINER_URL` and `DATABASE_MIGRATOR_URL` in part 4. Check the role of each URL against the table in `neon.md` before you save it.
+Follow `docs/runbooks/neon.md` in full. It covers the project, the roles (one command: `pnpm -F @wise-biz/db provision-neon <env>`), which connection string goes in which variable (pooled or direct host) and the read replica. Keep the four connection strings; they become the Secret Manager entries `DATABASE_URL`, `DATABASE_IDENTITY_URL`, `DATABASE_WORKER_URL`, `DATABASE_CHAINER_URL` and `DATABASE_MIGRATOR_URL` in part 4. Check the role of each URL against the table in `neon.md` before you save it.
 
 Check: from your machine, with the migrator URL in `DATABASE_MIGRATOR_URL`: `pnpm db:migrate`, then `pnpm db:rls-check`. Both must pass. Then confirm `select rolbypassrls from pg_roles where rolname in ('wb_app','wb_worker')` is false for both. Do this against the staging database first.
 
