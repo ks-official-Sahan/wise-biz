@@ -303,6 +303,8 @@ If anything goes wrong after step 3, follow `docs/runbooks/rollback.md`. Do not 
 
 `desktop.yml` runs on a release tag, builds the installers for the three systems in the GitHub environment `desktop-release` and attaches them to the run as artifacts. The tag must equal the version in `apps/desktop/package.json` (tag `v0.2.1` needs `"version": "0.2.1"`); the workflow stops before building if they differ.
 
+The workflow has two jobs that use the `desktop-release` environment: a short **plan** job (it reads `DESKTOP_UNSIGNED` to choose the systems) and then one **build** job per system. If you added required reviewers or a wait timer to the environment, each of those jobs waits for its own approval, so approve the plan job first and then each build job; the release is complete only when all of them have run.
+
 **Accounts and certificates**
 - **Windows**: buy a code signing certificate from a certificate authority (an OV or EV certificate; neither removes the SmartScreen warning at once, because Microsoft builds reputation for the signed file and certificate over the first downloads). Export it as a `.pfx` with a password. Encode it: `base64 -w0 cert.pfx` (on Windows PowerShell: `[Convert]::ToBase64String([IO.File]::ReadAllBytes("cert.pfx"))`).
 - **macOS**: join the Apple Developer Program (paid, yearly). In Certificates, create a **Developer ID Application** certificate, export it from Keychain Access as a `.p12` with a password and base64 it the same way. Create an app-specific password at appleid.apple.com (Sign-In and Security, App-Specific Passwords). Your Team ID is in the membership page.

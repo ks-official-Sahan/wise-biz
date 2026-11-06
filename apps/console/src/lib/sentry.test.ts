@@ -41,10 +41,11 @@ describe("consoleSentryOptions", () => {
       environment: "staging",
       release: "v1",
       sendDefaultPii: false,
-      tracesSampleRate: 0,
       maxBreadcrumbs: 0,
     });
     expect(consoleSentryOptions(DSN)).not.toHaveProperty("environment");
+    expect(o).not.toHaveProperty("tracesSampleRate");
+    expect(o).not.toHaveProperty("tracesSampler");
   });
   it("scrubs every event: no user, no query string, ids and emails masked", () => {
     const o = consoleSentryOptions(DSN) as { beforeSend: (e: unknown) => Record<string, unknown> };

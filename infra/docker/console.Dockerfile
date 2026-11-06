@@ -8,6 +8,11 @@ WORKDIR /repo
 COPY . .
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
     pnpm install --frozen-lockfile --filter "@wise-biz/console..." --ignore-scripts
+# Next.js inlines NEXT_PUBLIC_* values at build time, so the browser DSN must be passed when the image is built:
+#   docker build --build-arg NEXT_PUBLIC_SENTRY_DSN=... (ADR 0025). Empty means error reports are off.
+ARG NEXT_PUBLIC_SENTRY_DSN=
+ARG NEXT_PUBLIC_SENTRY_ENVIRONMENT=
+ENV NEXT_PUBLIC_SENTRY_DSN=$NEXT_PUBLIC_SENTRY_DSN NEXT_PUBLIC_SENTRY_ENVIRONMENT=$NEXT_PUBLIC_SENTRY_ENVIRONMENT
 RUN pnpm --filter @wise-biz/console build
 
 FROM node:${NODE_VERSION}-slim AS run

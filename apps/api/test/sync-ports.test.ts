@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { salesPorts } from "../src/sales-ports.ts";
 import { createSyncPorts } from "../src/sync-ports.ts";
 
 import type { ObjectStore } from "@wise-biz/storage";
@@ -40,7 +41,7 @@ describe("createSyncPorts", () => {
         c: unknown,
       ) => unknown;
       expect(handler(tx, "tenant", cmd)).toBe(fn);
-      expect(sales[fn]).toHaveBeenCalledWith(tx, expect.anything(), "tenant", cmd);
+      expect(sales[fn]).toHaveBeenCalledWith(tx, salesPorts, "tenant", cmd);
     }
   });
 
@@ -56,9 +57,9 @@ describe("createSyncPorts", () => {
     const ports = createSyncPorts(store);
     const ids = await ports.branchLocations({ query } as never, "tenant", "branch");
     expect(ids).toEqual(["l1", "l2"]);
-    expect(query).toHaveBeenCalledWith(expect.stringContaining("tenant_id = $1"), [
-      "tenant",
-      "branch",
-    ]);
+    expect(query).toHaveBeenCalledWith(
+      expect.stringMatching(/tenant_id = \$1 and branch_id = \$2/),
+      ["tenant", "branch"],
+    );
   });
 });

@@ -17,6 +17,10 @@
 \if :{?identity_pw} \else \echo 'pass -v identity_pw=...' \quit \endif
 \if :{?dbname} \else \echo 'pass -v dbname=...' \quit \endif
 
+-- Refuse to run against the wrong database (Neon starts with one called neondb): nothing below may touch it.
+SELECT current_database() = :'dbname' AS right_db \gset
+\if :right_db \else \echo 'Connected to the wrong database: connect to' :dbname 'and run again. Nothing was changed.' \quit \endif
+
 CREATE ROLE wb_migrator WITH LOGIN PASSWORD :'migrator_pw' NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;
 CREATE ROLE wb_app WITH LOGIN PASSWORD :'app_pw' NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS CONNECTION LIMIT 200;
 CREATE ROLE wb_worker WITH LOGIN PASSWORD :'worker_pw' NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS CONNECTION LIMIT 50;
