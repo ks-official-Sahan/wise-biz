@@ -11,6 +11,13 @@ import {
   r2AccountOf,
 } from "../src/quota.ts";
 
+// Local runs read the repository .env (CI sets the variables itself); values already in the environment win.
+try {
+  process.loadEnvFile(new URL("../../../.env", import.meta.url));
+} catch {
+  // no .env: use the environment as it is
+}
+
 const num = (name: string, fallback: number): number => {
   const v = process.env[name];
   return v === undefined || v === "" ? fallback : Number(v);

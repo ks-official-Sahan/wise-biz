@@ -287,7 +287,7 @@ const STORAGE_QUERY = `query ($account: String!, $from: Time!, $to: Time!) {
 
 interface GraphQlReply<T> {
   data?: { viewer?: { accounts?: Record<string, T[]>[] } };
-  errors?: { message?: string }[];
+  errors?: { message?: string }[] | null;
 }
 
 export interface UsageSourceConfig {
@@ -314,7 +314,7 @@ export function createUsageReader(cfg: UsageSourceConfig): () => Promise<UsageRe
     });
     if (!res.ok) throw new Error(`cloudflare analytics: ${String(res.status)}`);
     const body = (await res.json()) as GraphQlReply<T>;
-    if (body.errors !== undefined && body.errors.length > 0)
+    if (body.errors != null && body.errors.length > 0)
       throw new Error(`cloudflare analytics: ${body.errors[0]?.message ?? "error"}`);
     return body.data?.viewer?.accounts?.[0]?.[field] ?? [];
   };

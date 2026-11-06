@@ -222,7 +222,7 @@ describe("createUsageReader", () => {
       });
     await expect(mk(() => reply({}, 403))()).rejects.toThrow("403");
     await expect(mk(() => reply({ errors: [{ message: "denied" }] }))()).rejects.toThrow("denied");
-    expect(await mk(() => reply({ data: {} }))()).toEqual({
+    expect(await mk(() => reply({ data: null, errors: null }))()).toEqual({
       classA: 0,
       classB: 0,
       storageBytes: 0,
