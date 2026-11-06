@@ -8,7 +8,7 @@ import {
   chainerEnv,
   databaseEnv,
   defineEnv,
-  emailEnv,
+  mailEnv,
   httpEnv,
   identityDbEnv,
   kafkaEnv,
@@ -73,11 +73,11 @@ describe("defineEnv", () => {
       AUTH_SECRET: SECRET.slice(0, 10),
       DATABASE_POOL_MAX: `999${SECRET}`,
       EMAIL_PROVIDER: SECRET,
-      EMAIL_FROM: `nope${SECRET}`,
+      MAIL_FROM: `nope${SECRET}`,
     };
     let caught: unknown;
     try {
-      defineEnv({ ...databaseEnv, ...redisEnv, ...authEnv, ...emailEnv }, source);
+      defineEnv({ ...databaseEnv, ...redisEnv, ...authEnv, ...mailEnv }, source);
     } catch (e) {
       caught = e;
     }
@@ -89,8 +89,8 @@ describe("defineEnv", () => {
       "AUTH_URL",
       "DATABASE_POOL_MAX",
       "DATABASE_URL",
-      "EMAIL_FROM",
       "EMAIL_PROVIDER",
+      "MAIL_FROM",
       "REDIS_URL",
     ]);
     expect(err.message).toContain("AUTH_URL: required");
@@ -222,13 +222,13 @@ describe("assertProductionEnv", () => {
     }
   });
 
-  it("rejects capture and unset email provider", () => {
+  it("rejects the capture email provider; an unset one means auto and is allowed", () => {
     expect(() => {
       assertProductionEnv({ ...ok, EMAIL_PROVIDER: "capture" });
     }).toThrow(/EMAIL_PROVIDER/);
     expect(() => {
       assertProductionEnv({ ...ok, EMAIL_PROVIDER: undefined });
-    }).toThrow(/EMAIL_PROVIDER/);
+    }).not.toThrow();
   });
 });
 

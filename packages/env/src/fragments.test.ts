@@ -37,10 +37,40 @@ describe("mailEnv", () => {
     }
   });
 
-  it("reuses the RESEND_API_KEY schema from the email fragment", () => {
-    const env = defineEnv(mailEnv, { ...mailGood, RESEND_API_KEY: "re_test_1" });
-    expect(env.RESEND_API_KEY).toBe("re_test_1");
-    expect(mailEnv.RESEND_API_KEY).toBe(ALL_ENV_FRAGMENTS.email.RESEND_API_KEY);
+  it("defaults to auto, empty copy lists and the redacted copy mode", () => {
+    const env = defineEnv(mailEnv, mailGood);
+    expect(env.EMAIL_PROVIDER).toBe("auto");
+    expect(env.EMAIL_PROVIDER_ORDER).toEqual([]);
+    expect(env.MAIL_CC_EMAILS).toEqual([]);
+    expect(env.MAIL_BCC_EMAILS).toEqual([]);
+    expect(env.MAIL_COPY_MODE).toBe("redacted");
+    expect(env.BREVO_EMAIL_PORT).toBe(587);
+    expect(env.BREVO_EMAIL_USE_TLS).toBe(true);
+    expect(env.BREVO_DAILY_LIMIT).toBe(300);
+    expect(env.RESEND_DAILY_LIMIT).toBe(100);
+  });
+
+  it("reads comma-separated CC and BCC lists, trims them, and refuses a bad address", () => {
+    const env = defineEnv(mailEnv, {
+      ...mailGood,
+      MAIL_CC_EMAILS: " a@example.com, b@example.com ,",
+      MAIL_BCC_EMAILS: "c@example.com",
+      BREVO_EMAIL_USE_TLS: "False",
+      EMAIL_PROVIDER_ORDER: "resend, brevo-api",
+    });
+    expect(env.MAIL_CC_EMAILS).toEqual(["a@example.com", "b@example.com"]);
+    expect(env.MAIL_BCC_EMAILS).toEqual(["c@example.com"]);
+    expect(env.BREVO_EMAIL_USE_TLS).toBe(false);
+    expect(env.EMAIL_PROVIDER_ORDER).toEqual(["resend", "brevo-api"]);
+    expect(() =>
+      defineEnv(mailEnv, { ...mailGood, MAIL_CC_EMAILS: "ok@example.com,nope" }),
+    ).toThrow(/MAIL_CC_EMAILS/);
+    expect(() => defineEnv(mailEnv, { ...mailGood, EMAIL_PROVIDER_ORDER: "smtp2" })).toThrow(
+      /EMAIL_PROVIDER_ORDER/,
+    );
+    expect(() => defineEnv(mailEnv, { ...mailGood, EMAIL_PROVIDER: "gmail" })).toThrow(
+      /EMAIL_PROVIDER/,
+    );
   });
 });
 

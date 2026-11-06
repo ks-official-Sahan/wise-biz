@@ -9,7 +9,6 @@ export {
   consoleEnv,
   databaseEnv,
   demoSeedEnv,
-  emailEnv,
   httpEnv,
   identityDbEnv,
   inviteEnv,

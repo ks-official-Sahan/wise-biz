@@ -1,2 +1,9 @@
-export { MailError, createCaptureMailer, createMailer } from "./mailer.ts";
-export type { MailEnv, MailMessage, Mailer, SentMail } from "./mailer.ts";
+export { MailError, createCaptureMailer, createMailer, redactCopy } from "./mailer.ts";
+export type {
+  MailEnv,
+  MailMessage,
+  MailProviderName,
+  Mailer,
+  MailerOptions,
+  SentMail,
+} from "./mailer.ts";

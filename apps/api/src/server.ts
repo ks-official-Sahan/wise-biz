@@ -69,7 +69,14 @@ export async function startServer(
   const env = defineEnv(API_ENV, source);
   const logger = createLogger(env.LOG_LEVEL);
   // Transactional mail (verification, second factor, invites). Sends never block a request: see the callers.
-  const mailer = createMailer(env);
+  const mailer = createMailer(env, {
+    onCopyError: (errorClass) => {
+      logger.warn({ errorClass }, "mail copy not delivered");
+    },
+    onFallback: (provider, errorClass) => {
+      logger.warn({ provider, errorClass }, "mail provider failed; trying the next");
+    },
+  });
   // CORS allowlist without wildcards: the same origins are WebAuthn origins and Better Auth trusted origins.
   const origins = env.CORS_ORIGINS.filter((o) => o !== "*");
 

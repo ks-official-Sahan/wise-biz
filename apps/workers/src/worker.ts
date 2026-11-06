@@ -105,7 +105,14 @@ export function startWorker(
     consumers ??
     (() => {
       const e = consumerEnv ?? defineEnv(CONSUMER_ENV, source);
-      const mailer = createMailer(e);
+      const mailer = createMailer(e, {
+        onCopyError: (errorClass) => {
+          logger.warn({ errorClass }, "mail copy not delivered");
+        },
+        onFallback: (provider, errorClass) => {
+          logger.warn({ provider, errorClass }, "mail provider failed; trying the next");
+        },
+      });
       ports.mail = { send: (m) => mailer.send(m), consoleUrl: e.CONSOLE_URL };
       ports.push = createExpoPush();
       return createConsumers({
