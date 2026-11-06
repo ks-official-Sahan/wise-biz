@@ -20,6 +20,7 @@
             "PAYLOAD_TOO_LARGE",
             "RATE_LIMITED",
             "RATE_LIMIT_UNAVAILABLE",
+            "STORAGE_QUOTA_EXCEEDED",
             "ORIGIN_REJECTED",
             "CURRENCY_MISMATCH",
             "PRECONDITION_FAILED",

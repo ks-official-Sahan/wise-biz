@@ -2327,6 +2327,9 @@ importers:
       '@sahan-sac/media-kit':
         specifier: 0.4.1
         version: 0.4.1
+      '@wise-biz/errors':
+        specifier: workspace:*
+        version: link:../errors
     devDependencies:
       '@types/node':
         specifier: 24.19.2

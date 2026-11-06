@@ -43,6 +43,12 @@ export const ERROR_CODES = Object.freeze({
     title: "Rate limiter unavailable",
     slug: "rate-limit-unavailable",
   },
+  /** The object store reached its monthly free-tier cap (ADR 0023): uploads and downloads pause until the period resets. */
+  STORAGE_QUOTA_EXCEEDED: {
+    status: 503,
+    title: "Storage quota reached",
+    slug: "storage/quota-exceeded",
+  },
   // The only 403: a browser cookie request from an origin we do not trust (CSRF guard). It reveals nothing about
   // any resource, so it does not break "unauthorized = 404" for admin/platform surfaces.
   ORIGIN_REJECTED: { status: 403, title: "Origin rejected", slug: "origin-rejected" },

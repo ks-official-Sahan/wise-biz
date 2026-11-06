@@ -205,6 +205,7 @@ Tracked in `docs/prompts/P2/README.md` order; add rows here when P2 starts.
 
 ## Decisions taken during build
 
+- 2026-11-06 P1: object storage stays inside the Cloudflare R2 free tier (ADR 0023): caps 9.5 GB, 900k Class A, 9.5M Class B, a gate in `@wise-biz/storage`, an hourly `r2-usage` workflow; second account and Cloudinary deferred (user idea)
 <!-- - 2026-10-20 P0-04: money as safe-integer number in TS (ADR 0005 addendum) -->
 - 2026-10-23 P0-09a: styling system and theme engine (ADR 0011); per-store light/dark mode availability with per-mode customization (user)
 - 2026-10-22 P0-08b: tenancy privilege ceiling — only owners edit roles/grants or touch owner members; non-owners with `tenancy:manage` assign only roles they hold (security review HIGH)

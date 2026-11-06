@@ -20,7 +20,8 @@ import {
 import { createMailer } from "@wise-biz/mailer";
 import { SESSION_COOKIE_NAME, createIdentity } from "@wise-biz/module-identity";
 import { createTenancyPorts } from "@wise-biz/module-tenancy";
-import { storeFromEnv } from "@wise-biz/storage";
+import { captureError } from "@wise-biz/observability";
+import { guardFromEnv, storeFromEnv } from "@wise-biz/storage";
 import { createClient } from "redis";
 
 import { createApp } from "./app.ts";
@@ -158,6 +159,15 @@ export async function startServer(
       new Promise((resolve) => setTimeout(resolve, REDIS_BOOT_WAIT_MS)),
     ]);
 
+    // Keeps object storage under the Cloudflare R2 free tier (ADR 0023); a plain store when the endpoint is not R2.
+    const guard = guardFromEnv(storeFromEnv(env), env, {
+      logger,
+      onBlocked: (metric) => {
+        captureError(new Error(`R2 cap reached: ${metric}`));
+      },
+    });
+    await guard.start();
+
     const identity = createIdentity({
       pool: identityPool,
       secret: env.AUTH_SECRET,
@@ -175,7 +185,7 @@ export async function startServer(
         identity,
         { inviteSecret: env.INVITE_SECRET },
         { nonces: deviceNonces(kernelRedis), pinPepper: env.PIN_PEPPER },
-        storeFromEnv(env),
+        guard.store,
         env.REALTIME_TICKET_SECRET !== undefined && env.REALTIME_URL !== undefined
           ? { secret: env.REALTIME_TICKET_SECRET, url: env.REALTIME_URL }
           : undefined,
@@ -222,6 +232,7 @@ export async function startServer(
         } finally {
           clearTimeout(grace);
         }
+        guard.stop();
         await teardown();
         logger.info("api stopped");
       })());
