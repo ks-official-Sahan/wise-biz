@@ -20,6 +20,9 @@ allowBuilds:
   # matters when building Windows installers (the desktop release workflow runs it explicitly). Revisit with the owner.
   "@serialport/bindings-cpp": false
   electron-winstaller: false
+  # Sentry CLI (FSL, build-time) is pulled in by @sentry/nextjs for source-map upload, which we do not run; its install
+  # script downloads a binary and is not needed (docs/adr/0025-sentry-in-the-console.md).
+  "@sentry/cli": false
 
 # commitlint 21.2.4 was younger than pnpm's minimumReleaseAge at install (2026-10-19).
 # Remove this list once it ages out (after ~2026-10-21).
