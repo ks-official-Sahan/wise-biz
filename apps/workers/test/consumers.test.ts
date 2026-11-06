@@ -1,8 +1,22 @@
 import { createCaptureMailer } from "@wise-biz/mailer";
 import { createMemoryStore } from "@wise-biz/storage";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { createConsumers } from "../src/consumers.ts";
+
+const reporting = vi.hoisted(() => ({
+  zoneOf: undefined as undefined | ((...a: unknown[]) => Promise<unknown>),
+}));
+vi.mock("@wise-biz/module-reporting", async (original) => {
+  const actual = await original<Record<string, (...a: never[]) => unknown>>();
+  return {
+    ...actual,
+    createReportingConsumer: (opts: { zoneOf: (...a: unknown[]) => Promise<unknown> }) => {
+      reporting.zoneOf = opts.zoneOf;
+      return actual.createReportingConsumer?.(opts as never);
+    },
+  };
+});
 
 describe("consumer set", () => {
   it("runs the invite email, search, pricing and inventory projections, and catalog import consumers", () => {
@@ -36,5 +50,23 @@ describe("consumer set", () => {
       ["inventory.low-stock", ["inventory.movement.recorded@v1"]],
       ["catalog.import-runner", ["catalog.import.requested@v1"]],
     ]);
+  });
+});
+
+describe("reporting time zone lookup", () => {
+  it("reads the branch time zone, and gives null for an unknown branch", async () => {
+    createConsumers({
+      mailer: createCaptureMailer(),
+      consoleUrl: "http://localhost:3001",
+      inviteSecret: "workers-test-invite-secret-".padEnd(40, "x"),
+      imports: { pool: {} as never, store: createMemoryStore(), onError: () => undefined },
+    });
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [{ timezone: "Asia/Colombo" }] })
+      .mockResolvedValueOnce({ rows: [] });
+    expect(await reporting.zoneOf?.({ query }, "t", "b")).toBe("Asia/Colombo");
+    expect(await reporting.zoneOf?.({ query }, "t", "b")).toBeNull();
+    expect(query).toHaveBeenCalledWith(expect.stringContaining("tenancy.branches"), ["t", "b"]);
   });
 });
