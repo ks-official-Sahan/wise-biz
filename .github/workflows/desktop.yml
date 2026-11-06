@@ -22,27 +22,44 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # The build matrix cannot read an environment variable itself, so this job decides it. With DESKTOP_UNSIGNED=true
+  # (a variable of the desktop-release environment) macOS is left out: a Mac cannot run an unsigned app. Remove the
+  # variable once the certificates exist.
+  plan:
+    name: Plan the builds
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    environment: desktop-release
+    permissions: {}
+    outputs:
+      matrix: ${{ steps.m.outputs.matrix }}
+    steps:
+      - id: m
+        shell: bash
+        env:
+          UNSIGNED: ${{ vars.DESKTOP_UNSIGNED }}
+        run: |
+          WIN='{"os":"windows","runner":"windows-2025"}'
+          MAC='{"os":"macos","runner":"macos-15"}'
+          LIN='{"os":"linux","runner":"ubuntu-24.04"}'
+          if [[ "$UNSIGNED" == true ]]; then
+            echo "matrix={\"include\":[$WIN,$LIN]}" >> "$GITHUB_OUTPUT"
+          else
+            echo "matrix={\"include\":[$WIN,$MAC,$LIN]}" >> "$GITHUB_OUTPUT"
+          fi
+
   build:
     name: Build ${{ matrix.os }}
+    needs: plan
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
-    # DESKTOP_UNSIGNED=true (a variable of the desktop-release environment) builds Windows and Linux without a
-    # certificate and skips macOS, which cannot run unsigned apps. Remove the variable once the certificates exist.
-    if: ${{ matrix.os != 'macos' || vars.DESKTOP_UNSIGNED != 'true' }}
     # The signing secrets live in the protected environment.
     environment: desktop-release
     permissions:
       contents: read
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - os: windows
-            runner: windows-2025
-          - os: macos
-            runner: macos-15
-          - os: linux
-            runner: ubuntu-24.04
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
     env:
       LEFTHOOK: 0
     steps:

@@ -53,9 +53,10 @@ If the service crashes at start, **Logs** names the missing or bad variable (it 
 1. Where: vercel.com, **Add New**, **Project**, import the `wise-biz` repository.
 2. **Root Directory**: `apps/console`. Framework: Next.js (detected). Leave the build and install commands on their defaults (Vercel runs `pnpm install` for the workspace).
 3. **Environment Variables**: add `API_ORIGIN` = the Render address from step 2 (for example `https://wise-biz-server.onrender.com`, no trailing slash). The console sends every `/v1` request to it.
-4. **Deploy**. When it finishes you get an address such as `https://wise-biz-console.vercel.app`. That is your console address.
-5. Go back to Render, **Environment**, and set `CONSOLE_URL`, `AUTH_URL` and `CORS_ORIGINS` to that address, and `AUTH_RP_ID` to its host name. Save; Render redeploys.
-6. Add the address to the R2 bucket CORS rule (`first-release.md` part 2a, step 4).
+4. Optional, error reports: add `NEXT_PUBLIC_SENTRY_DSN` (a **Next.js** project's DSN from sentry.io, see `first-release.md` part 9) and `NEXT_PUBLIC_SENTRY_ENVIRONMENT` = `staging`. They must exist before the deploy, because the browser reads them at build time.
+5. **Deploy**. When it finishes you get an address such as `https://wise-biz-console.vercel.app`. That is your console address.
+6. Go back to Render, **Environment**, and set `CONSOLE_URL`, `AUTH_URL` and `CORS_ORIGINS` to that address, and `AUTH_RP_ID` to its host name. Save; Render redeploys.
+7. Add the address to the R2 bucket CORS rule (`first-release.md` part 2a, step 4).
 
 **Check:** open the console address, create the first account, check the verification email arrives, create a business. If sign-in fails with a network error, `API_ORIGIN` or `CORS_ORIGINS` is wrong.
 

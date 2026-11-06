@@ -205,6 +205,8 @@ Tracked in `docs/prompts/P2/README.md` order; add rows here when P2 starts.
 
 ## Decisions taken during build
 
+- 2026-11-06 P1: Sentry in the console (ADR 0025): `@sentry/nextjs`, errors only, scrubbed, CSP allows the DSN's ingest origin; POS and desktop still open (POS needs a bundle check)
+- 2026-11-06 P1: review findings of PRs #11 to #14 applied (provision-neon keeps new passwords on failure, R2 gate timeouts and refresh ordering, mail permanent-refusal handling, shared Brevo limit); desktop workflow had an invalid job-level `if` on `matrix` (broke every run of desktop.yml): replaced by a plan job
 - 2026-11-06 P1: free hosting path (ADR 0024): `apps/server` runs API + workers in one process for Render free, console on Vercel, keep-alive workflow, unsigned desktop switch `DESKTOP_UNSIGNED`; Google Cloud billing could not be created (user)
 - 2026-11-06 P1: mail through four providers with fallback and redacted CC/BCC copies (PR #13)
 - 2026-11-06 P1: object storage stays inside the Cloudflare R2 free tier (ADR 0023): caps 9.5 GB, 900k Class A, 9.5M Class B, a gate in `@wise-biz/storage`, an hourly `r2-usage` workflow; second account and Cloudinary deferred (user idea)
