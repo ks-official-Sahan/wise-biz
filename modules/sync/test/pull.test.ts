@@ -235,7 +235,12 @@ describe("pull", () => {
     expect(blocked.changes).toEqual([]); // hidden until the older transaction finishes
     await slow.query("commit");
     slow.release();
-    const after = await pull("catalog");
+    // The horizon also waits for other test files' open transactions: wait for visibility, as the stock test does.
+    let after = await pull("catalog");
+    for (let i = 0; i < 50 && after.changes.length < 2; i++) {
+      await new Promise((r) => setTimeout(r, 100));
+      after = await pull("catalog");
+    }
     expect(after.changes.map((c) => c.entityId)).toEqual([early, fast]);
     // A device that stopped after the first still gets the second.
     const first = await pull("catalog", undefined, 1);
