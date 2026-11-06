@@ -34,7 +34,7 @@ import {
 } from "@wise-biz/module-inventory";
 import { createExpoPush, runDeliveries } from "@wise-biz/module-notifications";
 import { runDailyDigests, runExports } from "@wise-biz/module-reporting";
-import { createMemoryStore, storeFromEnv } from "@wise-biz/storage";
+import { createMemoryStore, guardFromEnv, storeFromEnv } from "@wise-biz/storage";
 
 import { createConsumers } from "./consumers.ts";
 import { createLogger } from "./logger.ts";
@@ -92,7 +92,12 @@ export function startWorker(
   if (env.NODE_ENV !== "production") instrumentPool(pool);
   const realtime = createRealtimePublisher(env.REDIS_URL, logger);
   // Object store for jobs that write files (exports). Tests that pass their own consumers get an in-memory one.
-  const store = consumerEnv === undefined ? createMemoryStore() : storeFromEnv(consumerEnv);
+  const guard =
+    consumerEnv === undefined
+      ? undefined
+      : guardFromEnv(storeFromEnv(consumerEnv), consumerEnv, { logger });
+  void guard?.start();
+  const store = guard?.store ?? createMemoryStore();
   // The default consumer set needs the mailer, and so does the delivery loop that sends what its notifications flagged
   // (ADR 0018). Tests that pass their own consumers get neither.
   const ports: { mail?: MailPort; push?: PushPort } = {};
@@ -238,6 +243,7 @@ export function startWorker(
   return {
     logger,
     stop: async () => {
+      guard?.stop();
       // Every step runs even if an earlier one failed; the bus and both pools are ALWAYS closed.
       const failed = [
         ...(await settleSteps(

@@ -11,7 +11,7 @@ Read this first. Each line says **where** you do it, **what** you do and **when*
 | # | Where | What | When | Part below |
 |---|---|---|---|---|
 | 1 | Neon console, then PowerShell on your PC | Project, the two branches, settings, the role script and the migration check: follow `docs/runbooks/neon.md` start to end | first | 1 and `neon.md` |
-| 2 | Upstash, Cloudflare or AWS, Resend websites | Redis, a storage bucket, an email sender | after 1 | 2 |
+| 2 | Upstash (done), Cloudflare R2, Resend websites | Redis (done), two R2 buckets with keys and a usage token, an email sender | after 1 | 2 |
 | 3 | Google Cloud console and a terminal with `gcloud` | Project, registry, service accounts, workload identity | after 2 | 3 |
 | 4 | A terminal with `gcloud` | Put every setting into Secret Manager | after 3 | 4 |
 | 5 | GitHub, repository Settings, Environments | `staging` and `production` with their variables | after 4 | 5 |
@@ -30,7 +30,7 @@ What you need to hold in the end:
 | Neon | one project `Wise-Biz` with two branches, `production` and `staging` (they never share data), database `wise_biz` in each, five roles per branch, one read replica for production (optional) |
 | Google Cloud | one project, Cloud Run, Artifact Registry, Secret Manager, a deploy service account with workload identity |
 | Redis | one managed Redis (Upstash or similar) per environment |
-| Object storage | one S3-compatible bucket per environment (Cloudflare R2 or AWS S3) |
+| Object storage | Cloudflare R2: one private bucket per environment, a key per bucket, a read-only usage token (part 2a); caps in ADR 0023 |
 | Email | one sending domain at Resend (or an SMTP relay) |
 | GitHub | environments `staging`, `production`, `desktop-release`, `mobile-release` with the variables and secrets below |
 | Apple | Developer Program membership (macOS notarization, iOS builds) |
@@ -45,21 +45,101 @@ Follow `docs/runbooks/neon.md` in full. It covers the project, the roles (one co
 
 Check: from your machine, with the migrator URL in `DATABASE_MIGRATOR_URL`: `pnpm db:migrate`, then `pnpm db:rls-check`. Both must pass. Then confirm `select rolbypassrls from pg_roles where rolname in ('wb_app','wb_worker')` is false for both. Do this against the staging database first.
 
-## 2. Redis, object storage, email
+## 2. Redis, object storage (Cloudflare R2), email
 
 These are the three services the API and workers need besides Postgres.
 
-**Redis** (`REDIS_URL`, required by the API and realtime, used by workers): create a managed Redis (for example Upstash, region near the Cloud Run region). Use the TLS URL (`rediss://default:<password>@<host>:<port>`).
+**Redis: done.** Keep the `rediss://` URL; it becomes `REDIS_URL` in part 4. Use one Redis per environment (a staging one and a production one) so a test never touches real data.
 
-**Object storage** (`STORAGE_BUCKET`, `STORAGE_ACCESS_KEY_ID`, `STORAGE_SECRET_ACCESS_KEY`, plus `STORAGE_ENDPOINT` and `STORAGE_REGION` for non-AWS): create one private bucket per environment (imports, exports, product images). With Cloudflare R2: create the bucket, then an API token with Object Read and Write on that bucket only, and use `STORAGE_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com` and `STORAGE_REGION=auto`. With AWS S3: an IAM user limited to the bucket, no endpoint. Set `STORAGE_FORCE_PATH_STYLE=true` only for MinIO or a provider that needs it. Add a bucket CORS rule for the console origin with methods `PUT` and `GET` and `AllowedHeaders` set to `Content-Type` (browser imports send `Content-Type: text/csv`, which triggers a preflight; a rule without the header makes the upload fail).
+### 2a. Cloudflare R2 (object storage)
 
-**Email** (`MAIL_FROM`, `RESEND_API_KEY` or `MAIL_SMTP_HOST` and `MAIL_SMTP_PORT`): at Resend add your sending domain and add the DNS records they list (SPF, DKIM) until it shows verified, then create an API key limited to sending. `MAIL_FROM` must be an address on that domain, for example `wise-biz <no-reply@yourdomain>`.
+What it holds: CSV imports, report exports, product images. Why R2: no download fees, and a free tier of 10 GB, 1 million writes (Class A) and 10 million reads (Class B) every month. wise-biz refuses to go past 9.5 GB, 900,000 writes and 9,500,000 reads, so your bill stays at zero (`docs/adr/0023-object-storage-stays-inside-the-r2-free-tier.md`).
 
-Check: you have the Redis URL, the bucket name with its two keys, and a verified sending domain with a `MAIL_FROM` address.
+Know this first:
+- The free tier is **per Cloudflare account**, not per bucket. Staging and production buckets share the same 10 GB, so the caps are shared too.
+- Only the **Standard** storage class has a free tier. Never choose Infrequent Access.
+- Your billing period is November 6 to December 6, then December 6 to January 6, and so on. That is why you set `R2_PERIOD_ANCHOR_DAY=6` (below). Operation counts start again at zero on the 6th. Stored bytes do not reset; they go down only when files are deleted.
+- Cloudflare has no hard spending cap. The cap is wise-biz's own gate. It stops wise-biz's uploads and downloads; it cannot stop something you upload by hand in the Cloudflare dashboard.
+
+**Step 1. Find your account id.** Where: dash.cloudflare.com, signed in. The **Account ID** (32 letters and digits) is in the address bar after `dash.cloudflare.com/`, and in the right-hand column of the account home page. Copy it.
+
+**Step 2. Create the staging bucket.** Where: left menu **Storage & databases**, **R2 object storage**, **Overview**. Click **Create bucket**.
+- Bucket name: `wise-biz-staging` (lowercase, no spaces).
+- Location: **Asia-Pacific (APAC)**, near Singapore. (Leave Automatic if APAC is not offered.)
+- Default storage class: **Standard**.
+- Click **Create bucket**.
+
+**Step 3. Create the production bucket** the same way, named `wise-biz-production`. Leave both **private**: do not turn on the public `r2.dev` URL or a custom domain. Files are handed out through short-lived signed links.
+
+**Step 4. Allow the console to upload straight to the bucket.** Where: R2 object storage, click the bucket, **Settings**, section **CORS Policy**, **Add CORS policy**. Paste this with your own console address (you can edit it after the first deploy, part 6):
+
+```json
+[
+  {
+    "AllowedOrigins": ["https://app.example.com"],
+    "AllowedMethods": ["GET", "PUT"],
+    "AllowedHeaders": ["Content-Type"],
+    "MaxAgeSeconds": 3600
+  }
+]
+```
+
+Save. Do this on both buckets. Without `Content-Type` in `AllowedHeaders` the browser's CSV upload is refused.
+
+**Step 5. Create the access keys the application uses.** Where: R2 object storage, **Overview**, on the right **API**, then **Manage API tokens** (or **Create API token**).
+- Token name: `wise-biz-staging`.
+- Permissions: **Object Read & Write**.
+- Specify bucket(s): **Apply to specific buckets only**, tick `wise-biz-staging`.
+- Leave the TTL on forever. Click **Create API Token**.
+- The next page shows **Access Key ID**, **Secret Access Key** and the **endpoint** `https://<account-id>.r2.cloudflarestorage.com`. The secret is shown **once**. Copy all three into a private note now (never into a chat).
+
+Repeat for production: token `wise-biz-production`, bucket `wise-biz-production`. Each environment gets its own token, so a leak in staging cannot read production files.
+
+**Step 6. Create the usage token (this makes the cap exact).** Where: dash.cloudflare.com, profile icon at the top right, **My Profile**, **API Tokens**, **Create Token**, at the bottom **Create Custom Token** (**Get started**).
+- Token name: `wise-biz-r2-usage`.
+- Permissions: first box **Account**, second **Account Analytics**, third **Read**.
+- Account Resources: **Include**, your account.
+- **Continue to summary**, **Create Token**. Copy the token (shown once).
+
+This token can only read numbers. It cannot read files or change anything.
+
+**Step 7. Put the values where they belong.** In part 4 you set, per environment:
+
+| Secret | Value |
+|---|---|
+| `STORAGE_ENDPOINT` | `https://<account-id>.r2.cloudflarestorage.com` |
+| `STORAGE_REGION` | `auto` |
+| `STORAGE_BUCKET` | `wise-biz-staging` (or `wise-biz-production`) |
+| `STORAGE_ACCESS_KEY_ID` and `STORAGE_SECRET_ACCESS_KEY` | from step 5 |
+| `CLOUDFLARE_ANALYTICS_TOKEN` | from step 6 (the same token for both environments is fine) |
+| `R2_PERIOD_ANCHOR_DAY` | `6` |
+
+Optional: `R2_LIMIT_STORAGE_BYTES`, `R2_LIMIT_CLASS_A`, `R2_LIMIT_CLASS_B` change the caps (defaults 9500000000, 900000, 9500000). Never raise them above the free tier.
+
+**Step 8. The hourly usage check on GitHub.** Where: GitHub repository, Settings, Secrets and variables, Actions (repository level, not an environment, because the production environment waits for your approval and a scheduled run must not). On the **Variables** tab add `CLOUDFLARE_ACCOUNT_ID` (step 1) and `R2_PERIOD_ANCHOR_DAY` set to `6`; on the **Secrets** tab add `CLOUDFLARE_ANALYTICS_TOKEN` (step 6). The workflow **R2 usage** then runs every hour: it warns at 80% of a cap and fails at the cap, and GitHub emails you when a run fails. Run it now from Actions, **R2 usage**, **Run workflow**. Before any workflow step that writes to R2, run the same check with `pnpm -F @wise-biz/storage r2-usage`.
+
+**What happens when a cap is reached.** The API answers 503 with the code `STORAGE_QUOTA_EXCEEDED`; uploads and downloads of files pause (selling, stock and reports keep working). The log says `object storage reached its monthly cap` and Sentry gets an event. It clears by itself when the period resets, or when you delete files (storage only). If a month really reaches the caps, see "Alternatives not taken now" in ADR 0023 (a second account, or Cloudinary for images).
+
+**Check:** both buckets exist and are private; you hold, per environment, the endpoint, bucket, key id and secret; you hold the usage token and the account id; the **R2 usage** workflow ran and its summary shows three rows under the caps.
+
+### 2b. Email (Resend)
+
+Where: resend.com, signed in. **Domains**, **Add Domain**, enter your sending domain (for example `yourdomain.com`), pick the region nearest you. Resend lists DNS records (SPF and DKIM, a few `TXT` or `MX` rows). Add them at your domain's DNS page. If the domain is on Cloudflare: dash.cloudflare.com, the domain, **DNS**, **Records**, **Add record**; copy type, name and value exactly; set the proxy to **DNS only** (grey cloud). Back in Resend click **Verify DNS Records**; it can take minutes to an hour until it shows **Verified**. Then **API Keys**, **Create API Key**, permission **Sending access**, your domain. Copy the key (shown once).
+- `RESEND_API_KEY` is that key.
+- `MAIL_FROM` is an address on that domain, for example `wise-biz <no-reply@yourdomain.com>`.
+
+**Check:** the domain shows Verified; you hold the key and the `MAIL_FROM` text.
 
 ## 3. Google Cloud (Cloud Run, Artifact Registry, Secret Manager, workload identity)
 
 `deploy.yml` signs in with workload identity federation, so no long-lived key exists anywhere. Create one Google Cloud project per environment (or one for both with different secret prefixes; the secret names already carry `<ENV>`). Pick a region and use it everywhere. Use `asia-southeast1` (Singapore) to sit next to the Neon database in `ap-southeast-1`. Enable billing.
+
+**Before the commands (first time only)**
+1. **Create the project.** Where: console.cloud.google.com, signed in with your Google account. Top bar, the project picker, **New project**. Name `wise-biz-staging` (and later `wise-biz-production`). Click **Create**. Note the **Project ID** (it can differ from the name, for example `wise-biz-staging-123456`); the commands use the ID.
+2. **Turn on billing.** Left menu **Billing**, **Link a billing account**, add a card. Cloud Run has a free allowance; you pay only past it. In **Billing**, **Budgets & alerts**, **Create budget**: amount 20 USD a month, alerts at 50% and 100%, so you hear about cost early.
+3. **Install the `gcloud` tool on your PC.** Where: cloud.google.com/sdk/docs/install, **Windows**, download and run the installer, keep the defaults, tick **Run gcloud init** at the end.
+4. **Sign in.** In a new PowerShell window: `gcloud auth login` (a browser opens; choose your account), then `gcloud config set project <your-project-id>`.
+5. **The commands below use bash syntax.** On Windows open **Git Bash** (installed with Git) and run them there, or use **Cloud Shell**: in the Google Cloud console click the `>_` icon at the top right. Cloud Shell already has `gcloud` and is signed in, so steps 3 and 4 are not needed there.
 
 ```bash
 PROJECT=<your-project-id>   REGION=<your-region>   REPO=wise-biz
@@ -152,6 +232,8 @@ put STORAGE_ACCESS_KEY_ID     "<key id>"
 put STORAGE_SECRET_ACCESS_KEY "<secret>"
 put STORAGE_ENDPOINT   "<R2 endpoint, omit on AWS>"
 put STORAGE_REGION     "auto"
+put CLOUDFLARE_ANALYTICS_TOKEN "<usage token from part 2a>"
+put R2_PERIOD_ANCHOR_DAY "6"
 put DATABASE_URL            "<wb_app pooled URL>"
 put DATABASE_IDENTITY_URL   "<identity URL from neon.md>"
 put DATABASE_WORKER_URL     "<wb_worker direct URL>"
@@ -167,7 +249,7 @@ Required per service (from the code; run `node scripts/service-env.mts <api|work
 - **realtime**: `REDIS_URL`
 - **migrate job**: `DATABASE_MIGRATOR_URL`
 
-Also set the optional ones you want: `RESEND_API_KEY` or `MAIL_SMTP_HOST` and `MAIL_SMTP_PORT`, `DATABASE_READ_URL`, `AUTH_RP_ID`, `CORS_ORIGINS`, `TRUST_PROXY_HOPS`, `REALTIME_TICKET_SECRET`, `REALTIME_URL`, `SENTRY_DSN` (part 8), `OTEL_EXPORTER_OTLP_ENDPOINT`. `TRUST_PROXY_HOPS` is how many proxies sit in front of the API; on Cloud Run behind the console proxy start at `1` and check in the first request log that the client address is a real client, not a Google address, before trusting rate limits. `INVITE_SECRET`, `AUTH_SECRET` and `PIN_PEPPER` must be at least 32 characters and must never change without following `docs/runbooks/rotate-secrets.md` (changing `PIN_PEPPER` invalidates every PIN).
+Also set the optional ones you want: `RESEND_API_KEY` or `MAIL_SMTP_HOST` and `MAIL_SMTP_PORT`, `DATABASE_READ_URL`, `AUTH_RP_ID`, `CORS_ORIGINS`, `TRUST_PROXY_HOPS`, `CLOUDFLARE_ANALYTICS_TOKEN`, `R2_PERIOD_ANCHOR_DAY`, `R2_LIMIT_*`, `REALTIME_TICKET_SECRET`, `REALTIME_URL`, `SENTRY_DSN` (part 8), `OTEL_EXPORTER_OTLP_ENDPOINT`. `TRUST_PROXY_HOPS` is how many proxies sit in front of the API; on Cloud Run behind the console proxy start at `1` and check in the first request log that the client address is a real client, not a Google address, before trusting rate limits. `INVITE_SECRET`, `AUTH_SECRET` and `PIN_PEPPER` must be at least 32 characters and must never change without following `docs/runbooks/rotate-secrets.md` (changing `PIN_PEPPER` invalidates every PIN).
 
 Check: `gcloud secrets list --format='value(name)' | grep wb-staging-` lists them all.
 

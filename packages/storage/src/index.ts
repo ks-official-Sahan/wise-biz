@@ -1,5 +1,7 @@
 import { presignS3Url, signS3Request } from "@sahan-sac/media-kit/sigv4";
 
+export * from "./quota.ts";
+
 /**
  * Object storage behind one small port. Every key is built by `tenantKey`, so an object always lives under
  * `tenants/<tenantId>/` (media-kit has no tenant scoping yet: research gap #8, upstream follow-up in PROGRESS).

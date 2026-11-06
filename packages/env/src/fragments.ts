@@ -46,6 +46,14 @@ export const storageEnv = {
   STORAGE_ACCESS_KEY_ID: z.string().min(1),
   STORAGE_SECRET_ACCESS_KEY: z.string().min(1),
   STORAGE_FORCE_PATH_STYLE: z.stringbool().default(false),
+  // Cloudflare R2 free-tier caps (ADR 0023). They apply only when STORAGE_ENDPOINT is an R2 endpoint.
+  R2_LIMIT_STORAGE_BYTES: z.coerce.number().int().positive().default(9_500_000_000),
+  R2_LIMIT_CLASS_A: z.coerce.number().int().positive().default(900_000),
+  R2_LIMIT_CLASS_B: z.coerce.number().int().positive().default(9_500_000),
+  /** Day of the month your Cloudflare billing period starts (1 to 28). */
+  R2_PERIOD_ANCHOR_DAY: z.coerce.number().int().min(1).max(28).default(1),
+  /** API token with Account Analytics: Read; lets the cap see all usage, not only this process. */
+  CLOUDFLARE_ANALYTICS_TOKEN: z.string().min(1).optional(),
 };
 
 const resendApiKey = z.string().min(1).optional();
