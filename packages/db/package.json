@@ -16,7 +16,8 @@
     "test": "vitest run --coverage",
     "migrate": "node --env-file-if-exists=../../.env scripts/migrate.mts",
     "migration": "node scripts/new-migration.mts",
-    "rls-check": "node --env-file-if-exists=../../.env scripts/rls-check.mts"
+    "rls-check": "node --env-file-if-exists=../../.env scripts/rls-check.mts",
+    "provision-neon": "node scripts/provision-neon.mts"
   },
   "dependencies": {
     "@wise-biz/audit-chain": "workspace:*",

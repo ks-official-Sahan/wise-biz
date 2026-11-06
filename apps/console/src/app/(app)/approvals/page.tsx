@@ -20,7 +20,7 @@ const PLATFORM = {
   web: "Browser",
 } as const;
 
-/** What needs a decision from someone with authority: flagged sales and terminals waiting to be let in. */
+/** What needs a look from someone with authority: flagged sales and terminals that have not finished enrolling. */
 export default function ApprovalsPage() {
   const { tenant } = useTenant();
   const { sales, devices, flagged, waiting, label } = useApprovals(tenant.tenantId);
@@ -33,7 +33,7 @@ export default function ApprovalsPage() {
       </Row>
 
       <section aria-labelledby="approvals-devices">
-        <h2 id="approvals-devices">Terminals waiting to be approved</h2>
+        <h2 id="approvals-devices">Terminals that have not finished enrolling</h2>
         {devices.isPending ? <SkeletonRows rows={2} label="Loading terminals" /> : null}
         {devices.isError ? (
           <ErrorState
@@ -44,14 +44,15 @@ export default function ApprovalsPage() {
           />
         ) : null}
         {devices.isSuccess && waiting.length === 0 ? (
-          <Empty title="No terminals waiting">
-            New terminals show up here until you approve them.
+          <Empty title="No unfinished enrolments">
+            A terminal shows up here after its enrolment code is created and until it is used.
+            Review it to cancel a code that was never used.
           </Empty>
         ) : null}
         {waiting.length > 0 ? (
           <div className={styles.tableWrap}>
             <table className={styles.table}>
-              <caption className="sr-only">Terminals waiting for approval</caption>
+              <caption className="sr-only">Terminals that have not finished enrolling</caption>
               <thead>
                 <tr>
                   <th scope="col">Terminal</th>

@@ -4,6 +4,25 @@ The one-time setup that only the owner can do: accounts, keys, certificates and 
 
 Conventions: `<ENV>` is `staging` or `production`. Do `staging` first, end to end, then repeat for `production`. Replace `OWNER/REPO` with `ks-official-Sahan/wise-biz`. Never paste a secret into a chat, an issue, a commit or a workflow log. Generate values with `openssl rand -base64 48` and put them straight into the secret store.
 
+## The order, in one table
+
+Read this first. Each line says **where** you do it, **what** you do and **when**. Finish a line before the next. Everything about the application itself (what it does, how to run it, what is in which folder) is in `docs/GETTING-STARTED.md`.
+
+| # | Where | What | When | Part below |
+|---|---|---|---|---|
+| 1 | Neon console, then PowerShell on your PC | Project, database `wise_biz`, replica, then run the role script and the migration check | first | 1 and `neon.md` |
+| 2 | Upstash, Cloudflare or AWS, Resend websites | Redis, a storage bucket, an email sender | after 1 | 2 |
+| 3 | Google Cloud console and a terminal with `gcloud` | Project, registry, service accounts, workload identity | after 2 | 3 |
+| 4 | A terminal with `gcloud` | Put every setting into Secret Manager | after 3 | 4 |
+| 5 | GitHub, repository Settings, Environments | `staging` and `production` with their variables | after 4 | 5 |
+| 6 | GitHub, Actions | Tag (done for `v0.2.1`), then run the Deploy workflow for staging, then click through the console | after 5 | 6 |
+| 7 | Windows PC, Apple, Microsoft accounts | Desktop installers and signing | after 6 works | 7 |
+| 8 | Expo, Apple, Google Play | Mobile apps | after 6 works | 8 |
+| 9 | sentry.io | Error reports | any time after 6 | 9 |
+| 10 | Real devices and a staging shop | The P1-16 checks before real customers | last | 10 |
+
+You can stop after line 6 and use the staging console in a browser; lines 7 to 10 are for when you want installers, phones and customers.
+
 What you need to hold in the end:
 
 | Where | What |
@@ -22,7 +41,7 @@ What you need to hold in the end:
 
 ## 1. Neon (database)
 
-Follow `docs/runbooks/neon.md` in full. It covers the project, the roles (`infra/neon/provision-roles.sql`), which connection string goes in which variable (pooled or direct host) and the read replica. Keep the four connection strings; they become the Secret Manager entries `DATABASE_URL`, `DATABASE_IDENTITY_URL`, `DATABASE_WORKER_URL`, `DATABASE_CHAINER_URL` and `DATABASE_MIGRATOR_URL` in part 4. Check the role of each URL against the table in `neon.md` before you save it.
+Follow `docs/runbooks/neon.md` in full. It covers the project, the roles (one command: `pnpm -F @wise-biz/db provision-neon <env>`), which connection string goes in which variable (pooled or direct host) and the read replica. Keep the four connection strings; they become the Secret Manager entries `DATABASE_URL`, `DATABASE_IDENTITY_URL`, `DATABASE_WORKER_URL`, `DATABASE_CHAINER_URL` and `DATABASE_MIGRATOR_URL` in part 4. Check the role of each URL against the table in `neon.md` before you save it.
 
 Check: from your machine, with the migrator URL in `DATABASE_MIGRATOR_URL`: `pnpm db:migrate`, then `pnpm db:rls-check`. Both must pass. Then confirm `select rolbypassrls from pg_roles where rolname in ('wb_app','wb_worker')` is false for both. Do this against the staging database first.
 
