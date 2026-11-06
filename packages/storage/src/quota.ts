@@ -1,6 +1,6 @@
 import { DomainError } from "@wise-biz/errors";
 
-import type { ObjectStore } from "./index.ts";
+import type { ObjectStore } from "./port.ts";
 
 /**
  * Keeps object-store usage under Cloudflare R2's monthly free tier (ADR 0023). The caps sit below the free tier
