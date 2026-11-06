@@ -1,0 +1,34 @@
+{
+  "name": "@wise-biz/server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "wiseBiz": {
+    "runtime": "node"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "lint": "eslint . --max-warnings 0",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --coverage",
+    "dev": "node --env-file-if-exists=../../.env --watch src/main.ts",
+    "start": "node src/main.ts"
+  },
+  "dependencies": {
+    "@opentelemetry/sdk-node": "0.223.0",
+    "@sentry/node": "10.76.2",
+    "@wise-biz/api": "workspace:*",
+    "@wise-biz/observability": "workspace:*",
+    "@wise-biz/workers": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "@wise-biz/config": "workspace:*",
+    "@wise-biz/testing": "workspace:*",
+    "eslint": "10.13.0",
+    "typescript": "6.0.3",
+    "vitest": "5.0.5"
+  }
+}

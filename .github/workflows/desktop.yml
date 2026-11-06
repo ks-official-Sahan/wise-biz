@@ -26,6 +26,9 @@ jobs:
     name: Build ${{ matrix.os }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
+    # DESKTOP_UNSIGNED=true (a variable of the desktop-release environment) builds Windows and Linux without a
+    # certificate and skips macOS, which cannot run unsigned apps. Remove the variable once the certificates exist.
+    if: ${{ matrix.os != 'macos' || vars.DESKTOP_UNSIGNED != 'true' }}
     # The signing secrets live in the protected environment.
     environment: desktop-release
     permissions:
@@ -79,10 +82,12 @@ jobs:
           NOTARY_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           NOTARY_TEAM: ${{ secrets.APPLE_TEAM_ID }}
           MATRIX_OS: ${{ matrix.os }}
+          UNSIGNED: ${{ vars.DESKTOP_UNSIGNED }}
         run: |
           [[ "$API_URL" == https://* ]] || { echo "WISE_BIZ_API_URL must be an https URL" >&2; exit 1; }
           [[ "$UPDATE_URL" == https://* ]] || { echo "WISE_BIZ_UPDATE_URL must be an https URL" >&2; exit 1; }
-          if [[ "$MATRIX_OS" == windows && -z "$WIN_CERT" ]]; then echo "WIN_CSC_LINK is not set: never ship an unsigned installer" >&2; exit 1; fi
+          if [[ "$UNSIGNED" == true ]]; then echo "::warning::DESKTOP_UNSIGNED is on: this installer is NOT code-signed (SmartScreen will warn)"; fi
+          if [[ "$MATRIX_OS" == windows && "$UNSIGNED" != true && -z "$WIN_CERT" ]]; then echo "WIN_CSC_LINK is not set: never ship an unsigned installer" >&2; exit 1; fi
           if [[ "$MATRIX_OS" == macos && ( -z "$MAC_CERT" || -z "$NOTARY_ID" || -z "$NOTARY_PASSWORD" || -z "$NOTARY_TEAM" ) ]]; then echo "macOS signing or notarization is not configured" >&2; exit 1; fi
 
       - name: Export the POS web app (the terminal's renderer)
@@ -95,6 +100,7 @@ jobs:
         env:
           WISE_BIZ_API_URL: ${{ vars.WISE_BIZ_API_URL }}
           WISE_BIZ_UPDATE_URL: ${{ vars.WISE_BIZ_UPDATE_URL }}
+          CSC_IDENTITY_AUTO_DISCOVERY: ${{ vars.DESKTOP_UNSIGNED == 'true' && 'false' || 'true' }}
           WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
           WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
           CSC_LINK: ${{ secrets.CSC_LINK }}

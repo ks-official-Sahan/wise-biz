@@ -16,7 +16,8 @@ WORKDIR /repo
 COPY --from=build --chown=node:node /repo /repo
 # The container only runs node. npm and corepack ship their own copies of undici and brace-expansion, which the HIGH and
 # CRITICAL image scan flags (v0.2.1 run), and pnpm is not needed at run time: next starts straight from node.
-RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack \n    /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack \
+    /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack
 # Non-root. Next writes its cache under .next/cache: mount a tmpfs there when running with --read-only.
 USER node
 WORKDIR /repo/apps/console

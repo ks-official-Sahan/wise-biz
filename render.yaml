@@ -1,0 +1,62 @@
+# Render blueprint: the API and the background workers in ONE free container (ADR 0024).
+# Render, New, Blueprint, pick this repository. Values marked `sync: false` are asked for in the dashboard: paste them
+# there, never into this file. Walkthrough: docs/runbooks/free-hosting.md.
+services:
+  - type: web
+    name: wise-biz-server
+    runtime: docker
+    plan: free
+    region: singapore
+    dockerfilePath: ./infra/docker/service.Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    autoDeploy: false
+    envVars:
+      # Build arguments of infra/docker/service.Dockerfile: this image runs apps/server (API + workers).
+      - key: APP
+        value: server
+      - key: NODE_ENV
+        value: production
+      # Render sets PORT itself (10000); the API reads it.
+      - key: LOG_LEVEL
+        value: info
+      # One proxy (Render) sits in front of the API.
+      - key: TRUST_PROXY_HOPS
+        value: "1"
+      - key: SENTRY_ENVIRONMENT
+        value: staging
+      # Required.
+      - { key: AUTH_SECRET, sync: false }
+      - { key: AUTH_URL, sync: false }
+      - { key: CONSOLE_URL, sync: false }
+      - { key: CORS_ORIGINS, sync: false }
+      - { key: AUTH_RP_ID, sync: false }
+      - { key: INVITE_SECRET, sync: false }
+      - { key: PIN_PEPPER, sync: false }
+      - { key: MAIL_FROM, sync: false }
+      - { key: REDIS_URL, sync: false }
+      - { key: DATABASE_URL, sync: false }
+      - { key: DATABASE_IDENTITY_URL, sync: false }
+      - { key: DATABASE_WORKER_URL, sync: false }
+      - { key: DATABASE_CHAINER_URL, sync: false }
+      - { key: STORAGE_ENDPOINT, sync: false }
+      - { key: STORAGE_REGION, sync: false }
+      - { key: STORAGE_BUCKET, sync: false }
+      - { key: STORAGE_ACCESS_KEY_ID, sync: false }
+      - { key: STORAGE_SECRET_ACCESS_KEY, sync: false }
+      # Mail: set the ones for the providers you use (see .env.example).
+      - { key: EMAIL_PROVIDER, sync: false }
+      - { key: MAIL_CC_EMAILS, sync: false }
+      - { key: MAIL_BCC_EMAILS, sync: false }
+      - { key: RESEND_API_KEY, sync: false }
+      - { key: RESEND_EMAIL_SENDER_EMAIL, sync: false }
+      - { key: BREVO_API_KEY, sync: false }
+      - { key: BREVO_EMAIL_SENDER_USER, sync: false }
+      - { key: BREVO_EMAIL_HOST, sync: false }
+      - { key: BREVO_EMAIL_HOST_USER, sync: false }
+      - { key: BREVO_EMAIL_HOST_PASSWORD, sync: false }
+      # Optional.
+      - { key: DATABASE_READ_URL, sync: false }
+      - { key: CLOUDFLARE_ANALYTICS_TOKEN, sync: false }
+      - { key: R2_PERIOD_ANCHOR_DAY, sync: false }
+      - { key: SENTRY_DSN, sync: false }

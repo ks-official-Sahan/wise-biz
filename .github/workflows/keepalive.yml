@@ -1,0 +1,24 @@
+name: Keep the free server awake
+
+# A free container host (Render) puts the server to sleep after about 15 minutes without a request, and the background
+# workers (emails, exports, alerts, the outbox relay) sleep with it. A request every 10 minutes keeps it up. Off unless
+# the repository variable SERVER_URL is set (ADR 0024). The repository is public, so Actions minutes are free.
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  ping:
+    if: ${{ vars.SERVER_URL != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Ping /health
+        env:
+          URL: ${{ vars.SERVER_URL }}
+        run: |
+          # A sleeping server takes up to a minute to wake: allow for it, and retry.
+          curl --fail --silent --show-error --max-time 90 --retry 2 --retry-delay 10 "${URL%/}/health"

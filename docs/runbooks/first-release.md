@@ -4,6 +4,8 @@ The one-time setup that only the owner can do: accounts, keys, certificates and 
 
 Conventions: `<ENV>` is `staging` or `production`. Do `staging` first, end to end, then repeat for `production`. Replace `OWNER/REPO` with `ks-official-Sahan/wise-biz`. Never paste a secret into a chat, an issue, a commit or a workflow log. Generate values with `openssl rand -base64 48` and put them straight into the secret store.
 
+**No Google Cloud account?** Parts 3 to 6 below use Google Cloud. If you cannot create a billing account, or want to pay nothing until there is revenue, follow `docs/runbooks/free-hosting.md` for parts 3 to 6 instead (Render for the server, Vercel for the console), then continue here at part 7.
+
 ## The order, in one table
 
 Read this first. Each line says **where** you do it, **what** you do and **when**. Finish a line before the next. Everything about the application itself (what it does, how to run it, what is in which folder) is in `docs/GETTING-STARTED.md`.
