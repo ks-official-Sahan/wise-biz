@@ -30,8 +30,12 @@ const num = (name: string, fallback: number): number => {
   return n;
 };
 
+// An empty CLOUDFLARE_ACCOUNT_ID (a blank line in .env) counts as unset.
+const explicitAccount = process.env["CLOUDFLARE_ACCOUNT_ID"];
 const account =
-  process.env["CLOUDFLARE_ACCOUNT_ID"] ?? r2AccountOf(process.env["STORAGE_ENDPOINT"]);
+  explicitAccount !== undefined && explicitAccount !== ""
+    ? explicitAccount
+    : r2AccountOf(process.env["STORAGE_ENDPOINT"]);
 const token = process.env["CLOUDFLARE_ANALYTICS_TOKEN"];
 if (account === undefined || account === "" || token === undefined || token === "") {
   console.error("Set CLOUDFLARE_ACCOUNT_ID (or STORAGE_ENDPOINT) and CLOUDFLARE_ANALYTICS_TOKEN.");

@@ -291,6 +291,39 @@ describe("guardFromEnv", () => {
     expect(onBlocked).toHaveBeenCalledWith("classB", expect.objectContaining({ limit: 2 }));
   });
 
+  it("drops operation counts read across a period change, and keeps the storage level", async () => {
+    let t = Date.UTC(2026, 10, 5, 23, 59); // the period turns on the 6th
+    const f = vi.fn((_u: unknown, init?: RequestInit) => {
+      const q = (JSON.parse(init?.body as string) as { query: string }).query;
+      t = Date.UTC(2026, 10, 6, 0, 1); // the read finishes after midnight
+      const acct = (g: object) => reply({ data: { viewer: { accounts: [g] } } });
+      return q.includes("r2Operations")
+        ? acct({
+            r2OperationsAdaptiveGroups: [
+              { sum: { requests: 2 }, dimensions: { actionType: "GetObject" } },
+            ],
+          })
+        : acct({
+            r2StorageAdaptiveGroups: [
+              {
+                max: { payloadSize: 400, metadataSize: 0 },
+                dimensions: { datetime: "2026-11-05T23:00:00Z", bucketName: "b" },
+              },
+            ],
+          });
+    });
+    const g = guardFromEnv(
+      createMemoryStore(),
+      { ...env, R2_PERIOD_ANCHOR_DAY: 6, CLOUDFLARE_ANALYTICS_TOKEN: "t" },
+      { logger, fetch: f, now: () => new Date(t) },
+    );
+    await g.start();
+    g.stop();
+    const m = g.gate.status().metrics;
+    expect(m.classB.used).toBe(0);
+    expect(m.storage.used).toBe(400);
+  });
+
   it("reads Cloudflare at start and keeps going when a read fails", async () => {
     let fail = false;
     const f = vi.fn((_u: unknown, init?: RequestInit) => {
