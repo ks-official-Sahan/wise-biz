@@ -1,9 +1,10 @@
 "use client";
 
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { useEffect, useMemo } from "react";
 
 import { api } from "./api.ts";
-import { STALE } from "./queries.ts";
+import { STALE, useMembers } from "./queries.ts";
 
 // ---- shapes (mirror modules/sales/src/schemas.ts) ----
 
@@ -204,6 +205,37 @@ export const useShift = (t: string, id: string) =>
   });
 
 // ---- display helpers ----
+
+/** Short form of an id, for an operator who is no longer a member (a removed user). */
+export const shortId = (id: string): string => `${id.slice(0, 8)}…`;
+
+/**
+ * Builds the operator id -> label map once per page. The members payload has no display name, so a member shows
+ * "You" for the signed-in user and a short id for everyone else.
+ */
+export function operatorNames(
+  members: readonly { readonly userId: string }[],
+  me: string,
+): ReadonlyMap<string, string> {
+  const names = new Map<string, string>();
+  for (const m of members) names.set(m.userId, m.userId === me ? "You" : shortId(m.userId));
+  return names;
+}
+
+/** Label for a sale's operator; an id missing from the map (removed user, or not loaded yet) shows as a short id. */
+export function operatorLabel(operatorId: string, names: ReadonlyMap<string, string>): string {
+  return names.get(operatorId) ?? shortId(operatorId);
+}
+
+/** Loads every page of members (so the map is complete) and returns the resolver map. */
+export function useOperatorNames(t: string, me: string): ReadonlyMap<string, string> {
+  const members = useMembers(t);
+  const { hasNextPage, isFetchingNextPage, isError, fetchNextPage, data } = members;
+  useEffect(() => {
+    if (hasNextPage && !isFetchingNextPage && !isError) void fetchNextPage();
+  }, [hasNextPage, isFetchingNextPage, isError, fetchNextPage]);
+  return useMemo(() => operatorNames(data?.pages.flatMap((p) => p.members) ?? [], me), [data, me]);
+}
 
 const FLAGS: Readonly<Record<string, string>> = {
   price_mismatch: "Price differs from the list",

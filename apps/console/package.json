@@ -27,6 +27,7 @@
     "@wise-biz/theme": "workspace:*",
     "better-auth": "1.7.12",
     "next": "16.4.3",
+    "qrcode-generator": "2.0.4",
     "react": "19.3.0",
     "react-dom": "19.3.0"
   },

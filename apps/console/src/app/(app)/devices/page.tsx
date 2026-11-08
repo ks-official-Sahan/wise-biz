@@ -1,7 +1,7 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
   Alert,
@@ -29,6 +29,7 @@ import {
   useDevices,
   useHeartbeats,
 } from "@/lib/devices.ts";
+import { enrollmentPayload, qrMatrix, qrPath } from "@/lib/qr.ts";
 import { useBranches } from "@/lib/queries.ts";
 import { useTenant } from "@/lib/tenant.tsx";
 
@@ -355,7 +356,7 @@ function EnrollDialog({ onClose }: { onClose: () => void }) {
           <p>Type this code on the new terminal. It works once and expires in 15 minutes.</p>
           <p
             style={{
-              fontSize: "2rem",
+              fontSize: "var(--wb-font-size-xl)",
               letterSpacing: "0.15em",
               fontVariantNumeric: "tabular-nums",
             }}
@@ -363,6 +364,22 @@ function EnrollDialog({ onClose }: { onClose: () => void }) {
             <strong aria-hidden>{code.code}</strong>
             <span className="sr-only">{`Code ${code.code.split("").join(" ")}`}</span>
           </p>
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              gap: "var(--wb-space-4)",
+              alignItems: "center",
+            }}
+          >
+            <EnrollQr
+              payload={enrollmentPayload(code.code)}
+              label="QR code of the setup code. Scan it on the new terminal's setup screen."
+            />
+            <p className={styles.muted} style={{ margin: 0 }}>
+              Or scan this QR code on the new terminal.
+            </p>
+          </div>
           <p
             className={styles.muted}
           >{`Expires ${new Date(code.expiresAt).toLocaleTimeString()}. It is shown only now.`}</p>
@@ -388,6 +405,32 @@ function EnrollDialog({ onClose }: { onClose: () => void }) {
         </Stack>
       )}
     </Dialog>
+  );
+}
+
+/**
+ * Inline SVG of the enrollment payload: black modules on white inside a quiet zone, in light and dark theme alike.
+ * Scanners read dark-on-light reliably and many fail on an inverted code, so these two colours are fixed on purpose and
+ * are not theme tokens. No canvas and no remote service, so the code never leaves the browser.
+ */
+function EnrollQr({ payload, label }: { payload: string; label: string }) {
+  const { viewBox, d } = useMemo(() => qrPath(qrMatrix(payload)), [payload]);
+  return (
+    <svg
+      role="img"
+      aria-label={label}
+      viewBox={`0 0 ${String(viewBox)} ${String(viewBox)}`}
+      shapeRendering="crispEdges"
+      style={{
+        display: "block",
+        width: "min(100%, calc(var(--wb-space-12) * 3))",
+        height: "auto",
+        background: "#ffffff",
+        borderRadius: "var(--wb-radius-card)",
+      }}
+    >
+      <path d={d} fill="#000000" />
+    </svg>
   );
 }
 

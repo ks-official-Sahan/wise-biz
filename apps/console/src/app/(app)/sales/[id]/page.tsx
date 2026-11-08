@@ -15,7 +15,7 @@ import {
 } from "@/components/ui.tsx";
 import { formatPrice } from "@/lib/pricing.ts";
 import { useBranches } from "@/lib/queries.ts";
-import { flagLabel, tenderLabel, useSale } from "@/lib/sales.ts";
+import { flagLabel, operatorLabel, tenderLabel, useOperatorNames, useSale } from "@/lib/sales.ts";
 import { useTenant } from "@/lib/tenant.tsx";
 
 import s from "../../ops.module.css";
@@ -26,6 +26,8 @@ export default function SalePage() {
   const t = tenant.tenantId;
   const sale = useSale(t, id);
   const branches = useBranches(t);
+  const { userId } = useTenant();
+  const operators = useOperatorNames(t, userId);
 
   if (sale.isPending) return <SkeletonRows label="Loading sale" />;
   if (sale.isError)
@@ -47,7 +49,8 @@ export default function SalePage() {
         <div>
           <h1>{`Sale #${String(x.saleNo)}`}</h1>
           <p className={styles.muted}>
-            {new Date(x.completedAt).toLocaleString()} · {branch}
+            {new Date(x.completedAt).toLocaleString()} · {branch} ·{" "}
+            {operatorLabel(x.operatorId, operators)}
             {x.invoiceNo === null ? "" : ` · invoice ${x.invoiceNo}`}
           </p>
         </div>

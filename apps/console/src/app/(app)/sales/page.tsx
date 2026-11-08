@@ -17,7 +17,7 @@ import {
 } from "@/components/ui.tsx";
 import { formatPrice } from "@/lib/pricing.ts";
 import { useBranches } from "@/lib/queries.ts";
-import { flagLabel, useSales } from "@/lib/sales.ts";
+import { flagLabel, operatorLabel, useOperatorNames, useSales } from "@/lib/sales.ts";
 import { useTenant } from "@/lib/tenant.tsx";
 
 import s from "../ops.module.css";
@@ -25,13 +25,14 @@ import s from "../ops.module.css";
 import type { SalesFilter } from "@/lib/sales.ts";
 
 export default function SalesPage() {
-  const { tenant } = useTenant();
+  const { tenant, userId } = useTenant();
   const t = tenant.tenantId;
   const branches = useBranches(t);
   const [filter, setFilter] = useState<SalesFilter>({});
   const sales = useSales(t, filter);
   const rows = useMemo(() => sales.data?.pages.flatMap((p) => p.items) ?? [], [sales.data]);
   const branchName = new Map((branches.data ?? []).map((b) => [b.branchId, b.name]));
+  const operators = useOperatorNames(t, userId);
   const set = (patch: Partial<SalesFilter>) => {
     setFilter((f) => ({ ...f, ...patch }));
   };
@@ -118,6 +119,7 @@ export default function SalesPage() {
                 <th scope="col">Sale</th>
                 <th scope="col">When</th>
                 <th scope="col">Branch</th>
+                <th scope="col">Operator</th>
                 <th scope="col" className={s.num}>
                   Total
                 </th>
@@ -135,6 +137,7 @@ export default function SalesPage() {
                   </th>
                   <td>{new Date(r.completedAt).toLocaleString()}</td>
                   <td>{branchName.get(r.branchId) ?? "…"}</td>
+                  <td>{operatorLabel(r.operatorId, operators)}</td>
                   <td className={s.num}>{formatPrice(r.payableMinor, r.currency)}</td>
                   <td>
                     <span className={s.flags}>

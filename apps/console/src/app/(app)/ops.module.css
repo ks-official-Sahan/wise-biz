@@ -75,3 +75,35 @@
   border-bottom-color: var(--wb-color-accent, currentColor);
   font-weight: 600;
 }
+.tiles {
+  display: grid;
+  gap: var(--wb-space-4);
+  grid-template-columns: repeat(auto-fit, minmax(12.5rem, 1fr));
+}
+.tileLabel {
+  margin: 0;
+  font-size: inherit;
+  font-weight: 400;
+  color: var(--wb-color-text-muted, inherit);
+}
+.kpi {
+  font-size: var(--wb-font-size-2xl);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.topList {
+  display: grid;
+  gap: var(--wb-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.topRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: baseline;
+  gap: var(--wb-space-3);
+}
+.topName {
+  overflow-wrap: anywhere;
+}
