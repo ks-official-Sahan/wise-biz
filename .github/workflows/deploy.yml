@@ -115,7 +115,7 @@ jobs:
           # DATABASE_MIGRATOR_URL must be the direct (unpooled) Neon host: the migrator takes a session advisory lock.
           gcloud run jobs deploy "wb-migrate-$ENVIRONMENT" \
             --region "$REGION" --image "$AR/api:$VERSION" \
-            --command node --args packages/db/scripts/migrate.mts \
+            --command node --args /repo/packages/db/scripts/migrate.mts \
             --set-secrets "DATABASE_MIGRATOR_URL=wb-$ENVIRONMENT-DATABASE_MIGRATOR_URL:latest" \
             --max-retries 0 --task-timeout 15m
           gcloud run jobs execute "wb-migrate-$ENVIRONMENT" --region "$REGION" --wait
