@@ -9,7 +9,8 @@ Applies to the self-hosted stack (`infra/docker/compose.prod.yaml`). Managed con
 
 ## Steps
 1. `git fetch --tags && git checkout vX.Y.Z`
-2. Build: `WB_VERSION=X.Y.Z docker compose -f infra/docker/compose.prod.yaml --env-file .env.prod build`
+2. Split the secrets per service (least privilege: the console gets no database or auth secret, realtime no mail or storage keys): `node scripts/split-env-prod.mts .env.prod`. Run it again whenever `.env.prod` changes; it prints the names of variables no service reads.
+   Build: `WB_VERSION=X.Y.Z docker compose -f infra/docker/compose.prod.yaml --env-file .env.prod build`
 3. Scan: `trivy image --severity HIGH,CRITICAL --exit-code 1 wise-biz/api:X.Y.Z` (and workers, realtime, console). Fix or document an exception before continuing.
 4. Take a pre-release backup: `infra/backup/backup.sh` (see `restore.md`).
 5. Migrate and roll: `WB_VERSION=X.Y.Z docker compose ... up -d`. The `migrate` service runs first; the services start only if it exits 0.
