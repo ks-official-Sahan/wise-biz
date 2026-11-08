@@ -113,6 +113,63 @@ export const PoListQuery = z.object({
     .optional(),
 });
 
+// --- Transfers ---
+
+/** Zero or more, 4 places max: a received quantity may be zero (nothing arrived). */
+const qtyAny = z.string().regex(/^\d{1,9}(\.\d{1,4})?$/, "quantity, 4 places max");
+
+const TransferLineInput = z.object({ variantId: uuid, requestedQty: posQty });
+export const CreateTransferSchema = z
+  .object({
+    fromLocationId: uuid,
+    toLocationId: uuid,
+    notes: z.string().max(2000).default(""),
+    lines: z
+      .array(TransferLineInput)
+      .min(1)
+      .max(500)
+      .refine((ls) => new Set(ls.map((l) => l.variantId)).size === ls.length, {
+        message: "A variant can appear on one line only.",
+      }),
+  })
+  .refine((b) => b.fromLocationId !== b.toLocationId, {
+    message: "The destination must differ from the source.",
+    path: ["toLocationId"],
+  })
+  .meta({ id: "CreateTransfer" });
+
+/** Every line once: the service checks that together they cover the whole transfer. */
+const oncePerLine = (ls: readonly { line: number }[]) =>
+  new Set(ls.map((l) => l.line)).size === ls.length;
+const lineMsg = { message: "A transfer line can appear once." };
+
+export const DispatchTransferSchema = z
+  .object({
+    version,
+    lines: z
+      .array(z.object({ line: z.number().int().min(1), qty: posQty }))
+      .min(1)
+      .max(500)
+      .refine(oncePerLine, lineMsg),
+  })
+  .meta({ id: "DispatchTransfer" });
+
+export const ReceiveTransferSchema = z
+  .object({
+    version,
+    lines: z
+      .array(z.object({ line: z.number().int().min(1), receivedQty: qtyAny }))
+      .min(1)
+      .max(500)
+      .refine(oncePerLine, lineMsg),
+  })
+  .meta({ id: "ReceiveTransfer" });
+
+export const TransferListQuery = z.object({
+  ...page,
+  status: z.enum(["requested", "dispatched", "received", "closed", "cancelled"]).optional(),
+});
+
 export const IdParam = z.object({ id: uuid });
 
 // --- Responses ---
@@ -206,6 +263,47 @@ export const ReceiptSchema = z
     ),
   })
   .meta({ id: "PurchaseOrderReceipt" });
+
+// --- Transfer responses ---
+
+export const TransferLineSchema = z
+  .object({
+    line: z.number().int(),
+    variantId: z.string(),
+    requestedQty: z.string(),
+    dispatchedQty: z.string(),
+    receivedQty: z.string(),
+    varianceQty: z.string(),
+    valueMinor: z.number().int(),
+  })
+  .meta({ id: "TransferLine" });
+
+export const TransferSchema = z
+  .object({
+    id: z.string(),
+    transferNo: z.number().int(),
+    fromLocationId: z.string(),
+    toLocationId: z.string(),
+    status: z.enum(["requested", "dispatched", "received", "closed", "cancelled"]),
+    notes: z.string(),
+    currency: z.string().nullable(),
+    /** What is on the road now: the dispatched quantity and its value, both zero once received or closed. */
+    inTransitQty: z.string(),
+    inTransitValueMinor: z.number().int(),
+    version: z.number().int(),
+    dispatchedAt: z.string().nullable(),
+    receivedAt: z.string().nullable(),
+    closedAt: z.string().nullable(),
+    cancelledAt: z.string().nullable(),
+    createdAt: z.string(),
+    updatedAt: z.string(),
+    lines: z.array(TransferLineSchema),
+  })
+  .meta({ id: "Transfer" });
+
+export const TransferPageSchema = z
+  .object({ items: z.array(TransferSchema), nextCursor: z.string().nullable() })
+  .meta({ id: "TransferPage" });
 
 export const ReceiveResultSchema = z
   .object({ receipt: ReceiptSchema, purchaseOrder: PoSchema })

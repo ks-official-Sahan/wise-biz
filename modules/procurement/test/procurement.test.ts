@@ -5,7 +5,12 @@ import { OpenAPIHono } from "@hono/zod-openapi";
 import { createPool, migrate, withTenantTx } from "@wise-biz/db";
 import { DomainError, toProblem } from "@wise-biz/errors";
 import { uuidv7 } from "@wise-biz/ids";
-import { ensureInventoryPartitions, recordMovements } from "@wise-biz/module-inventory";
+import {
+  ensureInventoryPartitions,
+  lockStock,
+  recordMovements,
+  selectBatchesFefo,
+} from "@wise-biz/module-inventory";
 import { policyMiddleware } from "@wise-biz/module-kit";
 import { createCatalog, matrixFromRows } from "@wise-biz/policy";
 import { testDatabase } from "@wise-biz/testing/containers";
@@ -43,7 +48,10 @@ const refs: RefsPort = {
   },
 };
 
-const procurement = createProcurementModule({ stock: { recordMovements }, refs });
+const procurement = createProcurementModule({
+  stock: { recordMovements, lockStock, selectBatchesFefo },
+  refs,
+});
 const matrix = matrixFromRows(createCatalog(procurement.permissions), [
   { role: "reader", permission: "procurement:read" },
   { role: "clerk", permission: "procurement:read" },

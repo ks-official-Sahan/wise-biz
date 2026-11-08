@@ -23,7 +23,22 @@ import {
   upsertPricesCommand,
 } from "./application/suppliers.ts";
 import {
+  cancelTransferCommand,
+  closeTransferCommand,
+  createTransferCommand,
+  dispatchTransferCommand,
+  getTransfer,
+  listTransfers,
+  receiveTransferCommand,
+} from "./application/transfers.ts";
+import {
   CreatePoSchema,
+  CreateTransferSchema,
+  DispatchTransferSchema,
+  ReceiveTransferSchema,
+  TransferListQuery,
+  TransferPageSchema,
+  TransferSchema,
   CreateSupplierSchema,
   IdParam,
   PoListQuery,
@@ -204,6 +219,70 @@ const routes = {
     request: { ...params, ...body(VersionSchema) },
     responses: ok(PoSchema),
   }),
+  listTransfers: createRoute({
+    method: "get",
+    path: "/v1/procurement/transfers",
+    tags,
+    summary: "Stock transfers, newest first, optionally by status",
+    middleware: read,
+    request: { query: TransferListQuery },
+    responses: ok(TransferPageSchema),
+  }),
+  createTransfer: createRoute({
+    method: "post",
+    path: "/v1/procurement/transfers",
+    tags,
+    summary: "Request a transfer between two locations (no stock moves yet)",
+    middleware: write,
+    request: body(CreateTransferSchema),
+    responses: created(TransferSchema),
+  }),
+  getTransfer: createRoute({
+    method: "get",
+    path: "/v1/procurement/transfers/{id}",
+    tags,
+    summary: "One transfer with its lines and what is in transit",
+    middleware: read,
+    request: params,
+    responses: ok(TransferSchema),
+  }),
+  dispatchTransfer: createRoute({
+    method: "post",
+    path: "/v1/procurement/transfers/{id}/dispatch",
+    tags,
+    summary: "Dispatch every line: stock leaves the source into the transfer's in-transit location",
+    middleware: write,
+    request: { ...params, ...body(DispatchTransferSchema) },
+    responses: ok(TransferSchema),
+  }),
+  receiveTransfer: createRoute({
+    method: "post",
+    path: "/v1/procurement/transfers/{id}/receive",
+    tags,
+    summary:
+      "Receive every line: stock lands at the destination; any shortage is written off as a loss",
+    middleware: receive,
+    request: { ...params, ...body(ReceiveTransferSchema) },
+    responses: ok(TransferSchema),
+  }),
+  cancelTransfer: createRoute({
+    method: "post",
+    path: "/v1/procurement/transfers/{id}/cancel",
+    tags,
+    summary: "Cancel a requested transfer (only before dispatch)",
+    middleware: write,
+    request: { ...params, ...body(VersionSchema) },
+    responses: ok(TransferSchema),
+  }),
+  closeTransfer: createRoute({
+    method: "post",
+    path: "/v1/procurement/transfers/{id}/close",
+    tags,
+    summary: "Close a received transfer",
+    middleware: write,
+    request: { ...params, ...body(VersionSchema) },
+    responses: ok(TransferSchema),
+  }),
 };
 
 export function mountRoutes(
@@ -306,6 +385,44 @@ export function mountRoutes(
     const { id } = c.req.valid("param");
     return cmd(c, "procurement:write", VersionSchema, (tx, b, ctx) =>
       cancelPoCommand(tx, ctx, id, b.version),
+    );
+  });
+
+  app.openapi(routes.listTransfers, async (c) => {
+    const q = c.req.valid("query");
+    return c.json(await reading(c, (tx, t) => listTransfers(tx, t, q)), 200);
+  });
+  app.openapi(routes.getTransfer, async (c) => {
+    const { id } = c.req.valid("param");
+    return c.json(await reading(c, (tx, t) => getTransfer(tx, t, id)), 200);
+  });
+  app.openapi(routes.createTransfer, (c) =>
+    cmd(c, "procurement:write", CreateTransferSchema, (tx, b, ctx) =>
+      createTransferCommand(tx, ctx, b, ports),
+    ),
+  );
+  app.openapi(routes.dispatchTransfer, (c) => {
+    const { id } = c.req.valid("param");
+    return cmd(c, "procurement:write", DispatchTransferSchema, (tx, b, ctx) =>
+      dispatchTransferCommand(tx, ctx, id, b, ports),
+    );
+  });
+  app.openapi(routes.receiveTransfer, (c) => {
+    const { id } = c.req.valid("param");
+    return cmd(c, "procurement:receive", ReceiveTransferSchema, (tx, b, ctx) =>
+      receiveTransferCommand(tx, ctx, id, b, ports),
+    );
+  });
+  app.openapi(routes.cancelTransfer, (c) => {
+    const { id } = c.req.valid("param");
+    return cmd(c, "procurement:write", VersionSchema, (tx, b, ctx) =>
+      cancelTransferCommand(tx, ctx, id, b.version),
+    );
+  });
+  app.openapi(routes.closeTransfer, (c) => {
+    const { id } = c.req.valid("param");
+    return cmd(c, "procurement:write", VersionSchema, (tx, b, ctx) =>
+      closeTransferCommand(tx, ctx, id, b.version),
     );
   });
 }

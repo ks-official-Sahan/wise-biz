@@ -461,7 +461,8 @@ describe("port", () => {
           includeExpired,
         }),
       );
-    expect(await pick("6")).toEqual({
+    // Allocations also carry each batch's unit cost and currency (for transfers); the FEFO shape is what this checks.
+    expect(await pick("6")).toMatchObject({
       allocations: [
         { batchId: early, qty: "3", expiresOn: "2030-01-01" },
         { batchId: late, qty: "3", expiresOn: "2030-03-01" },
@@ -469,7 +470,7 @@ describe("port", () => {
       shortfall: "0",
     });
     expect((await pick("20")).shortfall).toBe("10");
-    expect((await pick("20")).allocations.at(-1)).toEqual({
+    expect((await pick("20")).allocations.at(-1)).toMatchObject({
       batchId: none,
       qty: "2",
       expiresOn: null,

@@ -1072,6 +1072,44 @@
         "required": ["code", "name", "inclusive", "strategy", "rules"],
         "type": "object"
       },
+      "CreateTransfer": {
+        "properties": {
+          "fromLocationId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "lines": {
+            "items": {
+              "properties": {
+                "requestedQty": {
+                  "pattern": "^(?!0+(\\.0+)?$)\\d{1,9}(\\.\\d{1,4})?$",
+                  "type": "string"
+                },
+                "variantId": {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                  "type": "string"
+                }
+              },
+              "required": ["variantId", "requestedQty"],
+              "type": "object"
+            },
+            "maxItems": 500,
+            "minItems": 1,
+            "type": "array"
+          },
+          "notes": {
+            "default": "",
+            "maxLength": 2000,
+            "type": "string"
+          },
+          "toLocationId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "type": "string"
+          }
+        },
+        "required": ["fromLocationId", "toLocationId", "lines"],
+        "type": "object"
+      },
       "CreateUnit": {
         "additionalProperties": false,
         "properties": {
@@ -1177,6 +1215,35 @@
           }
         },
         "required": ["devices"],
+        "type": "object"
+      },
+      "DispatchTransfer": {
+        "properties": {
+          "lines": {
+            "items": {
+              "properties": {
+                "line": {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "qty": {
+                  "pattern": "^(?!0+(\\.0+)?$)\\d{1,9}(\\.\\d{1,4})?$",
+                  "type": "string"
+                }
+              },
+              "required": ["line", "qty"],
+              "type": "object"
+            },
+            "maxItems": 500,
+            "minItems": 1,
+            "type": "array"
+          },
+          "version": {
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": ["version", "lines"],
         "type": "object"
       },
       "Enroll": {
@@ -2884,6 +2951,35 @@
           }
         },
         "required": ["lines"],
+        "type": "object"
+      },
+      "ReceiveTransfer": {
+        "properties": {
+          "lines": {
+            "items": {
+              "properties": {
+                "line": {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "receivedQty": {
+                  "pattern": "^\\d{1,9}(\\.\\d{1,4})?$",
+                  "type": "string"
+                }
+              },
+              "required": ["line", "receivedQty"],
+              "type": "object"
+            },
+            "maxItems": 500,
+            "minItems": 1,
+            "type": "array"
+          },
+          "version": {
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": ["version", "lines"],
         "type": "object"
       },
       "ReportExport": {
@@ -6108,6 +6204,135 @@
       "Timestamp": {
         "format": "date-time",
         "type": "string"
+      },
+      "Transfer": {
+        "properties": {
+          "cancelledAt": {
+            "type": ["string", "null"]
+          },
+          "closedAt": {
+            "type": ["string", "null"]
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "currency": {
+            "type": ["string", "null"]
+          },
+          "dispatchedAt": {
+            "type": ["string", "null"]
+          },
+          "fromLocationId": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "inTransitQty": {
+            "type": "string"
+          },
+          "inTransitValueMinor": {
+            "type": "integer"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/TransferLine"
+            },
+            "type": "array"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "receivedAt": {
+            "type": ["string", "null"]
+          },
+          "status": {
+            "enum": ["requested", "dispatched", "received", "closed", "cancelled"],
+            "type": "string"
+          },
+          "toLocationId": {
+            "type": "string"
+          },
+          "transferNo": {
+            "type": "integer"
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "transferNo",
+          "fromLocationId",
+          "toLocationId",
+          "status",
+          "notes",
+          "currency",
+          "inTransitQty",
+          "inTransitValueMinor",
+          "version",
+          "dispatchedAt",
+          "receivedAt",
+          "closedAt",
+          "cancelledAt",
+          "createdAt",
+          "updatedAt",
+          "lines"
+        ],
+        "type": "object"
+      },
+      "TransferLine": {
+        "properties": {
+          "dispatchedQty": {
+            "type": "string"
+          },
+          "line": {
+            "type": "integer"
+          },
+          "receivedQty": {
+            "type": "string"
+          },
+          "requestedQty": {
+            "type": "string"
+          },
+          "valueMinor": {
+            "type": "integer"
+          },
+          "varianceQty": {
+            "type": "string"
+          },
+          "variantId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "line",
+          "variantId",
+          "requestedQty",
+          "dispatchedQty",
+          "receivedQty",
+          "varianceQty",
+          "valueMinor"
+        ],
+        "type": "object"
+      },
+      "TransferPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/Transfer"
+            },
+            "type": "array"
+          },
+          "nextCursor": {
+            "type": ["string", "null"]
+          }
+        },
+        "required": ["items", "nextCursor"],
+        "type": "object"
       },
       "Unit": {
         "properties": {
@@ -10445,6 +10670,266 @@
           }
         },
         "summary": "Upsert prices per variant and valid-from date (supplier currency only)",
+        "tags": ["procurement"]
+      }
+    },
+    "/v1/procurement/transfers": {
+      "get": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "after",
+            "required": false,
+            "schema": {
+              "maxLength": 64,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "enum": ["requested", "dispatched", "received", "closed", "cancelled"],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransferPage"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Stock transfers, newest first, optionally by status",
+        "tags": ["procurement"]
+      },
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTransfer"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Transfer"
+                }
+              }
+            },
+            "description": "Created"
+          }
+        },
+        "summary": "Request a transfer between two locations (no stock moves yet)",
+        "tags": ["procurement"]
+      }
+    },
+    "/v1/procurement/transfers/{id}": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Transfer"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "One transfer with its lines and what is in transit",
+        "tags": ["procurement"]
+      }
+    },
+    "/v1/procurement/transfers/{id}/cancel": {
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpectedVersion"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Transfer"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Cancel a requested transfer (only before dispatch)",
+        "tags": ["procurement"]
+      }
+    },
+    "/v1/procurement/transfers/{id}/close": {
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpectedVersion"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Transfer"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Close a received transfer",
+        "tags": ["procurement"]
+      }
+    },
+    "/v1/procurement/transfers/{id}/dispatch": {
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DispatchTransfer"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Transfer"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Dispatch every line: stock leaves the source into the transfer's in-transit location",
+        "tags": ["procurement"]
+      }
+    },
+    "/v1/procurement/transfers/{id}/receive": {
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReceiveTransfer"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Transfer"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Receive every line: stock lands at the destination; any shortage is written off as a loss",
         "tags": ["procurement"]
       }
     },

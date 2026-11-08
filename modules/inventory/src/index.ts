@@ -25,6 +25,7 @@ export type { LocationExists } from "./application/stock.ts";
 /** InventoryPort: in-process contract for sales and orders (same DB transaction while the monolith lasts). */
 export {
   commitReservations,
+  lockStock,
   recordMovements,
   releaseReservations,
   reserve,

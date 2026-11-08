@@ -209,6 +209,9 @@ export interface FefoAllocation {
   readonly batchId: string;
   readonly qty: string;
   readonly expiresOn: string | null;
+  /** The batch's own unit cost and currency: what a transfer values its stock at. */
+  readonly unitCostMinor: number;
+  readonly currency: string;
 }
 
 /**
@@ -227,8 +230,15 @@ export async function selectBatchesFefo(
     readonly includeExpired?: boolean;
   },
 ): Promise<{ allocations: FefoAllocation[]; shortfall: string }> {
-  const r = await tx.query<{ batch_id: string; available: string; expires_on: string | null }>(
-    `select s.batch_id, (s.qty - s.reserved)::text as available, b.expires_on::text
+  const r = await tx.query<{
+    batch_id: string;
+    available: string;
+    expires_on: string | null;
+    unit_cost_minor: string;
+    currency: string;
+  }>(
+    `select s.batch_id, (s.qty - s.reserved)::text as available, b.expires_on::text,
+       b.unit_cost_minor::text as unit_cost_minor, b.currency
      from inventory.stock_balances s
      join inventory.batches b on b.tenant_id = s.tenant_id and b.id = s.batch_id
      where s.tenant_id = $1 and s.location_id = $2 and s.variant_id = $3 and s.qty - s.reserved > 0
@@ -244,10 +254,36 @@ export async function selectBatchesFefo(
       const a = toQty4(row.available);
       return a < left ? a : left;
     })();
-    allocations.push({ batchId: row.batch_id, qty: fromQty4(take), expiresOn: row.expires_on });
+    allocations.push({
+      batchId: row.batch_id,
+      qty: fromQty4(take),
+      expiresOn: row.expires_on,
+      unitCostMinor: Number(row.unit_cost_minor),
+      currency: row.currency,
+    });
     left -= take;
   }
   return { allocations, shortfall: fromQty4(left > 0n ? left : 0n) };
+}
+
+/**
+ * Locks the stock rows of these variants at one location, in the same key order recordMovements upserts them. A
+ * document that draws on stock (a transfer dispatch) calls this before selectBatchesFefo, so two of them on one SKU
+ * serialise instead of overdrawing the balance.
+ */
+export async function lockStock(
+  tx: TxHandle,
+  tenantId: string,
+  locationId: string,
+  variantIds: readonly string[],
+): Promise<void> {
+  if (variantIds.length === 0) return;
+  await tx.query(
+    `select 1 from inventory.stock_balances
+      where tenant_id = $1 and location_id = $2 and variant_id = any($3::uuid[])
+      order by variant_id, batch_id for update`,
+    [tenantId, locationId, [...new Set(variantIds)].sort()],
+  );
 }
 
 export interface ReserveInput {

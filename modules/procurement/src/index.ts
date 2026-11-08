@@ -15,8 +15,17 @@ export {
   PurchaseOrderReceivedV1,
   PurchaseOrderSentV1,
   SupplierUpsertedV1,
+  TransferClosedV1,
+  TransferDispatchedV1,
+  TransferReceivedV1,
 } from "./events.ts";
-export type { ProcurementDeps, RefsPort, StockPort, StockReceiptMovement } from "./port.ts";
+export type {
+  ProcurementDeps,
+  RefsPort,
+  StockBatchPick,
+  StockMovement,
+  StockPort,
+} from "./port.ts";
 
 /** Suppliers, supplier price lists, purchase orders and receiving (stock is written through the inventory port). */
 export function createProcurementModule(deps: ProcurementDeps): WbModule {

@@ -1,4 +1,4 @@
-import { recordMovements } from "@wise-biz/module-inventory";
+import { lockStock, recordMovements, selectBatchesFefo } from "@wise-biz/module-inventory";
 
 import type { RefsPort, StockPort } from "@wise-biz/module-procurement";
 
@@ -7,7 +7,7 @@ import type { RefsPort, StockPort } from "@wise-biz/module-procurement";
  * caller's tenant transaction (RLS applies). Modules never read each other's tables (AGENTS.md rule 9); these are the
  * same bridges the other modules get, wired here once.
  */
-export const procurementStock: StockPort = { recordMovements };
+export const procurementStock: StockPort = { recordMovements, lockStock, selectBatchesFefo };
 
 export const procurementRefs: RefsPort = {
   branchExists: async (tx, tenantId, branchId) => {

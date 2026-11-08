@@ -102,9 +102,68 @@ export const PurchaseOrderClosedV1 = defineEvent(
   }),
 );
 
+/** Dispatched: stock left the source into the transfer's holding location. `valueMinor` is what is now in transit. */
+export const TransferDispatchedV1 = defineEvent(
+  "procurement.transfer.dispatched",
+  1,
+  z.object({
+    transferId: z.string(),
+    transferNo: z.number().int(),
+    fromLocationId: z.string(),
+    toLocationId: z.string(),
+    currency: z.string(),
+    valueMinor: minor,
+    lines: z.array(
+      z.object({
+        line: z.number().int(),
+        variantId: z.string(),
+        dispatchedQty: qty,
+        valueMinor: minor,
+      }),
+    ),
+  }),
+);
+
+/** Received: `varianceQty` is received minus dispatched (negative short, positive over), per line. */
+export const TransferReceivedV1 = defineEvent(
+  "procurement.transfer.received",
+  1,
+  z.object({
+    transferId: z.string(),
+    transferNo: z.number().int(),
+    fromLocationId: z.string(),
+    toLocationId: z.string(),
+    currency: z.string(),
+    lines: z.array(
+      z.object({
+        line: z.number().int(),
+        variantId: z.string(),
+        dispatchedQty: qty,
+        receivedQty: qty,
+        varianceQty: qty,
+      }),
+    ),
+  }),
+);
+
+/** Closed: the transfer is final. `shortLines` counts lines received short. */
+export const TransferClosedV1 = defineEvent(
+  "procurement.transfer.closed",
+  1,
+  z.object({
+    transferId: z.string(),
+    transferNo: z.number().int(),
+    toLocationId: z.string(),
+    shortLines: z.number().int(),
+  }),
+);
+
 export const PROCUREMENT_EVENTS = [
   SupplierUpsertedV1,
   PurchaseOrderSentV1,
   PurchaseOrderReceivedV1,
   PurchaseOrderClosedV1,
+  TransferDispatchedV1,
+  TransferReceivedV1,
+  TransferClosedV1,
 ] as const;
