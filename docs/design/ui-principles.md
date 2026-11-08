@@ -5,6 +5,7 @@ the design skills the team uses (impeccable, emil-design-eng, design-taste-front
 platform-design, mobile-design, ux-principles, design-dna, bencium-innovative-ux-designer, agentic-ux-design,
 ux-researcher, frontend-design). Where a marketing-oriented skill conflicts with the POS hot path, this file wins:
 the sell screen is product UI, not a landing page. `docs/design/ux.md` keeps the layouts and checkout flow.
+`docs/design/DESIGN.md` is the compact token and component reference for coding agents; this file wins on conflict.
 
 ## Scene
 

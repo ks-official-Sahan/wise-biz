@@ -1,7 +1,7 @@
 # AGENTS.md
 
 Universal, multi-tenant enterprise POS platform. Monorepo. TypeScript first; Django-ready by contract.
-Keep this file short. Read linked docs only when the task touches that area.
+Read linked docs only when the task touches that area.
 
 ## Read when needed
 
@@ -22,7 +22,7 @@ Keep this file short. Read linked docs only when the task touches that area.
 | Docker, nginx, CI/CD, Cloudflare, backups | `docs/architecture/deployment.md` |
 | Payments, printers, scanners, drawers | `docs/features/payments-hardware.md` |
 | Plans, trials, limits, pay-as-you-go | `docs/features/subscriptions.md` |
-| UI/UX, checkout flow, ergonomics | `docs/design/ux.md`, `docs/design/ui-principles.md` (build rules) |
+| UI/UX, checkout flow, ergonomics | `docs/design/ux.md`, `docs/design/ui-principles.md` (build rules), `docs/design/DESIGN.md` (agent token reference) |
 | Brand themes, fonts, receipts, cards | `docs/design/theming.md` |
 | `@sahan-sac/*` packages, gaps, upgrades | `docs/research/sahan-packages.md` |
 | Market research, competitor flaws | `docs/research/pos-market.md` |
@@ -44,7 +44,7 @@ Keep this file short. Read linked docs only when the task touches that area.
 10. **Secrets are parameters**, compared in constant time, never logged.
 11. **Docs:** use Context7 for library APIs before writing code against them.
 12. **Performance:** use performance optimization, best practices, latency critical system with realtime updates, use best data structures and algorithms
-13. **Token Efficiency:** use caveman and ponytail skills
+13. **Token Efficiency:** use caveman and ponytail skills and graft and graphify with main conversation and subagents.
 
 ## Commands
 
@@ -58,4 +58,4 @@ pnpm db:migrate   # apply migrations
 
 ## Agents and cost
 
-Use small models (Haiku 5.5/Sonnet class) for subagents with exact file paths, the acceptance check, and the doc to read. Heavy models only for architecture decisions. Details: `CLAUDE.md`.
+Use small models (Haiku 5.5) for subagents with exact file paths, the acceptance check, and the doc to read. Heavy models only for architecture decisions. Details: `CLAUDE.md`.
