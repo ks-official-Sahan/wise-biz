@@ -48,6 +48,12 @@ Legend: ⬜ todo · 🟡 in progress · ✅ done · ⛔ blocked
 
 Tracked in `docs/prompts/P2/README.md` order; add rows here when P2 starts.
 
+Started 2026-11-08 at the owner's instruction, before the P1-16 gate passed (the gate needs real devices and is still open). Work lands on `master` directly; no PRs.
+
+| Step | Status | Date | Commit | Notes / deviations |
+|---|---|---|---|---|
+| P2-03a Suppliers, price lists, purchase orders | 🟨 | 2026-11-08 | see git log | `modules/procurement`: suppliers, supplier prices, POs (draft, sent, partially received, received, closed, cancelled), receipts against PO lines through the inventory port, over-receipt tolerance (default 5%), gapless-free PO numbers, RLS forced on every table, least-privilege grants, events `procurement.*@v1`, routes `/v1/procurement/*`. 24 module tests, DB 159, API 178, depcruise and licences green. **Open:** transfers (P2-03b), cost updates from receipts, PO PDF and email, refill suggestions, console and POS screens (P2-03c), no events for draft edit and cancel, no API to set the tolerance, batch and expiry on receipt lines are not passed to inventory batches yet, `variantsExist` reads the `inventory.variant_facts` projection so a lagging projection can reject a new variant, qty helpers are duplicated (depcruise forbids importing module-inventory). |
+
 ## Resume here
 
 - State (2026-11-03): branch `step/p0-10` carries P0 through P1-14 in good part; nothing is pushed or tagged. Next: the P1-15 hosting choice (ask the owner), then the P1-13b/13c/14 leftovers listed in their rows, then P1-16 (gate).

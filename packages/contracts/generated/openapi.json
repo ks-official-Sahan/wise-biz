@@ -885,6 +885,104 @@
         "required": ["name", "target", "effect"],
         "type": "object"
       },
+      "CreatePurchaseOrder": {
+        "properties": {
+          "branchId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "expectedOn": {
+            "default": null,
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "type": ["string", "null"]
+          },
+          "lines": {
+            "items": {
+              "properties": {
+                "orderedQty": {
+                  "pattern": "^(?!0+(\\.0+)?$)\\d{1,9}(\\.\\d{1,4})?$",
+                  "type": "string"
+                },
+                "unitCostMinor": {
+                  "maximum": 9007199254740991,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "variantId": {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                  "type": "string"
+                }
+              },
+              "required": ["variantId", "orderedQty", "unitCostMinor"],
+              "type": "object"
+            },
+            "maxItems": 500,
+            "minItems": 1,
+            "type": "array"
+          },
+          "locationId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "notes": {
+            "default": "",
+            "maxLength": 2000,
+            "type": "string"
+          },
+          "supplierId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "type": "string"
+          }
+        },
+        "required": ["supplierId", "branchId", "locationId", "lines"],
+        "type": "object"
+      },
+      "CreateSupplier": {
+        "properties": {
+          "address": {
+            "default": "",
+            "maxLength": 500,
+            "type": "string"
+          },
+          "contactName": {
+            "default": "",
+            "maxLength": 120,
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "email": {
+            "default": "",
+            "maxLength": 254,
+            "type": "string"
+          },
+          "leadTimeDays": {
+            "default": 0,
+            "maximum": 365,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "type": "string"
+          },
+          "paymentTermsDays": {
+            "default": 0,
+            "maximum": 365,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "phone": {
+            "default": "",
+            "maxLength": 40,
+            "type": "string"
+          }
+        },
+        "required": ["name", "currency"],
+        "type": "object"
+      },
       "CreateTag": {
         "additionalProperties": false,
         "properties": {
@@ -1130,6 +1228,16 @@
           }
         },
         "required": ["code", "qr", "expiresAt", "branchId", "name"],
+        "type": "object"
+      },
+      "ExpectedVersion": {
+        "properties": {
+          "version": {
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": ["version"],
         "type": "object"
       },
       "Fee": {
@@ -2060,6 +2168,183 @@
         "properties": {},
         "type": "object"
       },
+      "PurchaseOrder": {
+        "properties": {
+          "branchId": {
+            "type": "string"
+          },
+          "cancelledAt": {
+            "type": ["string", "null"]
+          },
+          "closedAt": {
+            "type": ["string", "null"]
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "expectedOn": {
+            "type": ["string", "null"]
+          },
+          "id": {
+            "type": "string"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/PurchaseOrderLine"
+            },
+            "type": "array"
+          },
+          "locationId": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "poNo": {
+            "type": "integer"
+          },
+          "sentAt": {
+            "type": ["string", "null"]
+          },
+          "status": {
+            "enum": ["draft", "sent", "partially_received", "received", "closed", "cancelled"],
+            "type": "string"
+          },
+          "supplierId": {
+            "type": "string"
+          },
+          "totalMinor": {
+            "type": "integer"
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "poNo",
+          "supplierId",
+          "branchId",
+          "locationId",
+          "currency",
+          "status",
+          "expectedOn",
+          "notes",
+          "totalMinor",
+          "version",
+          "sentAt",
+          "closedAt",
+          "cancelledAt",
+          "createdAt",
+          "updatedAt",
+          "lines"
+        ],
+        "type": "object"
+      },
+      "PurchaseOrderLine": {
+        "properties": {
+          "line": {
+            "type": "integer"
+          },
+          "lineTotalMinor": {
+            "type": "integer"
+          },
+          "orderedQty": {
+            "type": "string"
+          },
+          "receivedQty": {
+            "type": "string"
+          },
+          "shortQty": {
+            "type": "string"
+          },
+          "unitCostMinor": {
+            "type": "integer"
+          },
+          "variantId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "line",
+          "variantId",
+          "orderedQty",
+          "receivedQty",
+          "shortQty",
+          "unitCostMinor",
+          "lineTotalMinor"
+        ],
+        "type": "object"
+      },
+      "PurchaseOrderPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PurchaseOrder"
+            },
+            "type": "array"
+          },
+          "nextCursor": {
+            "type": ["string", "null"]
+          }
+        },
+        "required": ["items", "nextCursor"],
+        "type": "object"
+      },
+      "PurchaseOrderReceipt": {
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "lines": {
+            "items": {
+              "properties": {
+                "line": {
+                  "type": "integer"
+                },
+                "qty": {
+                  "type": "string"
+                },
+                "unitCostMinor": {
+                  "type": "integer"
+                },
+                "variantId": {
+                  "type": "string"
+                }
+              },
+              "required": ["line", "variantId", "qty", "unitCostMinor"],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "receivedAt": {
+            "type": "string"
+          },
+          "reference": {
+            "type": "string"
+          }
+        },
+        "required": ["id", "reference", "receivedAt", "lines"],
+        "type": "object"
+      },
+      "PurchaseOrderReceiveResult": {
+        "properties": {
+          "purchaseOrder": {
+            "$ref": "#/components/schemas/PurchaseOrder"
+          },
+          "receipt": {
+            "$ref": "#/components/schemas/PurchaseOrderReceipt"
+          }
+        },
+        "required": ["receipt", "purchaseOrder"],
+        "type": "object"
+      },
       "Quote": {
         "properties": {
           "cashRoundingMinor": {
@@ -2569,6 +2854,36 @@
           }
         },
         "required": ["locationId", "currency", "lines"],
+        "type": "object"
+      },
+      "ReceivePurchaseOrder": {
+        "properties": {
+          "lines": {
+            "items": {
+              "properties": {
+                "line": {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "qty": {
+                  "pattern": "^(?!0+(\\.0+)?$)\\d{1,9}(\\.\\d{1,4})?$",
+                  "type": "string"
+                }
+              },
+              "required": ["line", "qty"],
+              "type": "object"
+            },
+            "maxItems": 500,
+            "minItems": 1,
+            "type": "array"
+          },
+          "reference": {
+            "default": "",
+            "maxLength": 80,
+            "type": "string"
+          }
+        },
+        "required": ["lines"],
         "type": "object"
       },
       "ReportExport": {
@@ -3967,6 +4282,127 @@
           }
         },
         "required": ["items", "nextCursor"],
+        "type": "object"
+      },
+      "Supplier": {
+        "properties": {
+          "address": {
+            "type": "string"
+          },
+          "archivedAt": {
+            "type": ["string", "null"]
+          },
+          "contactName": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "leadTimeDays": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "paymentTermsDays": {
+            "type": "integer"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "contactName",
+          "email",
+          "phone",
+          "address",
+          "paymentTermsDays",
+          "leadTimeDays",
+          "currency",
+          "archivedAt",
+          "version",
+          "updatedAt"
+        ],
+        "type": "object"
+      },
+      "SupplierPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/Supplier"
+            },
+            "type": "array"
+          },
+          "nextCursor": {
+            "type": ["string", "null"]
+          }
+        },
+        "required": ["items", "nextCursor"],
+        "type": "object"
+      },
+      "SupplierPrice": {
+        "properties": {
+          "currency": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "minOrderQty": {
+            "type": "string"
+          },
+          "unitCostMinor": {
+            "type": "integer"
+          },
+          "validFrom": {
+            "type": "string"
+          },
+          "variantId": {
+            "type": "string"
+          }
+        },
+        "required": ["id", "variantId", "unitCostMinor", "currency", "minOrderQty", "validFrom"],
+        "type": "object"
+      },
+      "SupplierPricePage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SupplierPrice"
+            },
+            "type": "array"
+          },
+          "nextCursor": {
+            "type": ["string", "null"]
+          }
+        },
+        "required": ["items", "nextCursor"],
+        "type": "object"
+      },
+      "SupplierPrices": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SupplierPrice"
+            },
+            "type": "array"
+          }
+        },
+        "required": ["items"],
         "type": "object"
       },
       "SyncBootstrap": {
@@ -6068,6 +6504,100 @@
         "required": ["version"],
         "type": "object"
       },
+      "UpdatePurchaseOrder": {
+        "properties": {
+          "expectedOn": {
+            "default": null,
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "type": ["string", "null"]
+          },
+          "lines": {
+            "items": {
+              "properties": {
+                "orderedQty": {
+                  "pattern": "^(?!0+(\\.0+)?$)\\d{1,9}(\\.\\d{1,4})?$",
+                  "type": "string"
+                },
+                "unitCostMinor": {
+                  "maximum": 9007199254740991,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "variantId": {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                  "type": "string"
+                }
+              },
+              "required": ["variantId", "orderedQty", "unitCostMinor"],
+              "type": "object"
+            },
+            "maxItems": 500,
+            "minItems": 1,
+            "type": "array"
+          },
+          "notes": {
+            "default": "",
+            "maxLength": 2000,
+            "type": "string"
+          },
+          "version": {
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": ["version", "lines"],
+        "type": "object"
+      },
+      "UpdateSupplier": {
+        "properties": {
+          "address": {
+            "default": "",
+            "maxLength": 500,
+            "type": "string"
+          },
+          "contactName": {
+            "default": "",
+            "maxLength": 120,
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "email": {
+            "default": "",
+            "maxLength": 254,
+            "type": "string"
+          },
+          "leadTimeDays": {
+            "default": 0,
+            "maximum": 365,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "type": "string"
+          },
+          "paymentTermsDays": {
+            "default": 0,
+            "maximum": 365,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "phone": {
+            "default": "",
+            "maxLength": 40,
+            "type": "string"
+          },
+          "version": {
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": ["name", "currency", "version"],
+        "type": "object"
+      },
       "UpdateTaxRegion": {
         "properties": {
           "inclusive": {
@@ -6186,6 +6716,43 @@
           }
         },
         "required": ["version"],
+        "type": "object"
+      },
+      "UpsertSupplierPrices": {
+        "properties": {
+          "items": {
+            "items": {
+              "properties": {
+                "currency": {
+                  "type": "string"
+                },
+                "minOrderQty": {
+                  "pattern": "^(?!0+(\\.0+)?$)\\d{1,9}(\\.\\d{1,4})?$",
+                  "type": "string"
+                },
+                "unitCostMinor": {
+                  "maximum": 9007199254740991,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "validFrom": {
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                  "type": "string"
+                },
+                "variantId": {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                  "type": "string"
+                }
+              },
+              "required": ["variantId", "unitCostMinor", "currency", "minOrderQty", "validFrom"],
+              "type": "object"
+            },
+            "maxItems": 500,
+            "minItems": 1,
+            "type": "array"
+          }
+        },
+        "required": ["items"],
         "type": "object"
       },
       "Uuid7": {
@@ -9316,6 +9883,569 @@
         },
         "summary": "Replace a region's settings and rule set (optimistic lock on version)",
         "tags": ["pricing"]
+      }
+    },
+    "/v1/procurement/purchase-orders": {
+      "get": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "after",
+            "required": false,
+            "schema": {
+              "maxLength": 64,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "enum": ["draft", "sent", "partially_received", "received", "closed", "cancelled"],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PurchaseOrderPage"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Purchase orders, newest first, optionally by status",
+        "tags": ["procurement"]
+      },
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePurchaseOrder"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PurchaseOrder"
+                }
+              }
+            },
+            "description": "Created"
+          }
+        },
+        "summary": "Create a draft purchase order",
+        "tags": ["procurement"]
+      }
+    },
+    "/v1/procurement/purchase-orders/{id}": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PurchaseOrder"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "One purchase order with its lines",
+        "tags": ["procurement"]
+      },
+      "put": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePurchaseOrder"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PurchaseOrder"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Edit a draft (lines replaced; optimistic version)",
+        "tags": ["procurement"]
+      }
+    },
+    "/v1/procurement/purchase-orders/{id}/cancel": {
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpectedVersion"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PurchaseOrder"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Cancel a draft or a sent PO that has not been received against",
+        "tags": ["procurement"]
+      }
+    },
+    "/v1/procurement/purchase-orders/{id}/close": {
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpectedVersion"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PurchaseOrder"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Close a received or partly received PO; any shortfall is recorded as variance",
+        "tags": ["procurement"]
+      }
+    },
+    "/v1/procurement/purchase-orders/{id}/receive": {
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReceivePurchaseOrder"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PurchaseOrderReceiveResult"
+                }
+              }
+            },
+            "description": "Created"
+          }
+        },
+        "summary": "Receive against lines: writes a receipt and stock receipts at the PO location",
+        "tags": ["procurement"]
+      }
+    },
+    "/v1/procurement/purchase-orders/{id}/send": {
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpectedVersion"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PurchaseOrder"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Send a draft: it becomes read-only and the supplier is notified",
+        "tags": ["procurement"]
+      }
+    },
+    "/v1/procurement/suppliers": {
+      "get": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "after",
+            "required": false,
+            "schema": {
+              "maxLength": 64,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "includeArchived",
+            "required": false,
+            "schema": {
+              "default": false,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupplierPage"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Suppliers, keyset-paged by id",
+        "tags": ["procurement"]
+      },
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSupplier"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Supplier"
+                }
+              }
+            },
+            "description": "Created"
+          }
+        },
+        "summary": "Create a supplier (currency and payment terms fixed on the record)",
+        "tags": ["procurement"]
+      }
+    },
+    "/v1/procurement/suppliers/{id}": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Supplier"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "One supplier",
+        "tags": ["procurement"]
+      },
+      "put": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSupplier"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Supplier"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Edit a supplier (optimistic version)",
+        "tags": ["procurement"]
+      }
+    },
+    "/v1/procurement/suppliers/{id}/archive": {
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpectedVersion"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Supplier"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Archive a supplier: no new purchase orders or prices, history kept",
+        "tags": ["procurement"]
+      }
+    },
+    "/v1/procurement/suppliers/{id}/prices": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "after",
+            "required": false,
+            "schema": {
+              "maxLength": 64,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupplierPricePage"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "A supplier's price list, keyset-paged by id",
+        "tags": ["procurement"]
+      },
+      "put": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertSupplierPrices"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupplierPrices"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Upsert prices per variant and valid-from date (supplier currency only)",
+        "tags": ["procurement"]
       }
     },
     "/v1/reporting/exports": {

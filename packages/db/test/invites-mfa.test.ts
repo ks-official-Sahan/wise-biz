@@ -81,6 +81,7 @@ describe("migrations and lint", () => {
       "sync",
       "search",
       "theming",
+      "procurement",
       "reporting",
       "notifications",
       "template",

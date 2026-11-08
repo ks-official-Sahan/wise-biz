@@ -4,6 +4,7 @@ import { createDevicesModule } from "@wise-biz/module-devices";
 import { batchSalePrices, createInventoryModule } from "@wise-biz/module-inventory";
 import { notificationsModule } from "@wise-biz/module-notifications";
 import { createPricingModule } from "@wise-biz/module-pricing";
+import { createProcurementModule } from "@wise-biz/module-procurement";
 import { createReportingModule } from "@wise-biz/module-reporting";
 import { createSalesModule } from "@wise-biz/module-sales";
 import { createSearchModule } from "@wise-biz/module-search";
@@ -14,6 +15,7 @@ import { createTenancyModule } from "@wise-biz/module-tenancy";
 import { themingModule } from "@wise-biz/module-theming";
 import { createMemoryStore } from "@wise-biz/storage";
 
+import { procurementRefs, procurementStock } from "./procurement-ports.ts";
 import { createSyncPorts } from "./sync-ports.ts";
 
 import type { NonceStore } from "@wise-biz/http-signatures";
@@ -63,6 +65,8 @@ export function createModules(
     shortlinksModule,
     // The store's look: versioned themes and receipt templates (P1-13c).
     themingModule,
+    // Suppliers, price lists and purchase orders; receiving posts stock through the inventory port (P2-03a).
+    createProcurementModule({ stock: procurementStock, refs: procurementRefs }),
     // MIS reports read the rollups the worker maintains (P1-14).
     createReportingModule({ store }),
     notificationsModule,

@@ -82,6 +82,7 @@ describe("registry + migrations", () => {
       "sync",
       "search",
       "theming",
+      "procurement",
       "reporting",
       "notifications",
       "template",
