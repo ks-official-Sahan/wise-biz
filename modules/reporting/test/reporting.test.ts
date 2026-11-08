@@ -437,20 +437,57 @@ describe("rollups equal an independent aggregation of random data", () => {
     expect(await snapshot(tenantId)).toEqual(live);
   });
 
-  it("a void that arrives before its sale waits (throws), and works after the sale lands", async () => {
+  it("a void that arrives before its sale is parked and applied when the sale lands", async () => {
     const tenantId = uuidv7();
+    const other = uuidv7();
     const g = generate(5);
     const s = first(g.sales);
-    await expect(
-      asWorker(tenantId, (q) => onSaleVoided(q, { tenantId, data: { saleId: s.saleId } })),
-    ).rejects.toThrow(/not projected/);
-    await asWorker(tenantId, (q) => onSaleCompleted(q, saleEnvelope(tenantId, s)));
-    expect(
-      await asWorker(tenantId, (q) => onSaleVoided(q, { tenantId, data: { saleId: s.saleId } })),
-    ).toBe(true);
-    expect(
-      await asWorker(tenantId, (q) => onSaleVoided(q, { tenantId, data: { saleId: s.saleId } })),
-    ).toBe(false);
+    const void_ = (t: string) =>
+      asWorker(t, (q) => onSaleVoided(q, { tenantId: t, data: { saleId: s.saleId } }));
+    // Reference: the normal order, sale then void.
+    await asWorker(other, (q) => onSaleCompleted(q, saleEnvelope(other, s)));
+    expect(await void_(other)).toBe(true);
+    // Void first: nothing throws, nothing moves, the void is parked.
+    expect(await void_(tenantId)).toBe(false);
+    expect(await snapshot(tenantId)).toEqual({ day: [], sku: [], tender: [] });
+    expect(await asWorker(tenantId, (q) => onSaleCompleted(q, saleEnvelope(tenantId, s)))).toBe(
+      true,
+    );
+    // The parked void was applied with the sale: same rollups as sale-then-void, and nothing left parked.
+    expect(await snapshot(tenantId)).toEqual(await snapshot(other));
+    const parked = await asWorker(tenantId, (q) =>
+      q.query("select 1 from reporting.pending_voids where tenant_id = $1", [tenantId]),
+    );
+    expect(parked.rowCount).toBe(0);
+    // A redelivered void changes nothing.
+    expect(await void_(tenantId)).toBe(false);
+    expect(await snapshot(tenantId)).toEqual(await snapshot(other));
+  });
+
+  it("a sale and its void handled at the same moment end voided, whichever commits first", async () => {
+    const g = generate(5);
+    const s = first(g.sales);
+    const ref = uuidv7(); // the sequential outcome every interleaving must equal
+    await asWorker(ref, (q) => onSaleCompleted(q, saleEnvelope(ref, s)));
+    await asWorker(ref, (q) => onSaleVoided(q, { tenantId: ref, data: { saleId: s.saleId } }));
+    const expected = await snapshot(ref);
+    for (let i = 0; i < 6; i++) {
+      const t = uuidv7();
+      const env = saleEnvelope(t, s);
+      const voided = () =>
+        asWorker(t, (q) => onSaleVoided(q, { tenantId: t, data: { saleId: s.saleId } }));
+      const sold = () => asWorker(t, (q) => onSaleCompleted(q, env));
+      await Promise.all(i % 2 === 0 ? [sold(), voided()] : [voided(), sold()]);
+      const facts = await asWorker(t, (q) =>
+        q.query("select status from reporting.sale_facts where tenant_id = $1", [t]),
+      );
+      expect(facts.rows.map((r) => r.status)).toEqual(["voided"]);
+      const parked = await asWorker(t, (q) =>
+        q.query("select 1 from reporting.pending_voids where tenant_id = $1", [t]),
+      );
+      expect(parked.rowCount).toBe(0);
+      expect(await snapshot(t)).toEqual(expected);
+    }
   });
 
   it("a return before its shift waits (throws)", async () => {

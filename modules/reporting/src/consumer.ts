@@ -24,7 +24,7 @@ export interface ReportingConsumer {
 /**
  * Keeps the rollups current. Each event is applied in the bus's transaction (RLS has the event's tenant), and applying
  * it twice changes nothing: the fact insert (or the status flip) is the gate. Events of one branch arrive in order; a
- * void or return that arrives before its sale or shift throws, so the bus retries it after the earlier event lands.
+ * return that arrives before its shift throws, so the bus retries it after the earlier event lands; a void that arrives before its sale is parked (reporting.pending_voids) and applied when the sale lands.
  */
 export interface ReportingDeps {
   /** The branch's IANA time zone (tenancy owns branches, so the composition root bridges it). Omit: no hourly view. */

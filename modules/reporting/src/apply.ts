@@ -123,6 +123,16 @@ export interface ReturnFact {
  * A rebuild deletes a range and re-reads the facts; a consumer adding a fact in between would be counted twice. Events
  * take the tenant's reporting lock shared (they never block each other), a rebuild takes it exclusive.
  */
+/**
+ * Serializes the sale and the void of ONE sale. Both run under the shared tenant lock, so without this a void could
+ * commit its "not projected yet" note while the sale's transaction, which cannot see it, commits without applying it.
+ */
+async function lockSale(q: Q, tenantId: string, saleId: string): Promise<void> {
+  await q.query("select pg_advisory_xact_lock(hashtextextended($1, 0))", [
+    `reporting:sale:${tenantId}:${saleId}`,
+  ]);
+}
+
 async function lock(q: Q, tenantId: string, exclusive: boolean): Promise<void> {
   await q.query(
     exclusive
@@ -390,6 +400,7 @@ export async function onSaleCompleted(
   const e = SaleCompleted.parse(payload);
   await lock(q, e.tenantId, false);
   const d = e.data;
+  await lockSale(q, e.tenantId, d.saleId);
   const hour = localHour(d.completedAt, zone);
   const r = await q.query(
     `insert into reporting.sale_facts
@@ -418,30 +429,48 @@ export async function onSaleCompleted(
   );
   if (r.rowCount !== 1) return false;
   await applySale(q, { tenantId: e.tenantId, ...d, localHour: hour }, 1);
+  // A void that arrived first was parked: apply it now, so the order of the two events never changes the result.
+  const parked = await q.query(
+    "delete from reporting.pending_voids where tenant_id = $1 and sale_id = $2 returning sale_id",
+    [e.tenantId, d.saleId],
+  );
+  if (parked.rowCount === 1) await voidSale(q, e.tenantId, d.saleId);
   return true;
 }
 
-/** Returns true when the void moved the rollups. A void for a sale not seen yet throws, so the bus retries it. */
-export async function onSaleVoided(q: Q, payload: unknown): Promise<boolean> {
-  const e = SaleVoided.parse(payload);
-  await lock(q, e.tenantId, false);
+/** Marks a projected sale voided and takes it out of the rollups. False when it was not completed (already voided). */
+async function voidSale(q: Q, tenantId: string, saleId: string): Promise<boolean> {
   const r = await q.query(
     `update reporting.sale_facts set status = 'voided'
       where tenant_id = $1 and sale_id = $2 and status = 'completed'
       returning sale_id`,
-    [e.tenantId, e.data.saleId],
+    [tenantId, saleId],
   );
-  if (r.rowCount !== 1) {
-    const seen = await q.query(
-      "select 1 from reporting.sale_facts where tenant_id = $1 and sale_id = $2",
-      [e.tenantId, e.data.saleId],
-    );
-    if (seen.rowCount === 1) return false; // already voided: a redelivery
-    throw new Error("sale not projected yet: retry the void");
-  }
-  const f = await loadSale(q, e.tenantId, e.data.saleId);
+  if (r.rowCount !== 1) return false;
+  const f = await loadSale(q, tenantId, saleId);
   await applySale(q, f, -1);
   return true;
+}
+
+/**
+ * Returns true when the void moved the rollups. A void for a sale not seen yet is parked in `pending_voids` and applied
+ * when the sale lands (`onSaleCompleted`); it returns false and never throws for that.
+ */
+export async function onSaleVoided(q: Q, payload: unknown): Promise<boolean> {
+  const e = SaleVoided.parse(payload);
+  await lock(q, e.tenantId, false);
+  await lockSale(q, e.tenantId, e.data.saleId);
+  if (await voidSale(q, e.tenantId, e.data.saleId)) return true;
+  const seen = await q.query(
+    "select 1 from reporting.sale_facts where tenant_id = $1 and sale_id = $2",
+    [e.tenantId, e.data.saleId],
+  );
+  if (seen.rowCount === 1) return false; // already voided: a redelivery
+  await q.query(
+    "insert into reporting.pending_voids (tenant_id, sale_id) values ($1, $2) on conflict do nothing",
+    [e.tenantId, e.data.saleId],
+  );
+  return false;
 }
 
 export async function onReturnCompleted(q: Q, payload: unknown): Promise<boolean> {
