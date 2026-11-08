@@ -120,7 +120,7 @@ const mismatch = (): DomainError =>
 
 /**
  * Strict shape check of a Redis entry. Headers are dropped; status is 200|201 only; body is a bounded string.
- * Follow-up: HMAC the stored value (key from env) so a Redis writer cannot forge replays.
+ * The adapter (apps/api/src/idempotency-cache.ts) signs stored values, so a forged entry never reaches this check.
  */
 function parseCached(raw: string): { requestHash: string; response: StoredResponse } | undefined {
   if (raw.length > MAX_CACHED_BODY_BYTES * 2) return undefined;

@@ -205,4 +205,55 @@ describe("redisIdempotencyCache", () => {
       ["idempotency_cache_error", 1, { op: "set" }],
     ]);
   });
+
+  describe("signed values", () => {
+    const store = new Map<string, string>();
+    const kv: RedisKv = {
+      get: (k) => Promise.resolve(store.get(k) ?? null),
+      set: (k, v) => Promise.resolve(void store.set(k, v)),
+    };
+    const forged: string[] = [];
+    const opts = {
+      macKey: "a-secret-of-at-least-thirty-two-chars!!",
+      onMetric: (name: string) => forged.push(name),
+    };
+    const make = (over: Partial<typeof opts> = {}) =>
+      redisIdempotencyCache(kv, { warn: vi.fn() } as never, { ...opts, ...over });
+
+    it("round-trips a value and stores it with a MAC, never bare", async () => {
+      const cache = make();
+      await cache.set("idem:t:k1", '{"requestHash":"h"}', 1000);
+      expect(store.get("idem:t:k1")).not.toBe('{"requestHash":"h"}');
+      expect(store.get("idem:t:k1")).toMatch(/^[0-9a-f]{64}\./);
+      expect(await cache.get("idem:t:k1")).toBe('{"requestHash":"h"}');
+      expect(await cache.get("idem:t:missing")).toBeNull();
+    });
+
+    it("treats a bare, tampered, moved or foreign-signed value as a miss and counts it", async () => {
+      const cache = make();
+      await cache.set("idem:t:a", "payload-a", 1000);
+      const signed = store.get("idem:t:a") ?? "";
+      store.set("idem:t:bare", "payload-a"); // written by someone without the key
+      store.set("idem:t:tampered", signed.replace("payload-a", "payload-x"));
+      store.set("idem:t:moved", signed); // a valid entry copied under another key
+      await make({ macKey: "another-secret-of-at-least-32-characters" }).set(
+        "idem:t:other",
+        "p",
+        1000,
+      );
+      forged.length = 0;
+      for (const k of ["bare", "tampered", "moved", "other"]) {
+        expect(await cache.get(`idem:t:${k}`)).toBeNull();
+      }
+      expect(forged).toEqual(Array(4).fill("idempotency_cache_forged"));
+      expect(await cache.get("idem:t:a")).toBe("payload-a");
+    });
+
+    it("without a key stores and reads values as they are (dev and tests)", async () => {
+      const plain = redisIdempotencyCache(kv, { warn: vi.fn() } as never);
+      await plain.set("idem:t:plain", "v", 1000);
+      expect(store.get("idem:t:plain")).toBe("v");
+      expect(await plain.get("idem:t:plain")).toBe("v");
+    });
+  });
 });
