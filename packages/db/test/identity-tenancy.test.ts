@@ -467,7 +467,7 @@ describe("permissions_version trigger", () => {
     );
     expect(r.rows[0]).toEqual({
       prosecdef: true,
-      cfg: ["search_path=pg_catalog, tenancy"],
+      cfg: ["search_path=pg_catalog, tenancy, pg_temp"],
       owner: "wb_migrator",
       pub: false,
     });
