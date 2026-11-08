@@ -19,7 +19,7 @@
 .tab[aria-selected="true"] {
   color: var(--wb-color-text);
   border-bottom-color: var(--wb-color-accent, currentColor);
-  font-weight: 600;
+  font-weight: 500;
 }
 .split {
   display: grid;
@@ -90,7 +90,7 @@
   border-radius: var(--pv-radius, 12px);
   padding: 10px 14px;
   font: inherit;
-  font-weight: 600;
+  font-weight: 500;
   background: var(--pv-accent);
   color: var(--pv-text-on-accent);
 }

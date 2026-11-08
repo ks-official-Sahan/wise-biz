@@ -26,7 +26,7 @@
   align-items: center;
   gap: var(--wb-space-3);
   padding: var(--wb-space-2) var(--wb-space-3) var(--wb-space-5);
-  font-weight: 700;
+  font-weight: 500;
 }
 
 .mark {
@@ -48,14 +48,16 @@
   font-size: var(--wb-font-size-sm);
 }
 
-.link:hover {
-  background: var(--wb-color-surface-sunken);
+@media (hover: hover) and (pointer: fine) {
+  .link:hover {
+    background: var(--wb-color-surface-sunken);
+  }
 }
 
 .link[aria-current="page"] {
   background: var(--wb-color-accent-subtle);
   color: var(--wb-color-accent-text);
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .top {
@@ -85,7 +87,7 @@
   background: var(--wb-color-surface);
   color: var(--wb-color-text);
   font: inherit;
-  font-weight: 600;
+  font-weight: 500;
   font-size: var(--wb-font-size-sm);
 }
 
@@ -136,7 +138,8 @@
 }
 
 .paletteInput:focus-visible {
-  outline: none;
+  outline: 2px solid var(--wb-color-focus-ring);
+  outline-offset: -2px;
 }
 
 .paletteList {
@@ -216,8 +219,10 @@
   color: var(--wb-color-text);
 }
 
-.bell:hover {
-  background: var(--wb-color-surface-hover, rgb(0 0 0 / 6%));
+@media (hover: hover) and (pointer: fine) {
+  .bell:hover {
+    background: var(--wb-color-surface-hover, rgb(0 0 0 / 6%));
+  }
 }
 
 .badge {
@@ -227,10 +232,10 @@
   min-width: 18px;
   padding: 0 5px;
   border-radius: 9px;
-  background: var(--wb-color-danger, #b42318);
-  color: #fff;
+  background: var(--wb-color-danger);
+  color: var(--wb-color-on-danger);
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 500;
   line-height: 18px;
   text-align: center;
 }
@@ -239,8 +244,8 @@
   margin-left: 0.5rem;
   padding: 0 0.4rem;
   border-radius: 999px;
-  background: var(--wb-color-warning, #b45309);
-  color: #fff;
+  background: var(--wb-color-warning);
+  color: var(--wb-color-on-warning);
   font-size: 0.75rem;
   line-height: 1.25rem;
   font-variant-numeric: tabular-nums;

@@ -19,7 +19,7 @@
 .tab[aria-selected="true"] {
   color: var(--wb-color-text);
   border-bottom-color: var(--wb-color-accent, currentColor);
-  font-weight: 600;
+  font-weight: 500;
 }
 .form {
   display: grid;

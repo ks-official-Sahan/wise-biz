@@ -15,8 +15,9 @@
   background: var(--wb-color-surface, transparent);
 }
 
+/* Unread: tinted surface plus the "New" badge in the markup. Status is never color alone. */
 .item[data-unread="true"] {
-  border-inline-start: 4px solid var(--wb-color-accent, currentColor);
+  background: var(--wb-color-accent-subtle);
 }
 
 .item p {

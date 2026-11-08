@@ -10,7 +10,7 @@
   border: 1px solid transparent;
   border-radius: var(--wb-radius-control);
   font: inherit;
-  font-weight: 600;
+  font-weight: 500;
   font-size: var(--wb-font-size-sm);
   cursor: pointer;
   text-decoration: none;
@@ -39,8 +39,10 @@
   color: var(--wb-color-text-on-accent);
 }
 
-.primary:hover:not([aria-disabled="true"]) {
-  background: var(--wb-color-accent-hover);
+@media (hover: hover) and (pointer: fine) {
+  .primary:hover:not([aria-disabled="true"]) {
+    background: var(--wb-color-accent-hover);
+  }
 }
 
 .secondary {
@@ -49,8 +51,10 @@
   border-color: var(--wb-color-border-strong);
 }
 
-.secondary:hover:not([aria-disabled="true"]) {
-  background: var(--wb-color-surface-raised);
+@media (hover: hover) and (pointer: fine) {
+  .secondary:hover:not([aria-disabled="true"]) {
+    background: var(--wb-color-surface-raised);
+  }
 }
 
 .ghost {
@@ -58,8 +62,10 @@
   color: var(--wb-color-text);
 }
 
-.ghost:hover:not([aria-disabled="true"]) {
-  background: var(--wb-color-surface-sunken);
+@media (hover: hover) and (pointer: fine) {
+  .ghost:hover:not([aria-disabled="true"]) {
+    background: var(--wb-color-surface-sunken);
+  }
 }
 
 .danger {
@@ -74,7 +80,7 @@
 
 .label {
   font-size: var(--wb-font-size-sm);
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .input {
@@ -172,7 +178,7 @@ select.input {
   padding: 0 var(--wb-space-3);
   border-radius: var(--wb-radius-pill);
   font-size: var(--wb-font-size-xs);
-  font-weight: 600;
+  font-weight: 500;
   background: var(--wb-color-surface-sunken);
   color: var(--wb-color-text);
 }
@@ -195,7 +201,7 @@ select.input {
 
 .table th {
   text-align: left;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--wb-color-text-muted);
   padding: var(--wb-space-3) var(--wb-space-4);
   border-bottom: 1px solid var(--wb-color-border);
@@ -207,8 +213,10 @@ select.input {
   vertical-align: top;
 }
 
-.table tbody tr:hover {
-  background: var(--wb-color-surface-raised);
+@media (hover: hover) and (pointer: fine) {
+  .table tbody tr:hover {
+    background: var(--wb-color-surface-raised);
+  }
 }
 
 .tableWrap {
@@ -245,14 +253,33 @@ select.input {
   border-radius: var(--wb-radius-card);
   background: var(--wb-color-surface);
   color: var(--wb-color-text);
+  /* Exit: the closed state fades out on motion.exit. Enter stays a keyframe so older browsers still animate in. */
+  opacity: 0;
+  transform: scale(0.96);
+  transition:
+    opacity var(--wb-motion-exit) var(--wb-motion-ease-out),
+    transform var(--wb-motion-exit) var(--wb-motion-ease-out),
+    overlay var(--wb-motion-exit) allow-discrete,
+    display var(--wb-motion-exit) allow-discrete;
 }
 
 .dialog::backdrop {
   background: color-mix(in oklab, var(--wb-color-overlay) 55%, transparent);
+  opacity: 0;
+  transition:
+    opacity var(--wb-motion-exit) var(--wb-motion-ease-out),
+    overlay var(--wb-motion-exit) allow-discrete,
+    display var(--wb-motion-exit) allow-discrete;
 }
 
 .dialog[open] {
+  opacity: 1;
+  transform: none;
   animation: dialogIn var(--wb-motion-enter) var(--wb-motion-ease-out);
+}
+
+.dialog[open]::backdrop {
+  opacity: 1;
 }
 
 @keyframes dialogIn {
@@ -272,14 +299,59 @@ select.input {
   border-left: 1px solid var(--wb-color-border);
   background: var(--wb-color-surface);
   color: var(--wb-color-text);
+  opacity: 0;
+  transform: translateX(24px);
+  transition:
+    opacity var(--wb-motion-exit) var(--wb-motion-ease-out),
+    transform var(--wb-motion-exit) var(--wb-motion-ease-sheet),
+    overlay var(--wb-motion-exit) allow-discrete,
+    display var(--wb-motion-exit) allow-discrete;
 }
 
 .drawer::backdrop {
   background: color-mix(in oklab, var(--wb-color-overlay) 45%, transparent);
+  opacity: 0;
+  transition:
+    opacity var(--wb-motion-exit) var(--wb-motion-ease-out),
+    overlay var(--wb-motion-exit) allow-discrete,
+    display var(--wb-motion-exit) allow-discrete;
 }
 
 .drawer[open] {
+  opacity: 1;
+  transform: none;
   animation: drawerIn var(--wb-motion-enter) var(--wb-motion-ease-sheet);
+}
+
+.drawer[open]::backdrop {
+  opacity: 1;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+}
+
+/* Reduced motion: no movement or looping; short opacity fades stay because they aid comprehension. */
+@media (prefers-reduced-motion: reduce) {
+  .button:active:not([aria-disabled="true"]) {
+    transform: none;
+  }
+
+  .skeleton {
+    animation: none;
+  }
+
+  .dialog,
+  .drawer {
+    transform: none;
+  }
+
+  .dialog[open],
+  .drawer[open] {
+    animation: fadeIn var(--wb-motion-exit) linear;
+  }
 }
 
 @keyframes drawerIn {
