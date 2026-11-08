@@ -381,7 +381,7 @@ export default function CatalogPage() {
                       <Link href={`/catalog/${h.productId}` as never}>{h.title}</Link>
                     </td>
                     <td className="num">{h.sku}</td>
-                    <td className="num">{h.barcodes.join(", ") || "—"}</td>
+                    <td className="num">{h.barcodes.join(", ") || "None"}</td>
                   </tr>
                 ))}
               </tbody>
@@ -491,10 +491,12 @@ export default function CatalogPage() {
                         <Link href={`/catalog/${p.id}` as never}>{p.name}</Link>
                       </td>
                       <td>
-                        {p.categoryId === null ? "—" : (categoryName.get(p.categoryId) ?? "—")}
+                        {p.categoryId === null
+                          ? "None"
+                          : (categoryName.get(p.categoryId) ?? "None")}
                       </td>
                       <td className="num">
-                        {variants[0]?.sku ?? "—"}
+                        {variants[0]?.sku ?? "None"}
                         {variants.length > 1 ? ` +${String(variants.length - 1)}` : ""}
                       </td>
                       <td className={s.num}>

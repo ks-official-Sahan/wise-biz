@@ -24,7 +24,7 @@ export function diffJson(before: unknown, after: unknown, prefix = ""): FieldCha
 }
 
 export function show(value: unknown): string {
-  if (value === undefined) return "—";
+  if (value === undefined) return "none";
   if (typeof value === "string") return value;
   return JSON.stringify(value);
 }

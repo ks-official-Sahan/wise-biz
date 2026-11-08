@@ -71,5 +71,5 @@
   flex-wrap: wrap;
 }
 .stepper li[aria-current="step"] {
-  font-weight: 600;
+  font-weight: 500;
 }

@@ -65,6 +65,8 @@ export function useSell(onMetric?: (name: string, ms: number) => void): SellStat
       setModel(m);
       setRev((r) => r + 1);
       let seen = await ctx.fingerprint();
+      // Unmounted while the fingerprint was read: the cleanup already ran, so a new interval would never be cleared.
+      if (!isAlive()) return;
       timer = setInterval(() => {
         ctx
           .fingerprint()

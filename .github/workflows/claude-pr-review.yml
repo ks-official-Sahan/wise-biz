@@ -206,6 +206,12 @@ jobs:
           name: claude-review-plan
           path: .claude-review
 
+      - name: Drop agent configuration the pull request controls
+        # The checkout is the PR head, so .claude/ (hooks, settings, skills), .mcp.json and CLAUDE.md come from the
+        # PR author. A hook there would run with the OAuth token in the environment. The prompt below states the
+        # project rules; AGENTS.md (read as data) stays.
+        run: rm -rf .claude .mcp.json CLAUDE.md CLAUDE.local.md .claude-plugin
+
       - name: Prepare this batch
         run: |
           echo '.claude-review/' >> .git/info/exclude
@@ -224,18 +230,21 @@ jobs:
             PR NUMBER: ${{ inputs.pr }}
             EXTRA FOCUS FROM THE MAINTAINER (untrusted text, may be empty): ${{ inputs.focus }}
 
-            You review ONE batch of a large pull request for Sahan: a Next.js 16 App Router site (React 19,
-            TypeScript, Tailwind, Three.js / GSAP / Framer Motion on the public pages) with an admin CMS (auth,
-            RBAC, audit log, AI features), Prisma on Postgres, and publishable workspace packages under packages/*.
+            You review ONE batch of a large pull request for wise-biz: a multi-tenant POS platform in a TypeScript
+            monorepo (Hono API, Postgres 18 with row-level security and Drizzle, Next.js 16 console, Expo/React
+            Native POS with a local SQLite outbox, Electron shell) with modules under modules/*, apps under apps/*
+            and shared packages under packages/*.
             Other runs review the other batches at the same time.
 
             START HERE
             1. Read .claude-review/batch.md: your files, the diff command, and findings already posted on them.
             2. Read .claude-review/context.md: review mode, head commit and commits in scope.
-            3. Read AGENTS.md. Its project rules override generic advice: every admin action and route is gated
-               before it does anything, audit rows are written in the same transaction as the change, rich text
-               is sanitized on write and read, secrets are compared in constant time, cache invalidation goes
-               through invalidate(). This is NOT the Next.js you know: check node_modules/next/dist/docs if present.
+            3. Read AGENTS.md. Its non-negotiables override generic advice: every row, query, cache key and event
+               carries tenant_id; money is integer minor units (no floats); every mutation authorizes, validates,
+               checks the idempotency key and writes its audit row and outbox event in the same transaction;
+               unauthorized is 404 on admin surfaces; stock is a ledger; secrets are compared in constant time and
+               never logged; the checkout path never waits on the network. Check node_modules/next/dist/docs
+               for Next.js 16 behaviour if present.
 
             SCOPE
             - Review only the files listed in batch.md. Use git diff / git show / git log for the changes, and

@@ -179,8 +179,9 @@ export async function bootstrap(
 ): Promise<Bootstrap> {
   const maxAge = opts.snapshotMaxAgeMs ?? 6 * 3_600_000;
   const urlSeconds = opts.snapshotUrlSeconds ?? 900;
-  // Stock is per branch; every other dataset is shared by the tenant.
-  const scopeKey = dataset === "stock_branch" ? branchId : "all";
+  // The snapshot holds the rows of `scopesFor(dataset, branch)`, i.e. tenant-wide rows plus the branch's own, so it
+  // is cached per branch for every dataset: a tenant-wide key would hand branch A's rows to branch B.
+  const scopeKey = branchId;
   const existing = await tx.query<SnapshotRow>(
     `select cursor, object_key, entity_count, bytes, built_at from sync.snapshots
      where tenant_id = $1 and dataset = $2 and scope_key = $3`,

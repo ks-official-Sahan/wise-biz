@@ -159,9 +159,13 @@ export default function AppLayout({ children }: { readonly children: ReactNode }
           <Button
             variant="ghost"
             onClick={() => {
-              void signOut().then(() => {
-                router.replace("/sign-in");
-              });
+              void signOut()
+                .then(() => {
+                  router.replace("/sign-in");
+                })
+                .catch(() => {
+                  setSwitchError("Could not sign out. Check your connection and try again.");
+                });
             }}
           >
             Sign out

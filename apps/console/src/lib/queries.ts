@@ -84,9 +84,13 @@ export const useLocations = (t: string, branchId: string | null) =>
   useQuery({
     queryKey: keys.locations(t, branchId ?? "none"),
     queryFn: ({ signal }) =>
-      api<{ locations: Location[] }>("GET", `/v1/tenancy/branches/${branchId ?? ""}/locations`, {
-        signal,
-      }),
+      api<{ locations: Location[] }>(
+        "GET",
+        `/v1/tenancy/branches/${encodeURIComponent(branchId ?? "")}/locations`,
+        {
+          signal,
+        },
+      ),
     enabled: branchId !== null,
     staleTime: STALE.reference,
     select: (d) => d.locations,
@@ -106,7 +110,7 @@ export const useMembers = (t: string) =>
     queryFn: ({ signal, pageParam }) =>
       api<{ members: Member[]; nextCursor: string | null }>(
         "GET",
-        `/v1/tenancy/members?limit=50${pageParam ? `&cursor=${pageParam}` : ""}`,
+        `/v1/tenancy/members?limit=50${pageParam ? `&cursor=${encodeURIComponent(pageParam)}` : ""}`,
         { signal },
       ),
     initialPageParam: null as string | null,
@@ -121,7 +125,7 @@ export const useInvites = (t: string) =>
     queryFn: ({ signal, pageParam }) =>
       api<{ invites: Invite[]; nextCursor: string | null }>(
         "GET",
-        `/v1/tenancy/invites?limit=100${pageParam ? `&cursor=${pageParam}` : ""}`,
+        `/v1/tenancy/invites?limit=100${pageParam ? `&cursor=${encodeURIComponent(pageParam)}` : ""}`,
         { signal },
       ),
     initialPageParam: null as string | null,
@@ -147,7 +151,8 @@ export const useAudit = (t: string, filter: AuditFilter) =>
 export const useAuditEntry = (t: string, id: string | null) =>
   useQuery({
     queryKey: keys.auditEntry(t, id ?? "none"),
-    queryFn: ({ signal }) => api<AuditDetail>("GET", `/v1/audit/entries/${id ?? ""}`, { signal }),
+    queryFn: ({ signal }) =>
+      api<AuditDetail>("GET", `/v1/audit/entries/${encodeURIComponent(id ?? "")}`, { signal }),
     enabled: id !== null,
     staleTime: STALE.reference,
   });

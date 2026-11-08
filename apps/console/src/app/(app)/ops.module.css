@@ -25,7 +25,7 @@
   font-variant-numeric: tabular-nums;
 }
 .total {
-  font-weight: 600;
+  font-weight: 500;
   border-top: 1px solid var(--wb-color-border);
 }
 .flags {
@@ -42,7 +42,7 @@
   background: var(--wb-color-border);
 }
 .dotOnline {
-  background: var(--wb-color-success, #1a7f37);
+  background: var(--wb-color-success);
 }
 .report {
   max-width: 32rem;
@@ -73,7 +73,7 @@
 .tab[aria-selected="true"] {
   color: var(--wb-color-text);
   border-bottom-color: var(--wb-color-accent, currentColor);
-  font-weight: 600;
+  font-weight: 500;
 }
 .tiles {
   display: grid;
@@ -88,7 +88,7 @@
 }
 .kpi {
   font-size: var(--wb-font-size-2xl);
-  font-weight: 600;
+  font-weight: 500;
   font-variant-numeric: tabular-nums;
 }
 .topList {

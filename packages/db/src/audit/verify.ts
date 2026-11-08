@@ -38,7 +38,7 @@ type ChainedRow = PayloadRow & { chain_seq: string; prev_hash: string; hash: str
 export async function loadChain(
   pool: Pick<pg.Pool, "query">,
   tenantId: string,
-  opts: { fromSeq?: number; toSeq?: number } = {},
+  opts: { fromSeq?: number; toSeq?: number; limit?: number } = {},
 ): Promise<AuditChainRow[]> {
   if (!isUuidV7(tenantId)) throw new Error("loadChain: tenantId must be a UUIDv7");
   const params: unknown[] = [tenantId];
@@ -52,8 +52,15 @@ export async function loadChain(
     params.push(v);
     where += ` and chain_seq ${op} $${String(params.length)}`;
   }
+  let limit = "";
+  if (opts.limit !== undefined) {
+    if (!Number.isInteger(opts.limit) || opts.limit < 1)
+      throw new Error("limit must be an integer >= 1");
+    params.push(opts.limit);
+    limit = ` limit $${String(params.length)}`;
+  }
   const res = await pool.query<ChainedRow>(
-    `select ${PAYLOAD_COLUMNS}, chain_seq::text, prev_hash, hash from audit.audit_log where ${where} order by audit_log.chain_seq`,
+    `select ${PAYLOAD_COLUMNS}, chain_seq::text, prev_hash, hash from audit.audit_log where ${where} order by audit_log.chain_seq${limit}`,
     params,
   );
   return res.rows.map((r) => ({
@@ -64,29 +71,57 @@ export async function loadChain(
   }));
 }
 
+const VERIFY_PAGE = 5000;
+
 /**
  * Verify a tenant's whole chain: chain_seq contiguity (1..n) then hashes via verifyChain. Pass `expectedHead` /
  * `expectedLength` from a trusted anchor: without them tail truncation and a consistently re-hashed chain are
- * undetectable (the chain is unkeyed).
+ * undetectable (the chain is unkeyed). The chain is read in keyset pages of `pageSize` rows (default 5000), each
+ * verified from the previous page's head, so memory stays flat however long the history is.
  */
 export async function verifyTenantChain(
   pool: Pick<pg.Pool, "query">,
   tenantId: string,
-  opts: { expectedHead?: string; expectedLength?: number } = {},
+  opts: { expectedHead?: string; expectedLength?: number; pageSize?: number } = {},
 ): Promise<TenantVerifyResult> {
-  const rows = await loadChain(pool, tenantId);
-  for (let i = 0; i < rows.length; i++) {
-    const row = rows[i];
-    if (row !== undefined && row.chainSeq !== i + 1)
-      return { ok: false, index: i, reason: "seq_gap", chainSeq: row.chainSeq };
+  const pageSize = opts.pageSize ?? VERIFY_PAGE;
+  let prev: string | undefined;
+  let count = 0;
+  let next = 1;
+  for (;;) {
+    const page = await loadChain(pool, tenantId, { fromSeq: next, limit: pageSize });
+    for (let i = 0; i < page.length; i++) {
+      const row = page[i];
+      if (row !== undefined && row.chainSeq !== next + i)
+        return { ok: false, index: count + i, reason: "seq_gap", chainSeq: row.chainSeq };
+    }
+    if (page.length > 0) {
+      const res = verifyChain(page, prev === undefined ? {} : { startHash: prev });
+      if (!res.ok) {
+        return {
+          ok: false,
+          index: count + res.index,
+          reason: res.reason,
+          chainSeq: page[res.index]?.chainSeq ?? null,
+        };
+      }
+      prev = res.head;
+      count += page.length;
+      next += page.length;
+    }
+    if (page.length < pageSize) break;
   }
-  const res = verifyChain(rows, opts);
-  if (res.ok) return res;
+  const empty = verifyChain([]);
+  const head = prev ?? (empty.ok ? empty.head : "");
+  if (opts.expectedHead !== undefined && opts.expectedHead !== head)
+    return { ok: false, index: count, reason: "head_mismatch", chainSeq: null };
+  if (opts.expectedLength !== undefined && opts.expectedLength !== count)
+    return { ok: false, index: count, reason: "length_mismatch", chainSeq: null };
   return {
-    ok: false,
-    index: res.index,
-    reason: res.reason,
-    chainSeq: rows[res.index]?.chainSeq ?? null,
+    ok: true,
+    head: head as ChainHash,
+    length: count,
+    anchored: opts.expectedHead !== undefined,
   };
 }
 

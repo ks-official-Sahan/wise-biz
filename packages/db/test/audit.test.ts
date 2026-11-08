@@ -323,6 +323,66 @@ describe("chainTenant / verifyTenantChain", () => {
     });
   });
 
+  it("verifies page by page: same answers as one pass, errors keep their global position", async () => {
+    const T = uuid7();
+    await put(T, 23);
+    const r = await chainTenant(chainer, T);
+    const whole = await verifyTenantChain(chainer, T, { expectedHead: r.head, expectedLength: 23 });
+    expect(whole).toMatchObject({ ok: true, length: 23, anchored: true });
+    // 23 rows in pages of 5: four full pages and a short one; a page size that divides the length exactly too.
+    for (const pageSize of [5, 23, 1]) {
+      expect(
+        await verifyTenantChain(chainer, T, { pageSize, expectedHead: r.head, expectedLength: 23 }),
+      ).toEqual(whole);
+    }
+    expect(await verifyTenantChain(chainer, T, { pageSize: 5, expectedLength: 22 })).toMatchObject({
+      ok: false,
+      reason: "length_mismatch",
+      index: 23,
+    });
+    expect(
+      await verifyTenantChain(chainer, T, { pageSize: 5, expectedHead: "0".repeat(64) }),
+    ).toMatchObject({ ok: false, reason: "head_mismatch", index: 23 });
+    const c = await admin.connect();
+    try {
+      await c.query("begin");
+      await c.query("set local session_replication_role = replica");
+      // row 12 sits in the third page (rows 11-15): the tamper must be reported at its global index
+      await c.query(
+        `update audit.audit_log set after = '{"total": 1}' where tenant_id = $1 and chain_seq = 12`,
+        [T],
+      );
+      await c.query("commit");
+    } finally {
+      c.release();
+    }
+    expect(await verifyTenantChain(chainer, T, { pageSize: 5 })).toMatchObject({
+      ok: false,
+      reason: "hash_mismatch",
+      index: 11,
+      chainSeq: 12,
+    });
+    // A deleted row at a page boundary (row 6 opens the second page) is a gap, not a silent skip.
+    const G = uuid7();
+    await put(G, 12);
+    await chainTenant(chainer, G);
+    const d = await admin.connect();
+    try {
+      await d.query("begin");
+      await d.query("set local session_replication_role = replica");
+      await d.query("delete from audit.audit_log where tenant_id = $1 and chain_seq = 6", [G]);
+      await d.query("commit");
+    } finally {
+      d.release();
+    }
+    expect(await verifyTenantChain(chainer, G, { pageSize: 5 })).toMatchObject({
+      ok: false,
+      reason: "seq_gap",
+      index: 5,
+      chainSeq: 7,
+    });
+  });
+
   it("two concurrent chainers on one tenant give contiguous chain_seq without duplicates", async () => {
     const T = uuid7();
     await put(T, 50);

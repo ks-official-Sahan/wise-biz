@@ -6,7 +6,7 @@ import {
   IconTrash,
   IconUser,
 } from "@tabler/icons-react-native";
-import { money } from "@wise-biz/money";
+import { format as formatMoney, money } from "@wise-biz/money";
 import {
   Badge,
   Button,
@@ -132,7 +132,7 @@ export function Catalog(p: SellViewProps) {
           <Card
             key={q.id}
             style={s.tile}
-            accessibilityLabel={`Add ${q.name}, ${new Intl.NumberFormat(p.locale, { style: "currency", currency: p.totals.currency }).format(q.priceMinor / 100)}`}
+            accessibilityLabel={`Add ${q.name}, ${formatMoney(money(q.priceMinor, p.totals.currency), p.locale)}`}
             onPress={() => {
               p.onAddQuick(q.id);
             }}

@@ -217,8 +217,8 @@ export default function ImportPage() {
       {step === 1 && mapping !== null ? (
         <Stack>
           <p>
-            <strong>{fileName}</strong> — {String(rows.length - 1)} row(s). Tell us which column of
-            your file feeds each field.
+            <strong>{fileName}</strong> has {String(rows.length - 1)} row(s). Tell us which column
+            of your file feeds each field.
           </p>
           {IMPORT_COLUMNS.map((c) => (
             <SelectField
@@ -226,7 +226,7 @@ export default function ImportPage() {
               label={c.required ? `${c.label} (required)` : c.label}
               value={mapping[c.key] === null ? "" : String(mapping[c.key])}
               options={[
-                { value: "", label: "— not in my file —" },
+                { value: "", label: "Not in my file" },
                 ...header.map((h, i) => ({
                   value: String(i),
                   label: h === "" ? `Column ${String(i + 1)}` : h,

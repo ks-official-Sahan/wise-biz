@@ -204,7 +204,10 @@ export async function startServer(
       policyRows: (tenantId, requestId) => tenancy.loadPolicyRows(tenantId, requestId),
       kernelRedis,
       identity,
-      idempotencyCache: redisIdempotencyCache(redis, logger, { onMetric: hooks.onMetric }),
+      idempotencyCache: redisIdempotencyCache(redis, logger, {
+        onMetric: hooks.onMetric,
+        macKey: env.AUTH_SECRET,
+      }),
     });
     const server = serve({ fetch: app.fetch, port: env.PORT }, (info: AddressInfo) => {
       logger.info({ port: info.port }, "api listening");

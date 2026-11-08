@@ -62,7 +62,7 @@ function RoleEditor({ role }: { role: Role }) {
             key={g.module}
             style={{ border: 0, padding: 0, margin: 0, display: "grid", gap: 4 }}
           >
-            <legend style={{ fontWeight: 600, marginBottom: 8 }}>{g.module}</legend>
+            <legend style={{ fontWeight: 500, marginBottom: 8 }}>{g.module}</legend>
             {g.items.map((p) => (
               <label
                 key={p.permission}

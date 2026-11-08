@@ -286,7 +286,7 @@ function Kpi({ label, value }: { label: string; value: string }) {
     <Card>
       <Stack>
         <span className="muted">{label}</span>
-        <span className="num" style={{ fontSize: "var(--wb-font-size-xl)", fontWeight: 600 }}>
+        <span className="num" style={{ fontSize: "var(--wb-font-size-xl)", fontWeight: 500 }}>
           {value}
         </span>
       </Stack>

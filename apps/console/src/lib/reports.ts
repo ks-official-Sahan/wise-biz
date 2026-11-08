@@ -193,7 +193,7 @@ export function exportStatusText(e: ExportRow): string {
 }
 
 export const exportDownloadUrl = (id: string): `/v1/${string}` =>
-  `/v1/reporting/exports/${id}/download`;
+  `/v1/reporting/exports/${encodeURIComponent(id)}/download`;
 
 const exportsKey = (t: string) => [t, "reports", "exports"] as const;
 

@@ -31,12 +31,18 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+strong,
+b,
+th {
+  font-weight: 500;
+}
+
 h1,
 h2,
 h3 {
   margin: 0;
   line-height: 1.25;
-  font-weight: 600;
+  font-weight: 500;
   text-wrap: balance;
 }
 
@@ -87,12 +93,10 @@ a {
   border: 0;
 }
 
+/* Component-level reduced-motion rules live next to their animations (components/ui.module.css). */
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 1ms !important;
-    transition-duration: 1ms !important;
+  html {
+    scroll-behavior: auto;
   }
 }
 
