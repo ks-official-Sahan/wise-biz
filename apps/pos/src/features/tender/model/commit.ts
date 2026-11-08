@@ -115,6 +115,9 @@ export async function commitSale(deps: CommitDeps, input: CommitInput): Promise<
         }),
       ],
     );
+    // The crash-recovery draft goes with the sale, in the same transaction: a crash right after the commit must not
+    // bring the sold cart back on restart (a second sale of the same goods).
+    await tx.run("DELETE FROM drafts WHERE id = ?", [`current:${deps.operatorId}`]);
     return { saleId, saleNo, completedAt, shiftId: shift.id };
   });
 }

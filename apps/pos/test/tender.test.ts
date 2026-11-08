@@ -92,6 +92,32 @@ describe("committing a sale", () => {
     expect(moves.every((m) => m.ref_id === sale.saleId && m.qty.startsWith("-"))).toBe(true);
   });
 
+  it("removes the crash-recovery draft in the same transaction, so a crash after commit cannot restore the sold cart", async () => {
+    const { db, model, store, deps } = await setup();
+    await model.addVariant(ids.tea, "1");
+    await model.flush(); // the draft is on disk, as it is after any edit
+    const draft = `current:${deps.operatorId}`;
+    expect(await db.all("SELECT id FROM drafts WHERE id = ?", [draft])).toHaveLength(1);
+    const pricing = model.pricing()!;
+    await commitSale(deps, {
+      pricing,
+      cart: linesOf(store),
+      tenders: [
+        {
+          id: uuidv7(),
+          kind: "cash",
+          amountMinor: pricing.totals.totalMinor,
+          receivedMinor: pricing.totals.totalMinor,
+          changeMinor: 0,
+        },
+      ],
+      customerId: null,
+      approvals: [],
+    });
+    // No finish() call: that is the step a crash would skip.
+    expect(await db.all("SELECT id FROM drafts WHERE id = ?", [draft])).toHaveLength(0);
+  });
+
   it("numbers sales in order, reuses the open shift and chains approvals before the sale", async () => {
     const { outbox, model, store, deps } = await setup();
     const t = (amount: number): TenderEntry[] => [

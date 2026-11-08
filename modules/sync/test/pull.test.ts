@@ -321,7 +321,7 @@ describe("bootstrap", () => {
       .trim()
       .split("\n")
       .map((l) => JSON.parse(l) as Record<string, unknown>);
-    expect(lines[0]).toMatchObject({ dataset: "promotions", scope: "all", cursor: boot.cursor });
+    expect(lines[0]).toMatchObject({ dataset: "promotions", scope: BRANCH, cursor: boot.cursor });
     // The device client reads exactly this format.
     const parsed = parseSnapshot(
       gunzipSync(
@@ -339,6 +339,14 @@ describe("bootstrap", () => {
       bootstrap(tx, T, BRANCH, ports, "promotions", new Date(now.getTime() + 60_000)),
     );
     expect(again.builtAt).toBe(boot.builtAt);
+    // Snapshots are per branch: another branch never reuses (or is served) this branch's file.
+    const other = await read((tx) => bootstrap(tx, T, OTHER_BRANCH, ports, "promotions", now));
+    expect(other.url).not.toBe(boot.url);
+    const scopes = await admin.query<{ scope_key: string }>(
+      "select scope_key from sync.snapshots where tenant_id = $1 and dataset = 'promotions' order by scope_key",
+      [T],
+    );
+    expect(scopes.rows.map((r) => r.scope_key)).toEqual([BRANCH, OTHER_BRANCH].sort());
     // A change after the snapshot arrives through pull from the snapshot's cursor, and only that one.
     const c = uuidv7();
     await consume(event("pricing.promotion.published", { promotionId: c, version: 1, name: "c" }));

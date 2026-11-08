@@ -1,3 +1,5 @@
+import { divRound } from "@wise-biz/money";
+
 import { toQty4, fromQty4 } from "../../sell/model/qty.ts";
 import { ensureShift } from "../../shift/model/shift.ts";
 import { businessDateOf } from "../../tender/model/sale-command.ts";
@@ -149,14 +151,19 @@ export function refundFor(
   if (want <= 0 || want > left) return { refundMinor: 0, taxMinor: 0 };
   const remainingMinor = line.totalMinor - refundedSoFarMinor;
   if (want === left) {
-    const tax = Math.round((line.taxMinor * want) / sold);
+    const tax = share(line.taxMinor, want, sold);
     return { refundMinor: remainingMinor, taxMinor: Math.min(tax, remainingMinor) };
   }
-  const refund = Math.min(remainingMinor, Math.round((line.totalMinor * want) / sold));
+  const refund = Math.min(remainingMinor, share(line.totalMinor, want, sold));
   return {
     refundMinor: refund,
-    taxMinor: Math.min(refund, Math.round((line.taxMinor * want) / sold)),
+    taxMinor: Math.min(refund, share(line.taxMinor, want, sold)),
   };
+}
+
+/** `amount * want / sold` in exact integer arithmetic, half up (money is never rounded through floats). */
+function share(amountMinor: number, want: number, sold: number): number {
+  return Number(divRound(BigInt(amountMinor) * BigInt(want), BigInt(sold), "half-up"));
 }
 
 export interface ReturnLineInput {

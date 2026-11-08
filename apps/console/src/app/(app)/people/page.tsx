@@ -51,7 +51,7 @@ function InviteDialog({
   const [roleId, setRoleId] = useState(assignable[0]?.roleId ?? "");
   const [branchId, setBranchId] = useState("all");
   const [error, setError] = useState<string | null>(null);
-  // One key per invite: retries of a submit reuse it, a new invite gets a fresh one.
+  // One key per invite payload: retries of an unchanged submit reuse it; editing any field starts a new invite.
   const [id, setId] = useState(uuidv7);
   const chosenRole = roleId === "" ? (assignable[0]?.roleId ?? "") : roleId;
   const invite = useApiMutation(
@@ -97,6 +97,7 @@ function InviteDialog({
             value={email}
             onChange={(e) => {
               setEmail(e.target.value);
+              setId(uuidv7());
             }}
           />
           <SelectField
@@ -105,6 +106,7 @@ function InviteDialog({
             options={assignable.map((r) => ({ value: r.roleId, label: label(r.name) }))}
             onChange={(e) => {
               setRoleId(e.target.value);
+              setId(uuidv7());
             }}
           />
           <SelectField
@@ -119,6 +121,7 @@ function InviteDialog({
             ]}
             onChange={(e) => {
               setBranchId(e.target.value);
+              setId(uuidv7());
             }}
           />
           <Row spread>

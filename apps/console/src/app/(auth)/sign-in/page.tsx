@@ -90,8 +90,17 @@ function SignInForm() {
 
   async function passkey(): Promise<void> {
     setError(null);
-    const res = await (await loadAuth()).signIn.passkey();
-    if (res.error) {
+    setBusy(true);
+    let failed: boolean;
+    try {
+      const res = await (await loadAuth()).signIn.passkey();
+      failed = Boolean(res.error);
+    } catch {
+      failed = true;
+    } finally {
+      setBusy(false);
+    }
+    if (failed) {
       setError("Passkey sign-in did not complete. Use your email and password instead.");
       return;
     }
@@ -156,7 +165,13 @@ function SignInForm() {
             </Button>
             <Button
               variant="ghost"
-              onClick={() => void loadAuth().then((a) => a.twoFactor.sendOtp())}
+              onClick={() =>
+                void loadAuth()
+                  .then((a) => a.twoFactor.sendOtp())
+                  .catch(() => {
+                    setError("Could not send a new code. Try again in a moment.");
+                  })
+              }
             >
               Send a new code
             </Button>
