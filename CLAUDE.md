@@ -6,6 +6,7 @@ Claude-specific notes. Everything shared with other agents lives in `AGENTS.md`.
 
 ## Working style
 
+- Always think critically.
 - Answers terse. Code and docs complete.
 - Plan before multi-file changes: list files, the contract touched, the test that proves it.
 - Prefer the smallest design that meets `SYSTEM.md` targets. Kill speculative abstraction (ponytail rule). Keep the extraction seams (contracts, events, ports) because they are planned, not speculative.
@@ -22,6 +23,7 @@ Run one step at a time: `/wb-step docs/prompts/<phase>/<NN>-<name>.md`. Loop and
 - Every subagent prompt includes: goal, exact paths, the one doc section to read, constraints from `AGENTS.md` non-negotiables, acceptance test command, output format (diff summary, ≤150 words).
 - Split large work by module, not by layer. One subagent per module keeps context small.
 - Review pass after code: `typescript-reviewer` or `react-reviewer`, `database-reviewer` for migrations, `security-reviewer` for auth, payments, devices, MCP.
+- Only use `Haiku class models` for the subagents, never use token heavy models like Opus class or sonnet class model for subagents. Use a model like `Haiku 5.5`.
 
 ## Skills to reach for
 
