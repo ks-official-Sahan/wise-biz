@@ -60,6 +60,8 @@ pnpm -F @wise-biz/console dev    # the console, http://localhost:3000
 
 Open **http://localhost:3000** and sign in as `owner@demo.wise-biz.local` with the `DEMO_PASSWORD` you set. The demo seed also creates one user per other role (the addresses are `<role>@demo.wise-biz.local`; the Roles page lists the roles). Emails the system sends (verification, invitations) land in the fake mailbox at **http://localhost:8025**.
 
+The whole product in containers (no development tools needed, nothing is deployed): `pnpm stack:env`, `pnpm stack:up`, `pnpm stack:smoke`, then open http://localhost:8080. Details and the VPS path: `docs/runbooks/docker.md`.
+
 The POS app in a browser (a quick way to see the cashier side): in a new tab set `$env:EXPO_PUBLIC_API_URL = "http://localhost:3001"`, add `http://localhost:8081` to `CORS_ORIGINS` in `.env` (restart the API), then run `pnpm -F @wise-biz/pos web`. For a phone you need the Expo Go or a development build (`docs/runbooks/first-release.md`, part 8).
 
 Stop everything with `pnpm infra:down`. Wipe the local data with `pnpm infra:reset`.

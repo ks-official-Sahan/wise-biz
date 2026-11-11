@@ -8,10 +8,16 @@ ARG APP
 ENV PNPM_HOME=/pnpm CI=true
 RUN corepack enable
 WORKDIR /repo
+# Layer 1 depends on the lockfile and the pnpm settings only: it is rebuilt when a dependency changes, never when source
+# does. Dependency install scripts stay off, as in the install below. `pnpm fetch` puts every production package into the store without reading any workspace manifest.
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json .npmrc ./
+COPY patches ./patches
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store --mount=type=cache,id=pnpm-meta,target=/root/.cache/pnpm \
+    pnpm --config.ignore-scripts=true fetch --prod
 COPY . .
-# Production dependencies of this app and of the workspace packages it uses, from the lockfile only.
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
-    pnpm install --frozen-lockfile --prod --filter "@wise-biz/${APP}..." --ignore-scripts
+# Production dependencies of this app and of the workspace packages it uses, linked from the store (no network).
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store --mount=type=cache,id=pnpm-meta,target=/root/.cache/pnpm \
+    pnpm install --offline --frozen-lockfile --prod --filter "@wise-biz/${APP}..." --ignore-scripts
 
 FROM node:${NODE_VERSION}-slim AS run
 ARG APP

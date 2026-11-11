@@ -5,15 +5,20 @@ FROM node:${NODE_VERSION}-slim AS build
 ENV PNPM_HOME=/pnpm CI=true NEXT_TELEMETRY_DISABLED=1
 RUN corepack enable
 WORKDIR /repo
+# Layer 1 depends on the lockfile and the pnpm settings only (see service.Dockerfile).
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json .npmrc ./
+COPY patches ./patches
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store --mount=type=cache,id=pnpm-meta,target=/root/.cache/pnpm \
+    pnpm --config.ignore-scripts=true fetch
 COPY . .
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
-    pnpm install --frozen-lockfile --filter "@wise-biz/console..." --ignore-scripts
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store --mount=type=cache,id=pnpm-meta,target=/root/.cache/pnpm \
+    pnpm install --offline --frozen-lockfile --filter "console..." --ignore-scripts
 # Next.js inlines NEXT_PUBLIC_* values at build time, so the browser DSN must be passed when the image is built:
 #   docker build --build-arg NEXT_PUBLIC_SENTRY_DSN=... (ADR 0025). Empty means error reports are off.
 ARG NEXT_PUBLIC_SENTRY_DSN=
 ARG NEXT_PUBLIC_SENTRY_ENVIRONMENT=
 ENV NEXT_PUBLIC_SENTRY_DSN=$NEXT_PUBLIC_SENTRY_DSN NEXT_PUBLIC_SENTRY_ENVIRONMENT=$NEXT_PUBLIC_SENTRY_ENVIRONMENT
-RUN pnpm --filter @wise-biz/console build
+RUN pnpm --filter console build
 
 FROM node:${NODE_VERSION}-slim AS run
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 HEALTH_PORT=3000

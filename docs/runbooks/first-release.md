@@ -6,6 +6,8 @@ Conventions: `<ENV>` is `staging` or `production`. Do `staging` first, end to en
 
 **No Google Cloud account?** Parts 3 to 6 below use Google Cloud. If you cannot create a billing account, or want to pay nothing until there is revenue, follow `docs/runbooks/free-hosting.md` for parts 3 to 6 instead (Render for the server, Vercel for the console), then continue here at part 7.
 
+**Want to test the whole product in containers first, or run it on your own VPS later?** Follow `docs/runbooks/docker.md`: one command starts everything on your PC (database, storage, mail sink, API, workers, console, web server) and a smoke test proves the owner journey. The same images deploy to a VPS (part B of that runbook), with no cloud account.
+
 ## The order, in one table
 
 Read this first. Each line says **where** you do it, **what** you do and **when**. Finish a line before the next. Everything about the application itself (what it does, how to run it, what is in which folder) is in `docs/GETTING-STARTED.md`.
