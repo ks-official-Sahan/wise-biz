@@ -145,6 +145,65 @@ export const PERMISSION_GROUPS: readonly { module: string; items: readonly Permi
     ],
   },
   {
+    module: "Stock counts",
+    items: [
+      {
+        permission: "counts:read",
+        label: "View stock counts",
+        allows: "See counts, scan totals, expected quantities (unless blind) and variances.",
+      },
+      {
+        permission: "counts:write",
+        label: "Run stock counts",
+        allows:
+          "Start, count, request recounts, close and cancel counts. Nothing is posted to stock.",
+      },
+      {
+        permission: "counts:approve",
+        label: "Approve count variances",
+        allows:
+          "Approve a reviewed count. Its variances post to stock and reveal blind expected quantities.",
+      },
+    ],
+  },
+  {
+    module: "Stock gaps",
+    items: [
+      {
+        permission: "gaps:read",
+        label: "View stock gaps",
+        allows: "See gap cases, their tasks and the evidence around them.",
+      },
+      {
+        permission: "gaps:write",
+        label: "Work stock gaps",
+        allows:
+          "Create cases from a count, move them to investigating, assign people and manage tasks.",
+      },
+      {
+        permission: "gaps:resolve",
+        label: "Resolve stock gaps",
+        allows:
+          "Close a case with a resolution. Finding misplaced stock adds it to the stock ledger.",
+      },
+    ],
+  },
+  {
+    module: "Expiry",
+    items: [
+      {
+        permission: "expiry:read",
+        label: "View expiry",
+        allows: "See batches that expire soon, their value and the FEFO compliance report.",
+      },
+      {
+        permission: "expiry:writeoff",
+        label: "Write off and markdown",
+        allows: "Write off stock expiring within a week and record markdown drafts.",
+      },
+    ],
+  },
+  {
     module: "Pricing",
     items: [
       {

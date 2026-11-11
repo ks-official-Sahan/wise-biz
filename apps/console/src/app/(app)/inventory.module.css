@@ -1,0 +1,74 @@
+/* Shared by the stock counts, stock gaps and expiry screens. Tokens only. */
+.progress {
+  width: 100%;
+  height: 0.75rem;
+  accent-color: var(--wb-color-accent);
+}
+.check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 48px;
+  min-height: 48px;
+}
+.check input {
+  width: 1.25rem;
+  height: 1.25rem;
+  accent-color: var(--wb-color-accent);
+}
+.check input:focus-visible {
+  outline: 2px solid var(--wb-color-accent);
+  outline-offset: 2px;
+}
+.help {
+  color: var(--wb-color-text-muted);
+  font-size: var(--wb-font-size-sm);
+  margin: 0;
+}
+.nowrap {
+  white-space: nowrap;
+}
+.num {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+.rowActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--wb-space-2);
+}
+.bar {
+  display: grid;
+  gap: var(--wb-space-2);
+}
+.reason {
+  color: var(--wb-color-text-muted);
+  font-size: var(--wb-font-size-sm);
+  margin: 0;
+}
+.summary {
+  display: grid;
+  gap: var(--wb-space-2) var(--wb-space-4);
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  margin: 0;
+}
+.summary dt {
+  color: var(--wb-color-text-muted);
+}
+.summary dd {
+  margin: 0;
+}
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--wb-space-2);
+}
+.item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--wb-space-2);
+}

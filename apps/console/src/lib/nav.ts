@@ -13,6 +13,9 @@ export interface NavItem {
     | "/stock"
     | "/purchasing"
     | "/transfers"
+    | "/counts"
+    | "/gaps"
+    | "/expiry"
     | "/people"
     | "/roles"
     | "/audit"
@@ -78,6 +81,33 @@ export const NAV: readonly NavItem[] = [
     href: "/transfers",
     label: "Transfers",
     keywords: ["move stock", "between locations", "in transit", "dispatch", "stock transfer"],
+    primary: false,
+  },
+  {
+    href: "/counts",
+    label: "Stock counts",
+    keywords: ["count", "stocktake", "variance", "blind count", "cycle count", "recount", "shrink"],
+    primary: false,
+  },
+  {
+    href: "/gaps",
+    label: "Stock gaps",
+    keywords: ["shortage", "missing stock", "theft", "investigate", "variance cases", "resolve"],
+    primary: false,
+  },
+  {
+    href: "/expiry",
+    label: "Expiry",
+    keywords: [
+      "expiring",
+      "expired",
+      "near expiry",
+      "write off",
+      "markdown",
+      "fefo",
+      "best before",
+      "waste",
+    ],
     primary: false,
   },
   {
