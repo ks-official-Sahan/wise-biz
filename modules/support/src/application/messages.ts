@@ -24,12 +24,13 @@ export async function messagesOf(
     `select id, author_kind, author_id, body, internal, created_at
        from support.ticket_messages
       where tenant_id = $1 and ticket_id = $2${internalFilter}
-      order by created_at, id
+      order by created_at desc, id desc
       limit $3`,
     [tenantId, ticketId, MESSAGE_DETAIL_LIMIT + 1],
   );
+  // newest first from SQL so a long thread keeps its latest replies; oldest messages fall off
   return {
-    messages: r.rows.slice(0, MESSAGE_DETAIL_LIMIT).map(toMessage),
+    messages: r.rows.slice(0, MESSAGE_DETAIL_LIMIT).map(toMessage).reverse(),
     truncated: r.rows.length > MESSAGE_DETAIL_LIMIT,
   };
 }
