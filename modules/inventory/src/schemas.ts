@@ -403,3 +403,187 @@ export const VarianceSchema = z
     }),
   })
   .openapi("CountVariance");
+
+// --- Stock-gap cases (P2-04b) ---
+
+const caseId = uuid7;
+const GapStatusEnum = z.enum(["open", "investigating", "resolved"]);
+export const RESOLUTION_CODE_ENUM = [
+  "theft",
+  "damage",
+  "data_error",
+  "misplaced_found",
+  "supplier_short",
+] as const;
+const ResolutionEnum = z.enum(RESOLUTION_CODE_ENUM);
+
+/** Thresholds of a case run: either or both. A line over either becomes a case (see domain/gap.ts isGapCase). */
+export const GenerateGapsSchema = z
+  .object({
+    minQty: qtyOrZero.optional(),
+    minValueMinor: minor.optional(),
+  })
+  .superRefine((b, ctx) => {
+    if (b.minQty === undefined && b.minValueMinor === undefined) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["minQty"],
+        message: "Give minQty, minValueMinor or both.",
+      });
+    }
+  })
+  .openapi("GenerateGaps");
+
+export const UpdateGapSchema = z
+  .object({
+    version: z.number().int().min(1),
+    status: z.literal("investigating").optional(),
+    assigneeId: uuid7.nullable().optional(),
+  })
+  .superRefine((b, ctx) => {
+    if (b.status === undefined && b.assigneeId === undefined) {
+      ctx.addIssue({ code: "custom", path: ["status"], message: "Nothing to change." });
+    }
+  })
+  .openapi("UpdateGap");
+
+export const CreateGapTaskSchema = z
+  .object({
+    version: z.number().int().min(1),
+    title: z.string().trim().min(1).max(200),
+    assigneeId: uuid7.nullable().optional(),
+  })
+  .openapi("CreateGapTask");
+
+export const UpdateGapTaskSchema = z
+  .object({
+    version: z.number().int().min(1),
+    done: z.boolean().optional(),
+    assigneeId: uuid7.nullable().optional(),
+  })
+  .superRefine((b, ctx) => {
+    if (b.done === undefined && b.assigneeId === undefined) {
+      ctx.addIssue({ code: "custom", path: ["done"], message: "Nothing to change." });
+    }
+  })
+  .openapi("UpdateGapTask");
+
+export const ResolveGapSchema = z
+  .object({
+    version: z.number().int().min(1),
+    code: ResolutionEnum,
+    note: z.string().trim().max(500).optional(),
+    /** misplaced_found only: where the stock was found, and how much (at most the shortage). */
+    foundLocationId: uuid7.optional(),
+    foundQty: positive.optional(),
+  })
+  .superRefine((b, ctx) => {
+    const misplaced = b.code === "misplaced_found";
+    if (misplaced && (b.foundLocationId === undefined || b.foundQty === undefined)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["foundLocationId"],
+        message: "A misplaced-found resolution needs foundLocationId and foundQty.",
+      });
+    }
+    if (!misplaced && (b.foundLocationId !== undefined || b.foundQty !== undefined)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["foundLocationId"],
+        message: "Only a misplaced-found resolution takes a location and quantity.",
+      });
+    }
+  })
+  .openapi("ResolveGap");
+
+export const GapListQuerySchema = z.object({
+  status: GapStatusEnum.optional(),
+  assigneeId: uuid7.optional(),
+  after: caseId.optional(),
+  limit: z.coerce.number().int().min(1).max(200).optional(),
+});
+
+export const GapCaseSchema = z
+  .object({
+    id: z.string(),
+    countId: z.string(),
+    locationId: z.string(),
+    variantId: z.string(),
+    batchId: z.string().nullable(),
+    currency: z.string(),
+    varianceQty: z.string(),
+    unitCostMinor: z.number().int().nullable(),
+    valueMinor: z.number().int().nullable(),
+    windowFrom: z.string(),
+    windowTo: z.string(),
+    status: GapStatusEnum,
+    assigneeId: z.string().nullable(),
+    resolutionCode: ResolutionEnum.nullable(),
+    resolutionNote: z.string(),
+    foundLocationId: z.string().nullable(),
+    foundQty: z.string().nullable(),
+    version: z.number().int(),
+    taskCount: z.number().int(),
+    openTaskCount: z.number().int(),
+    openedAt: z.string(),
+    resolvedAt: z.string().nullable(),
+  })
+  .openapi("GapCase");
+
+const GapTaskSchema = z
+  .object({
+    id: z.string(),
+    title: z.string(),
+    assigneeId: z.string().nullable(),
+    done: z.boolean(),
+    doneAt: z.string().nullable(),
+    createdAt: z.string(),
+  })
+  .openapi("GapTask");
+
+const GapEvidenceItemSchema = z.object({
+  source: z.string(),
+  kind: z.string(),
+  locationId: z.string(),
+  variantId: z.string().nullable(),
+  occurredAt: z.string(),
+  qty: z.string().nullable(),
+  actorId: z.string().nullable(),
+  ref: z.string(),
+});
+
+export const GapEvidenceSchema = z
+  .object({
+    /** Ordered newest first, bounded: `truncated` is true when more events fell in the window. */
+    items: z.array(GapEvidenceItemSchema),
+    truncated: z.boolean(),
+    /** Evidence sources that are not wired yet (their events are missing, not zero). */
+    unavailable: z.array(z.string()),
+  })
+  .openapi("GapEvidence");
+
+export const GapCaseDetailSchema = z
+  .object({
+    case: GapCaseSchema,
+    tasks: z.array(GapTaskSchema),
+    evidence: GapEvidenceSchema,
+  })
+  .openapi("GapCaseDetail");
+
+export const GapCasePageSchema = z
+  .object({ items: z.array(GapCaseSchema), nextCursor: z.string().nullable() })
+  .openapi("GapCasePage");
+
+export const GapGenerateResultSchema = z
+  .object({
+    countId: z.string(),
+    /** Cases created by this call. A replay creates none. */
+    created: z.number().int(),
+    /** Lines over the thresholds that already had a case. */
+    existing: z.number().int(),
+  })
+  .openapi("GapGenerateResult");
+
+export const GapTaskResultSchema = z
+  .object({ task: GapTaskSchema, case: GapCaseSchema })
+  .openapi("GapTaskResult");

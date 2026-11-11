@@ -882,6 +882,25 @@
         "required": ["base", "quote", "rate"],
         "type": "object"
       },
+      "CreateGapTask": {
+        "properties": {
+          "assigneeId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": ["string", "null"]
+          },
+          "title": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "version": {
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": ["version", "title"],
+        "type": "object"
+      },
       "CreateImport": {
         "additionalProperties": false,
         "properties": {
@@ -1711,6 +1730,258 @@
           }
         },
         "required": ["id", "base", "quote", "rate", "validFrom", "source"],
+        "type": "object"
+      },
+      "GapCase": {
+        "properties": {
+          "assigneeId": {
+            "type": ["string", "null"]
+          },
+          "batchId": {
+            "type": ["string", "null"]
+          },
+          "countId": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "foundLocationId": {
+            "type": ["string", "null"]
+          },
+          "foundQty": {
+            "type": ["string", "null"]
+          },
+          "id": {
+            "type": "string"
+          },
+          "locationId": {
+            "type": "string"
+          },
+          "openTaskCount": {
+            "type": "integer"
+          },
+          "openedAt": {
+            "type": "string"
+          },
+          "resolutionCode": {
+            "enum": ["theft", "damage", "data_error", "misplaced_found", "supplier_short", null],
+            "type": ["string", "null"]
+          },
+          "resolutionNote": {
+            "type": "string"
+          },
+          "resolvedAt": {
+            "type": ["string", "null"]
+          },
+          "status": {
+            "enum": ["open", "investigating", "resolved"],
+            "type": "string"
+          },
+          "taskCount": {
+            "type": "integer"
+          },
+          "unitCostMinor": {
+            "type": ["integer", "null"]
+          },
+          "valueMinor": {
+            "type": ["integer", "null"]
+          },
+          "varianceQty": {
+            "type": "string"
+          },
+          "variantId": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer"
+          },
+          "windowFrom": {
+            "type": "string"
+          },
+          "windowTo": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "countId",
+          "locationId",
+          "variantId",
+          "batchId",
+          "currency",
+          "varianceQty",
+          "unitCostMinor",
+          "valueMinor",
+          "windowFrom",
+          "windowTo",
+          "status",
+          "assigneeId",
+          "resolutionCode",
+          "resolutionNote",
+          "foundLocationId",
+          "foundQty",
+          "version",
+          "taskCount",
+          "openTaskCount",
+          "openedAt",
+          "resolvedAt"
+        ],
+        "type": "object"
+      },
+      "GapCaseDetail": {
+        "properties": {
+          "case": {
+            "$ref": "#/components/schemas/GapCase"
+          },
+          "evidence": {
+            "$ref": "#/components/schemas/GapEvidence"
+          },
+          "tasks": {
+            "items": {
+              "$ref": "#/components/schemas/GapTask"
+            },
+            "type": "array"
+          }
+        },
+        "required": ["case", "tasks", "evidence"],
+        "type": "object"
+      },
+      "GapCasePage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/GapCase"
+            },
+            "type": "array"
+          },
+          "nextCursor": {
+            "type": ["string", "null"]
+          }
+        },
+        "required": ["items", "nextCursor"],
+        "type": "object"
+      },
+      "GapEvidence": {
+        "properties": {
+          "items": {
+            "items": {
+              "properties": {
+                "actorId": {
+                  "type": ["string", "null"]
+                },
+                "kind": {
+                  "type": "string"
+                },
+                "locationId": {
+                  "type": "string"
+                },
+                "occurredAt": {
+                  "type": "string"
+                },
+                "qty": {
+                  "type": ["string", "null"]
+                },
+                "ref": {
+                  "type": "string"
+                },
+                "source": {
+                  "type": "string"
+                },
+                "variantId": {
+                  "type": ["string", "null"]
+                }
+              },
+              "required": [
+                "source",
+                "kind",
+                "locationId",
+                "variantId",
+                "occurredAt",
+                "qty",
+                "actorId",
+                "ref"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "unavailable": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": ["items", "truncated", "unavailable"],
+        "type": "object"
+      },
+      "GapGenerateResult": {
+        "properties": {
+          "countId": {
+            "type": "string"
+          },
+          "created": {
+            "type": "integer"
+          },
+          "existing": {
+            "type": "integer"
+          }
+        },
+        "required": ["countId", "created", "existing"],
+        "type": "object"
+      },
+      "GapTask": {
+        "properties": {
+          "assigneeId": {
+            "type": ["string", "null"]
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "done": {
+            "type": "boolean"
+          },
+          "doneAt": {
+            "type": ["string", "null"]
+          },
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": ["id", "title", "assigneeId", "done", "doneAt", "createdAt"],
+        "type": "object"
+      },
+      "GapTaskResult": {
+        "properties": {
+          "case": {
+            "$ref": "#/components/schemas/GapCase"
+          },
+          "task": {
+            "$ref": "#/components/schemas/GapTask"
+          }
+        },
+        "required": ["task", "case"],
+        "type": "object"
+      },
+      "GenerateGaps": {
+        "properties": {
+          "minQty": {
+            "pattern": "^\\d{1,14}(\\.\\d{1,4})?$",
+            "type": "string"
+          },
+          "minValueMinor": {
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
         "type": "object"
       },
       "Heartbeat": {
@@ -3431,6 +3702,32 @@
           }
         },
         "required": ["version", "lines"],
+        "type": "object"
+      },
+      "ResolveGap": {
+        "properties": {
+          "code": {
+            "enum": ["theft", "damage", "data_error", "misplaced_found", "supplier_short"],
+            "type": "string"
+          },
+          "foundLocationId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "foundQty": {
+            "pattern": "^\\d{1,14}(\\.\\d{1,4})?$",
+            "type": "string"
+          },
+          "note": {
+            "maxLength": 500,
+            "type": "string"
+          },
+          "version": {
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": ["version", "code"],
         "type": "object"
       },
       "RestoreThemeVersion": {
@@ -6833,6 +7130,41 @@
         "required": ["version"],
         "type": "object"
       },
+      "UpdateGap": {
+        "properties": {
+          "assigneeId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": ["string", "null"]
+          },
+          "status": {
+            "enum": ["investigating"],
+            "type": "string"
+          },
+          "version": {
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": ["version"],
+        "type": "object"
+      },
+      "UpdateGapTask": {
+        "properties": {
+          "assigneeId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": ["string", "null"]
+          },
+          "done": {
+            "type": "boolean"
+          },
+          "version": {
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": ["version"],
+        "type": "object"
+      },
       "UpdatePriceList": {
         "properties": {
           "archived": {
@@ -9407,6 +9739,45 @@
         "tags": ["inventory"]
       }
     },
+    "/v1/inventory/counts/{id}/gaps": {
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenerateGaps"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GapGenerateResult"
+                }
+              }
+            },
+            "description": "Created"
+          }
+        },
+        "summary": "Create gap cases from an approved count: one per line over the thresholds (idempotent per line)",
+        "tags": ["inventory"]
+      }
+    },
     "/v1/inventory/counts/{id}/open": {
       "post": {
         "parameters": [
@@ -9550,6 +9921,255 @@
           }
         },
         "summary": "Variance per line after close, valued at line cost (hidden for blind counts without counts:approve)",
+        "tags": ["inventory"]
+      }
+    },
+    "/v1/inventory/gap-cases": {
+      "get": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "enum": ["open", "investigating", "resolved"],
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "assigneeId",
+            "required": false,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "after",
+            "required": false,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GapCasePage"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Gap cases, newest first, by status or assignee (keyset pages)",
+        "tags": ["inventory"]
+      }
+    },
+    "/v1/inventory/gap-cases/{id}": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GapCaseDetail"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "One gap case: its tasks and the evidence correlated within the count window (ledger and wired sales sources)",
+        "tags": ["inventory"]
+      },
+      "patch": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateGap"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GapCase"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Move a case to investigating and set or clear its assignee",
+        "tags": ["inventory"]
+      }
+    },
+    "/v1/inventory/gap-cases/{id}/resolve": {
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveGap"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GapCase"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Resolve a case once (theft, damage, data error, misplaced found, supplier short); misplaced found posts the found stock",
+        "tags": ["inventory"]
+      }
+    },
+    "/v1/inventory/gap-cases/{id}/tasks": {
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateGapTask"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GapTaskResult"
+                }
+              }
+            },
+            "description": "Created"
+          }
+        },
+        "summary": "Add a manual task to a case",
+        "tags": ["inventory"]
+      }
+    },
+    "/v1/inventory/gap-cases/{id}/tasks/{taskId}": {
+      "patch": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "taskId",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateGapTask"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GapTaskResult"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Mark a task done or reassign it",
         "tags": ["inventory"]
       }
     },

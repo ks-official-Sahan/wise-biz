@@ -476,3 +476,63 @@ export async function commitReservations(
     opts,
   );
 }
+
+// --- Stock-gap evidence (P2-04b) ---
+
+/** Movement reasons that are inventory's own evidence for a gap: the ledger rows of the count window. */
+export const GAP_LEDGER_REASONS = [
+  "adjust",
+  "writeoff",
+  "expiry",
+  "transfer_in",
+  "transfer_out",
+  "return",
+] as const;
+
+/**
+ * What a sources' query covers: one location, a set of variants (a page of cases in one call, no N+1), and the count
+ * window. Sources must filter on it; inventory filters the same way again, so a source cannot widen the window.
+ */
+export interface GapEvidenceQuery {
+  readonly locationId: string;
+  readonly variantIds: readonly string[];
+  readonly from: Date;
+  readonly to: Date;
+}
+
+/** One correlated event. `ref` names the source document (never a secret or card data). */
+export interface GapEvidenceItem {
+  readonly kind: string;
+  readonly locationId: string;
+  readonly variantId: string | null;
+  readonly occurredAt: Date;
+  readonly qty: string | null;
+  readonly actorId: string | null;
+  readonly ref: string;
+}
+
+/**
+ * A sales-owned evidence source (voids, returns without receipt, price overrides, operators on shift). Run in the
+ * caller's tenant transaction (RLS applies). Modules never read another module's tables: the composition root wires
+ * these from sales and audit data. An absent source is reported in `unavailable`, never as "no events".
+ */
+export type GapEvidenceSource = (
+  tx: TxHandle,
+  tenantId: string,
+  q: GapEvidenceQuery,
+) => Promise<readonly GapEvidenceItem[]>;
+
+export interface GapEvidencePorts {
+  readonly voids?: GapEvidenceSource;
+  readonly returnsWithoutReceipt?: GapEvidenceSource;
+  readonly priceOverrides?: GapEvidenceSource;
+  readonly operatorsOnShift?: GapEvidenceSource;
+}
+
+export const GAP_EVIDENCE_SOURCES = [
+  "voids",
+  "returnsWithoutReceipt",
+  "priceOverrides",
+  "operatorsOnShift",
+] as const;
+export type GapEvidenceSourceName = (typeof GAP_EVIDENCE_SOURCES)[number];

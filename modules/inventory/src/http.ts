@@ -15,6 +15,15 @@ import {
   scanCountCommand,
 } from "./application/counts.ts";
 import {
+  addGapTaskCommand,
+  generateGapCasesCommand,
+  getGapCase,
+  listGapCases,
+  resolveGapCommand,
+  updateGapCommand,
+  updateGapTaskCommand,
+} from "./application/gaps.ts";
+import {
   listBalances,
   listMovements,
   listThresholds,
@@ -42,20 +51,32 @@ import {
   CountScanResultSchema,
   CountVersionSchema,
   CreateCountSchema,
+  CreateGapTaskSchema,
+  GapCaseDetailSchema,
+  GapCasePageSchema,
+  GapCaseSchema,
+  GapGenerateResultSchema,
+  GapListQuerySchema,
+  GapTaskResultSchema,
+  GenerateGapsSchema,
   MovementPageSchema,
   MovementsQuerySchema,
   ReceiptSchema,
   ReceiveSchema,
   RecountSchema,
+  ResolveGapSchema,
   ScansSchema,
   SetThresholdsSchema,
   ThresholdSchema,
   UpdateBatchSchema,
+  UpdateGapSchema,
+  UpdateGapTaskSchema,
   uuid7,
   VarianceSchema,
 } from "./schemas.ts";
 
 import type { LocationExists } from "./application/stock.ts";
+import type { GapEvidencePorts } from "./port.ts";
 import type { OpenAPIHono } from "@hono/zod-openapi";
 import type { TxHandle } from "@wise-biz/db";
 import type { AppEnv, AuthorizeResource, CommandOptions, ModuleDeps } from "@wise-biz/module-kit";
@@ -69,7 +90,10 @@ type InventoryPermission =
   | "inventory:write"
   | "counts:read"
   | "counts:write"
-  | "counts:approve";
+  | "counts:approve"
+  | "gaps:read"
+  | "gaps:write"
+  | "gaps:resolve";
 /** authorize runs BEFORE validation, so an unauthorized caller gets 404 without learning the request shape. */
 const needs =
   (permission: InventoryPermission, precheck?: AuthorizeResource): MiddlewareHandler<AppEnv> =>
@@ -87,6 +111,7 @@ const created = <T extends z.ZodType>(schema: T) => ({
   201: { description: "Created", ...json(schema) },
 });
 const Id = z.object({ id: uuid7 });
+const TaskParams = z.object({ id: uuid7, taskId: uuid7 });
 const tags = ["inventory"];
 const ZERO: AuthorizeResource = { amountMinor: 0 };
 
@@ -261,12 +286,80 @@ const routes = {
     request: { params: Id, ...body(CountVersionSchema) },
     responses: ok(CountHeaderSchema),
   }),
+  // Stock-gap cases (P2-04b). Evidence and variance are read-only; every mutation is a command.
+  generateGaps: createRoute({
+    method: "post",
+    path: "/v1/inventory/counts/{id}/gaps",
+    tags,
+    summary:
+      "Create gap cases from an approved count: one per line over the thresholds (idempotent per line)",
+    middleware: needs("gaps:write"),
+    request: { params: Id, ...body(GenerateGapsSchema) },
+    responses: created(GapGenerateResultSchema),
+  }),
+  listGaps: createRoute({
+    method: "get",
+    path: "/v1/inventory/gap-cases",
+    tags,
+    summary: "Gap cases, newest first, by status or assignee (keyset pages)",
+    middleware: needs("gaps:read"),
+    request: { query: GapListQuerySchema },
+    responses: ok(GapCasePageSchema),
+  }),
+  getGap: createRoute({
+    method: "get",
+    path: "/v1/inventory/gap-cases/{id}",
+    tags,
+    summary:
+      "One gap case: its tasks and the evidence correlated within the count window (ledger and wired sales sources)",
+    middleware: needs("gaps:read"),
+    request: { params: Id },
+    responses: ok(GapCaseDetailSchema),
+  }),
+  updateGap: createRoute({
+    method: "patch",
+    path: "/v1/inventory/gap-cases/{id}",
+    tags,
+    summary: "Move a case to investigating and set or clear its assignee",
+    middleware: needs("gaps:write"),
+    request: { params: Id, ...body(UpdateGapSchema) },
+    responses: ok(GapCaseSchema),
+  }),
+  addGapTask: createRoute({
+    method: "post",
+    path: "/v1/inventory/gap-cases/{id}/tasks",
+    tags,
+    summary: "Add a manual task to a case",
+    middleware: needs("gaps:write"),
+    request: { params: Id, ...body(CreateGapTaskSchema) },
+    responses: created(GapTaskResultSchema),
+  }),
+  updateGapTask: createRoute({
+    method: "patch",
+    path: "/v1/inventory/gap-cases/{id}/tasks/{taskId}",
+    tags,
+    summary: "Mark a task done or reassign it",
+    middleware: needs("gaps:write"),
+    request: { params: TaskParams, ...body(UpdateGapTaskSchema) },
+    responses: ok(GapTaskResultSchema),
+  }),
+  resolveGap: createRoute({
+    method: "post",
+    path: "/v1/inventory/gap-cases/{id}/resolve",
+    tags,
+    summary:
+      "Resolve a case once (theft, damage, data error, misplaced found, supplier short); misplaced found posts the found stock",
+    middleware: needs("gaps:resolve"),
+    request: { params: Id, ...body(ResolveGapSchema) },
+    responses: ok(GapCaseSchema),
+  }),
 };
 
 export function mountRoutes(
   app: OpenAPIHono<AppEnv>,
   deps: ModuleDeps,
   locationExists: LocationExists,
+  gapEvidence: GapEvidencePorts,
 ): void {
   const command = <I>(
     c: Context<AppEnv>,
@@ -393,6 +486,45 @@ export function mountRoutes(
     const { id } = c.req.valid("param");
     return command(c, "counts:write", CountVersionSchema, (tx, b, ctx) =>
       cancelCountCommand(tx, ctx, id, b.version),
+    );
+  });
+
+  app.openapi(routes.generateGaps, (c) => {
+    const { id } = c.req.valid("param");
+    return command(c, "gaps:write", GenerateGapsSchema, (tx, b, ctx) =>
+      generateGapCasesCommand(tx, ctx, id, b),
+    );
+  });
+  app.openapi(routes.listGaps, async (c) => {
+    const q = c.req.valid("query");
+    return c.json(await reading(c, (tx, t) => listGapCases(tx, t, q)), 200);
+  });
+  app.openapi(routes.getGap, async (c) => {
+    const { id } = c.req.valid("param");
+    return c.json(await reading(c, (tx, t) => getGapCase(tx, t, id, gapEvidence)), 200);
+  });
+  app.openapi(routes.updateGap, (c) => {
+    const { id } = c.req.valid("param");
+    return command(c, "gaps:write", UpdateGapSchema, (tx, b, ctx) =>
+      updateGapCommand(tx, ctx, id, b),
+    );
+  });
+  app.openapi(routes.addGapTask, (c) => {
+    const { id } = c.req.valid("param");
+    return command(c, "gaps:write", CreateGapTaskSchema, (tx, b, ctx) =>
+      addGapTaskCommand(tx, ctx, id, b),
+    );
+  });
+  app.openapi(routes.updateGapTask, (c) => {
+    const { id, taskId } = c.req.valid("param");
+    return command(c, "gaps:write", UpdateGapTaskSchema, (tx, b, ctx) =>
+      updateGapTaskCommand(tx, ctx, id, taskId, b),
+    );
+  });
+  app.openapi(routes.resolveGap, (c) => {
+    const { id } = c.req.valid("param");
+    return command(c, "gaps:resolve", ResolveGapSchema, (tx, b, ctx) =>
+      resolveGapCommand(tx, ctx, id, b, locationExists),
     );
   });
 }

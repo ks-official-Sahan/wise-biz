@@ -183,6 +183,51 @@ export const CountCancelledV1 = defineEvent(
   }),
 );
 
+/** A variance line of an approved count became a gap case (once per count line). */
+export const GapDetectedV1 = defineEvent(
+  "inventory.gap.detected",
+  1,
+  z.object({
+    caseId: z.string(),
+    countId: z.string(),
+    locationId: z.string(),
+    variantId: z.string(),
+    batchId: z.string().nullable(),
+    varianceQty: qty,
+    /** Null when the line has no known cost (never 0). */
+    valueMinor: z.number().int().nullable(),
+    currency: z.string(),
+  }),
+);
+
+/** Status, assignee or a task of a case changed. `changes` names what moved (no values). */
+export const GapUpdatedV1 = defineEvent(
+  "inventory.gap.updated",
+  1,
+  z.object({
+    caseId: z.string(),
+    locationId: z.string(),
+    variantId: z.string(),
+    status: z.enum(["open", "investigating", "resolved"]),
+    changes: z.array(z.enum(["status", "assignee", "task_added", "task_updated"])),
+  }),
+);
+
+/** Resolved (terminal). A misplaced-found resolution also posted stock: its movement is a separate movement.recorded. */
+export const GapResolvedV1 = defineEvent(
+  "inventory.gap.resolved",
+  1,
+  z.object({
+    caseId: z.string(),
+    countId: z.string(),
+    locationId: z.string(),
+    variantId: z.string(),
+    resolutionCode: z.enum(["theft", "damage", "data_error", "misplaced_found", "supplier_short"]),
+    foundLocationId: z.string().nullable(),
+    foundQty: qty.nullable(),
+  }),
+);
+
 export const INVENTORY_EVENTS = [
   MovementRecordedV1,
   BalanceNegativeV1,
@@ -197,4 +242,7 @@ export const INVENTORY_EVENTS = [
   CountClosedV1,
   CountApprovedV1,
   CountCancelledV1,
+  GapDetectedV1,
+  GapUpdatedV1,
+  GapResolvedV1,
 ] as const;
