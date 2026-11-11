@@ -11,6 +11,8 @@ export interface NavItem {
     | "/approvals"
     | "/devices"
     | "/stock"
+    | "/purchasing"
+    | "/transfers"
     | "/people"
     | "/roles"
     | "/audit"
@@ -64,6 +66,18 @@ export const NAV: readonly NavItem[] = [
     href: "/stock",
     label: "Stock",
     keywords: ["inventory", "receive", "adjust", "low stock", "expiry", "labels", "barcode"],
+    primary: false,
+  },
+  {
+    href: "/purchasing",
+    label: "Purchasing",
+    keywords: ["purchase orders", "po", "suppliers", "buy", "order", "supplier", "goods in"],
+    primary: false,
+  },
+  {
+    href: "/transfers",
+    label: "Transfers",
+    keywords: ["move stock", "between locations", "in transit", "dispatch", "stock transfer"],
     primary: false,
   },
   {

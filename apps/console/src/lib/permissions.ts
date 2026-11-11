@@ -124,6 +124,27 @@ export const PERMISSION_GROUPS: readonly { module: string; items: readonly Permi
     ],
   },
   {
+    module: "Purchasing",
+    items: [
+      {
+        permission: "procurement:read",
+        label: "View purchasing",
+        allows: "See suppliers, purchase orders and stock transfers.",
+      },
+      {
+        permission: "procurement:write",
+        label: "Edit purchasing",
+        allows:
+          "Manage suppliers, create and send purchase orders, request and dispatch transfers, cancel and close them.",
+      },
+      {
+        permission: "procurement:receive",
+        label: "Receive goods",
+        allows: "Record goods received against purchase orders and transfers.",
+      },
+    ],
+  },
+  {
     module: "Pricing",
     items: [
       {

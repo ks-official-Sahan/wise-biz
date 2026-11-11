@@ -102,7 +102,15 @@ describe("permissions", () => {
   });
 
   it("the matrix covers the tenancy and audit catalogs", () => {
-    for (const p of ["tenancy:read", "tenancy:manage", "audit:read", "audit:export"]) {
+    for (const p of [
+      "tenancy:read",
+      "tenancy:manage",
+      "audit:read",
+      "audit:export",
+      "procurement:read",
+      "procurement:write",
+      "procurement:receive",
+    ]) {
       expect(KNOWN_PERMISSIONS.has(p)).toBe(true);
     }
   });
