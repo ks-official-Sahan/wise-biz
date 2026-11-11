@@ -21,6 +21,8 @@ const UNIQUE: Readonly<Record<string, string>> = {
   receipts_pkey: "A receipt with this id already exists.",
   adjustments_pkey: "An adjustment with this id already exists.",
   batches_pkey: "A batch with this id already exists.",
+  stock_counts_pkey: "A count with this id already exists.",
+  stock_counts_one_active_uq: "A count is already open at this location.",
 };
 const REFERENCE: Readonly<Record<string, [path: string, message: string]>> = {
   receipt_lines_batch_fk: ["lines", "Unknown batch."],

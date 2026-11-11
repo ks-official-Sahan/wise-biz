@@ -13,6 +13,8 @@ const VariantUpserted = z.object({
     variantId: z.string(),
     tracksBatches: z.boolean(),
     archived: z.boolean(),
+    /** Category ids root..leaf: a cycle count scopes by category. Absent on older events = no categories. */
+    categoryIds: z.array(z.string()).default([]),
   }),
 });
 
@@ -22,12 +24,19 @@ export const INVENTORY_FACTS_CONSUMER = "inventory.variant-facts";
 export async function applyVariantFacts(client: PoolClient, payload: unknown): Promise<void> {
   const e = VariantUpserted.parse(payload);
   await client.query(
-    `insert into inventory.variant_facts (tenant_id, variant_id, tracks_batches, archived, source_time)
-     values ($1, $2, $3, $4, $5)
+    `insert into inventory.variant_facts (tenant_id, variant_id, tracks_batches, archived, source_time, category_ids)
+     values ($1, $2, $3, $4, $5, $6::uuid[])
      on conflict (tenant_id, variant_id) do update set tracks_batches = excluded.tracks_batches,
-       archived = excluded.archived, source_time = excluded.source_time
+       archived = excluded.archived, source_time = excluded.source_time, category_ids = excluded.category_ids
      where inventory.variant_facts.source_time <= excluded.source_time`,
-    [e.tenantId, e.data.variantId, e.data.tracksBatches, e.data.archived, e.time],
+    [
+      e.tenantId,
+      e.data.variantId,
+      e.data.tracksBatches,
+      e.data.archived,
+      e.time,
+      e.data.categoryIds,
+    ],
   );
 }
 

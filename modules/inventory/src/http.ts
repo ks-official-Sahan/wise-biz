@@ -1,7 +1,19 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { withTenantTx } from "@wise-biz/db";
-import { authorize, requireTenant, runCommand } from "@wise-biz/module-kit";
+import { authorize, permits, requireTenant, runCommand } from "@wise-biz/module-kit";
 
+import {
+  approveCountCommand,
+  cancelCountCommand,
+  closeCountCommand,
+  createCountCommand,
+  getCount,
+  getVariance,
+  listCounts,
+  openCountCommand,
+  requestRecountCommand,
+  scanCountCommand,
+} from "./application/counts.ts";
 import {
   listBalances,
   listMovements,
@@ -21,14 +33,26 @@ import {
   BalancePageSchema,
   BalancesQuerySchema,
   BatchSchema,
+  CloseCountSchema,
+  CountDetailSchema,
+  CountHeaderSchema,
+  CountLinesQuerySchema,
+  CountListQuerySchema,
+  CountPageSchema,
+  CountScanResultSchema,
+  CountVersionSchema,
+  CreateCountSchema,
   MovementPageSchema,
   MovementsQuerySchema,
   ReceiptSchema,
   ReceiveSchema,
+  RecountSchema,
+  ScansSchema,
   SetThresholdsSchema,
   ThresholdSchema,
   UpdateBatchSchema,
   uuid7,
+  VarianceSchema,
 } from "./schemas.ts";
 
 import type { LocationExists } from "./application/stock.ts";
@@ -39,7 +63,13 @@ import type { Permission } from "@wise-biz/policy";
 import type { Context, MiddlewareHandler } from "hono";
 
 type InventoryPermission =
-  "inventory:read" | "inventory:receive" | "inventory:adjust" | "inventory:write";
+  | "inventory:read"
+  | "inventory:receive"
+  | "inventory:adjust"
+  | "inventory:write"
+  | "counts:read"
+  | "counts:write"
+  | "counts:approve";
 /** authorize runs BEFORE validation, so an unauthorized caller gets 404 without learning the request shape. */
 const needs =
   (permission: InventoryPermission, precheck?: AuthorizeResource): MiddlewareHandler<AppEnv> =>
@@ -137,6 +167,100 @@ const routes = {
       z.object({ locationId: z.string(), set: z.number().int(), removed: z.number().int() }),
     ),
   }),
+  listCounts: createRoute({
+    method: "get",
+    path: "/v1/inventory/counts",
+    tags,
+    summary: "Stock counts, newest first, optionally by status",
+    middleware: needs("counts:read"),
+    request: { query: CountListQuerySchema },
+    responses: ok(CountPageSchema),
+  }),
+  createCount: createRoute({
+    method: "post",
+    path: "/v1/inventory/counts",
+    tags,
+    summary: "Create a count (draft) and take the snapshot of expected stock at its location",
+    middleware: needs("counts:write"),
+    request: body(CreateCountSchema),
+    responses: created(CountHeaderSchema),
+  }),
+  getCount: createRoute({
+    method: "get",
+    path: "/v1/inventory/counts/{id}",
+    tags,
+    summary: "One count: header and a keyset page of lines (expected hidden for blind counts)",
+    middleware: needs("counts:read"),
+    request: { params: Id, query: CountLinesQuerySchema },
+    responses: ok(CountDetailSchema),
+  }),
+  countVariance: createRoute({
+    method: "get",
+    path: "/v1/inventory/counts/{id}/variance",
+    tags,
+    summary:
+      "Variance per line after close, valued at line cost (hidden for blind counts without counts:approve)",
+    middleware: needs("counts:read"),
+    request: { params: Id },
+    responses: ok(VarianceSchema),
+  }),
+  openCount: createRoute({
+    method: "post",
+    path: "/v1/inventory/counts/{id}/open",
+    tags,
+    summary: "Open a draft count for counting (scans are accepted from now on)",
+    middleware: needs("counts:write"),
+    request: { params: Id, ...body(CountVersionSchema) },
+    responses: ok(CountHeaderSchema),
+  }),
+  scanCount: createRoute({
+    method: "post",
+    path: "/v1/inventory/counts/{id}/scans",
+    tags,
+    summary:
+      "Submit device scans (idempotent per scan id); the count is not revealed in the response",
+    middleware: needs("counts:write"),
+    request: { params: Id, ...body(ScansSchema) },
+    responses: ok(CountScanResultSchema),
+  }),
+  requestRecount: createRoute({
+    method: "post",
+    path: "/v1/inventory/counts/{id}/recounts",
+    tags,
+    summary:
+      "Request a recount of lines (their counted quantity is cleared; a reviewed count reopens)",
+    middleware: needs("counts:write"),
+    request: { params: Id, ...body(RecountSchema) },
+    responses: ok(CountHeaderSchema),
+  }),
+  closeCount: createRoute({
+    method: "post",
+    path: "/v1/inventory/counts/{id}/close",
+    tags,
+    summary:
+      "Close counting: take the close cut, sum the scans, value the lines; the count awaits review",
+    middleware: needs("counts:write"),
+    request: { params: Id, ...body(CloseCountSchema) },
+    responses: ok(CountHeaderSchema),
+  }),
+  approveCount: createRoute({
+    method: "post",
+    path: "/v1/inventory/counts/{id}/approve",
+    tags,
+    summary: "Approve a reviewed count: variances post as count_variance movements",
+    middleware: needs("counts:approve"),
+    request: { params: Id, ...body(CountVersionSchema) },
+    responses: ok(CountHeaderSchema),
+  }),
+  cancelCount: createRoute({
+    method: "post",
+    path: "/v1/inventory/counts/{id}/cancel",
+    tags,
+    summary: "Cancel a count that is not approved (nothing has been posted)",
+    middleware: needs("counts:write"),
+    request: { params: Id, ...body(CountVersionSchema) },
+    responses: ok(CountHeaderSchema),
+  }),
 };
 
 export function mountRoutes(
@@ -212,4 +336,63 @@ export function mountRoutes(
       setThresholdsCommand(tx, ctx, b),
     ),
   );
+
+  // Stock counts. Blind counts hide expected quantities from callers without counts:approve; mutation responses are
+  // header summaries only (no quantities), so an idempotent replay never leaks what a blind count hides.
+  app.openapi(routes.listCounts, async (c) => {
+    const q = c.req.valid("query");
+    return c.json(await reading(c, (tx, t) => listCounts(tx, t, q)), 200);
+  });
+  app.openapi(routes.createCount, (c) =>
+    command(c, "counts:write", CreateCountSchema, (tx, b, ctx) =>
+      createCountCommand(tx, ctx, b, locationExists),
+    ),
+  );
+  app.openapi(routes.getCount, async (c) => {
+    const { id } = c.req.valid("param");
+    const q = c.req.valid("query");
+    const review = permits(c, "counts:approve");
+    return c.json(await reading(c, (tx, t) => getCount(tx, t, id, q, review)), 200);
+  });
+  app.openapi(routes.countVariance, async (c) => {
+    const { id } = c.req.valid("param");
+    const review = permits(c, "counts:approve");
+    return c.json(await reading(c, (tx, t) => getVariance(tx, t, id, review)), 200);
+  });
+  app.openapi(routes.openCount, (c) => {
+    const { id } = c.req.valid("param");
+    return command(c, "counts:write", CountVersionSchema, (tx, b, ctx) =>
+      openCountCommand(tx, ctx, id, b.version),
+    );
+  });
+  app.openapi(routes.scanCount, (c) => {
+    const { id } = c.req.valid("param");
+    return command(c, "counts:write", ScansSchema, (tx, b, ctx) =>
+      scanCountCommand(tx, ctx, id, b),
+    );
+  });
+  app.openapi(routes.requestRecount, (c) => {
+    const { id } = c.req.valid("param");
+    return command(c, "counts:write", RecountSchema, (tx, b, ctx) =>
+      requestRecountCommand(tx, ctx, id, b),
+    );
+  });
+  app.openapi(routes.closeCount, (c) => {
+    const { id } = c.req.valid("param");
+    return command(c, "counts:write", CloseCountSchema, (tx, b, ctx) =>
+      closeCountCommand(tx, ctx, id, b),
+    );
+  });
+  app.openapi(routes.approveCount, (c) => {
+    const { id } = c.req.valid("param");
+    return command(c, "counts:approve", CountVersionSchema, (tx, b, ctx) =>
+      approveCountCommand(tx, ctx, id, b.version),
+    );
+  });
+  app.openapi(routes.cancelCount, (c) => {
+    const { id } = c.req.valid("param");
+    return command(c, "counts:write", CountVersionSchema, (tx, b, ctx) =>
+      cancelCountCommand(tx, ctx, id, b.version),
+    );
+  });
 }

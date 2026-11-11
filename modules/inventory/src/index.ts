@@ -15,6 +15,12 @@ export {
   BatchExpiringV1,
   BatchReceivedV1,
   BatchUpdatedV1,
+  CountApprovedV1,
+  CountCancelledV1,
+  CountClosedV1,
+  CountCreatedV1,
+  CountRecountRequestedV1,
+  CountStartedV1,
   DriftDetectedV1,
   MovementRecordedV1,
 } from "./events.ts";
@@ -46,13 +52,11 @@ export function createInventoryModule(opts: { locationExists: LocationExists }):
   return defineModule({
     name: "inventory",
     migrationsDir: join(import.meta.dirname, "..", "migrations"),
-    permissions: definePermissions("inventory", [
-      "read",
-      "receive",
-      "adjust",
-      "write",
-      "sell_expired",
-    ]),
+    permissions: [
+      ...definePermissions("inventory", ["read", "receive", "adjust", "write", "sell_expired"]),
+      // Stock counts: reading and counting are separate from approving the variances they post.
+      ...definePermissions("counts", ["read", "write", "approve"]),
+    ],
     events: [...INVENTORY_EVENTS],
     routes: (app, deps) => {
       mountRoutes(app, deps, opts.locationExists);

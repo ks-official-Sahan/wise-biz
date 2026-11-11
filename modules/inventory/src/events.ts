@@ -114,6 +114,71 @@ export const DriftDetectedV1 = defineEvent(
   }),
 );
 
+const countLine = z.object({ variantId: z.string(), batchId: z.string().nullable() });
+
+/** A count was created (snapshot taken). Scans are not evented: the close event carries the summary. */
+export const CountCreatedV1 = defineEvent(
+  "inventory.count.created",
+  1,
+  z.object({
+    countId: z.string(),
+    locationId: z.string(),
+    kind: z.enum(["full", "cycle"]),
+    mode: z.enum(["frozen", "live"]),
+    blind: z.boolean(),
+    lineCount: z.number().int(),
+  }),
+);
+
+export const CountStartedV1 = defineEvent(
+  "inventory.count.started",
+  1,
+  z.object({ countId: z.string(), locationId: z.string() }),
+);
+
+/** Lines sent back for another count (review -> open, or a recount request while counting). */
+export const CountRecountRequestedV1 = defineEvent(
+  "inventory.count.recount_requested",
+  1,
+  z.object({ countId: z.string(), locationId: z.string(), lines: z.array(countLine) }),
+);
+
+/** Counting closed: the expectation is frozen at the close cut and the count awaits review. */
+export const CountClosedV1 = defineEvent(
+  "inventory.count.closed",
+  1,
+  z.object({
+    countId: z.string(),
+    locationId: z.string(),
+    lineCount: z.number().int(),
+    uncountedLines: z.number().int(),
+  }),
+);
+
+/** Approved: its variances were posted as count_variance movements in the same transaction. */
+export const CountApprovedV1 = defineEvent(
+  "inventory.count.approved",
+  1,
+  z.object({
+    countId: z.string(),
+    locationId: z.string(),
+    adjustedLines: z.number().int(),
+    /** Sum of the valued variances in the count currency; null when a line has no known cost. */
+    netValueMinor: z.number().int().nullable(),
+    unvaluedLines: z.number().int(),
+  }),
+);
+
+export const CountCancelledV1 = defineEvent(
+  "inventory.count.cancelled",
+  1,
+  z.object({
+    countId: z.string(),
+    locationId: z.string(),
+    fromStatus: z.enum(["draft", "open", "review"]),
+  }),
+);
+
 export const INVENTORY_EVENTS = [
   MovementRecordedV1,
   BalanceNegativeV1,
@@ -122,4 +187,10 @@ export const INVENTORY_EVENTS = [
   BatchExpiringV1,
   BalanceLowV1,
   DriftDetectedV1,
+  CountCreatedV1,
+  CountStartedV1,
+  CountRecountRequestedV1,
+  CountClosedV1,
+  CountApprovedV1,
+  CountCancelledV1,
 ] as const;

@@ -392,6 +392,306 @@
         "required": ["id", "parentId", "name", "path"],
         "type": "object"
       },
+      "CloseCount": {
+        "properties": {
+          "version": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "zeroUncounted": {
+            "type": "boolean"
+          }
+        },
+        "required": ["version"],
+        "type": "object"
+      },
+      "Count": {
+        "properties": {
+          "approvedAt": {
+            "type": ["string", "null"]
+          },
+          "blind": {
+            "type": "boolean"
+          },
+          "cancelledAt": {
+            "type": ["string", "null"]
+          },
+          "closedAt": {
+            "type": ["string", "null"]
+          },
+          "countedLineCount": {
+            "type": "integer"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": ["full", "cycle"],
+            "type": "string"
+          },
+          "lineCount": {
+            "type": "integer"
+          },
+          "locationId": {
+            "type": "string"
+          },
+          "mode": {
+            "enum": ["frozen", "live"],
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          },
+          "openedAt": {
+            "type": "string"
+          },
+          "scope": {
+            "properties": {
+              "categoryIds": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "variantCount": {
+                "type": "integer"
+              }
+            },
+            "required": ["categoryIds", "variantCount"],
+            "type": "object"
+          },
+          "startedAt": {
+            "type": ["string", "null"]
+          },
+          "status": {
+            "enum": ["draft", "open", "review", "approved", "cancelled"],
+            "type": "string"
+          },
+          "version": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "locationId",
+          "kind",
+          "scope",
+          "blind",
+          "mode",
+          "status",
+          "currency",
+          "note",
+          "version",
+          "lineCount",
+          "countedLineCount",
+          "openedAt",
+          "startedAt",
+          "closedAt",
+          "approvedAt",
+          "cancelledAt"
+        ],
+        "type": "object"
+      },
+      "CountDetail": {
+        "properties": {
+          "count": {
+            "$ref": "#/components/schemas/Count"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/CountLine"
+            },
+            "type": "array"
+          },
+          "nextCursor": {
+            "type": ["string", "null"]
+          }
+        },
+        "required": ["count", "lines", "nextCursor"],
+        "type": "object"
+      },
+      "CountLine": {
+        "properties": {
+          "batchId": {
+            "type": ["string", "null"]
+          },
+          "closeQty": {
+            "type": ["string", "null"]
+          },
+          "countedQty": {
+            "type": ["string", "null"]
+          },
+          "expectedQty": {
+            "type": ["string", "null"]
+          },
+          "note": {
+            "type": "string"
+          },
+          "recountRequested": {
+            "type": "boolean"
+          },
+          "round": {
+            "type": "integer"
+          },
+          "variantId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "variantId",
+          "batchId",
+          "round",
+          "countedQty",
+          "recountRequested",
+          "note",
+          "expectedQty",
+          "closeQty"
+        ],
+        "type": "object"
+      },
+      "CountPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/Count"
+            },
+            "type": "array"
+          },
+          "nextCursor": {
+            "type": ["string", "null"]
+          }
+        },
+        "required": ["items", "nextCursor"],
+        "type": "object"
+      },
+      "CountScanResult": {
+        "properties": {
+          "accepted": {
+            "type": "integer"
+          },
+          "duplicates": {
+            "type": "integer"
+          }
+        },
+        "required": ["accepted", "duplicates"],
+        "type": "object"
+      },
+      "CountScans": {
+        "properties": {
+          "deviceId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "scans": {
+            "items": {
+              "properties": {
+                "batchId": {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                  "type": ["string", "null"]
+                },
+                "id": {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                  "type": "string"
+                },
+                "qty": {
+                  "pattern": "^\\d{1,14}(\\.\\d{1,4})?$",
+                  "type": "string"
+                },
+                "scannedAt": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "variantId": {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                  "type": "string"
+                }
+              },
+              "required": ["id", "variantId", "qty", "scannedAt"],
+              "type": "object"
+            },
+            "maxItems": 200,
+            "minItems": 1,
+            "type": "array"
+          }
+        },
+        "required": ["scans"],
+        "type": "object"
+      },
+      "CountVariance": {
+        "properties": {
+          "count": {
+            "$ref": "#/components/schemas/Count"
+          },
+          "lines": {
+            "items": {
+              "properties": {
+                "batchId": {
+                  "type": ["string", "null"]
+                },
+                "countedQty": {
+                  "type": ["string", "null"]
+                },
+                "expectedQty": {
+                  "type": ["string", "null"]
+                },
+                "unitCostMinor": {
+                  "type": ["integer", "null"]
+                },
+                "valueMinor": {
+                  "type": ["integer", "null"]
+                },
+                "varianceQty": {
+                  "type": ["string", "null"]
+                },
+                "variantId": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "variantId",
+                "batchId",
+                "countedQty",
+                "expectedQty",
+                "varianceQty",
+                "unitCostMinor",
+                "valueMinor"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "totals": {
+            "properties": {
+              "overValueMinor": {
+                "type": ["integer", "null"]
+              },
+              "shortValueMinor": {
+                "type": ["integer", "null"]
+              },
+              "unvaluedLines": {
+                "type": "integer"
+              }
+            },
+            "required": ["shortValueMinor", "overValueMinor", "unvaluedLines"],
+            "type": "object"
+          }
+        },
+        "required": ["count", "lines", "totals"],
+        "type": "object"
+      },
+      "CountVersion": {
+        "properties": {
+          "version": {
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": ["version"],
+        "type": "object"
+      },
       "Coupon": {
         "properties": {
           "active": {
@@ -434,6 +734,60 @@
           }
         },
         "required": ["name"],
+        "type": "object"
+      },
+      "CreateCount": {
+        "properties": {
+          "blind": {
+            "type": "boolean"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "id": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "kind": {
+            "enum": ["full", "cycle"],
+            "type": "string"
+          },
+          "locationId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "mode": {
+            "enum": ["frozen", "live"],
+            "type": "string"
+          },
+          "note": {
+            "maxLength": 500,
+            "type": "string"
+          },
+          "scope": {
+            "additionalProperties": false,
+            "properties": {
+              "categoryIds": {
+                "items": {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                  "type": "string"
+                },
+                "maxItems": 50,
+                "type": "array"
+              },
+              "variantIds": {
+                "items": {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                  "type": "string"
+                },
+                "maxItems": 1000,
+                "type": "array"
+              }
+            },
+            "type": "object"
+          }
+        },
+        "required": ["locationId", "kind", "blind", "mode", "currency"],
         "type": "object"
       },
       "CreateCoupon": {
@@ -3044,6 +3398,39 @@
           }
         },
         "required": ["exports"],
+        "type": "object"
+      },
+      "RequestRecount": {
+        "properties": {
+          "lines": {
+            "items": {
+              "properties": {
+                "batchId": {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                  "type": ["string", "null"]
+                },
+                "note": {
+                  "maxLength": 500,
+                  "type": "string"
+                },
+                "variantId": {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                  "type": "string"
+                }
+              },
+              "required": ["variantId"],
+              "type": "object"
+            },
+            "maxItems": 200,
+            "minItems": 1,
+            "type": "array"
+          },
+          "version": {
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": ["version", "lines"],
         "type": "object"
       },
       "RestoreThemeVersion": {
@@ -8778,6 +9165,391 @@
           }
         },
         "summary": "Set or clear a batch's own sale price (wins over the price list)",
+        "tags": ["inventory"]
+      }
+    },
+    "/v1/inventory/counts": {
+      "get": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "enum": ["draft", "open", "review", "approved", "cancelled"],
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "after",
+            "required": false,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CountPage"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Stock counts, newest first, optionally by status",
+        "tags": ["inventory"]
+      },
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCount"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Count"
+                }
+              }
+            },
+            "description": "Created"
+          }
+        },
+        "summary": "Create a count (draft) and take the snapshot of expected stock at its location",
+        "tags": ["inventory"]
+      }
+    },
+    "/v1/inventory/counts/{id}": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "after",
+            "required": false,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "maximum": 500,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CountDetail"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "One count: header and a keyset page of lines (expected hidden for blind counts)",
+        "tags": ["inventory"]
+      }
+    },
+    "/v1/inventory/counts/{id}/approve": {
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CountVersion"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Count"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Approve a reviewed count: variances post as count_variance movements",
+        "tags": ["inventory"]
+      }
+    },
+    "/v1/inventory/counts/{id}/cancel": {
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CountVersion"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Count"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Cancel a count that is not approved (nothing has been posted)",
+        "tags": ["inventory"]
+      }
+    },
+    "/v1/inventory/counts/{id}/close": {
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CloseCount"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Count"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Close counting: take the close cut, sum the scans, value the lines; the count awaits review",
+        "tags": ["inventory"]
+      }
+    },
+    "/v1/inventory/counts/{id}/open": {
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CountVersion"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Count"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Open a draft count for counting (scans are accepted from now on)",
+        "tags": ["inventory"]
+      }
+    },
+    "/v1/inventory/counts/{id}/recounts": {
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestRecount"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Count"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Request a recount of lines (their counted quantity is cleared; a reviewed count reopens)",
+        "tags": ["inventory"]
+      }
+    },
+    "/v1/inventory/counts/{id}/scans": {
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CountScans"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CountScanResult"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Submit device scans (idempotent per scan id); the count is not revealed in the response",
+        "tags": ["inventory"]
+      }
+    },
+    "/v1/inventory/counts/{id}/variance": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CountVariance"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Variance per line after close, valued at line cost (hidden for blind counts without counts:approve)",
         "tags": ["inventory"]
       }
     },
