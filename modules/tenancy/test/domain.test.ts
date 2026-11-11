@@ -54,6 +54,22 @@ describe("newBusiness (pure)", () => {
     expect(DEFAULT_ROLE_GRANTS.accountant).toContain("counts:read");
   });
 
+  it("stock gaps: managers work and resolve, clerks read and work, accountants read; nobody else", () => {
+    expect(DEFAULT_ROLE_GRANTS.manager).toEqual(
+      expect.arrayContaining(["gaps:read", "gaps:write", "gaps:resolve"]),
+    );
+    expect(DEFAULT_ROLE_GRANTS.inventory_clerk).toEqual(
+      expect.arrayContaining(["gaps:read", "gaps:write"]),
+    );
+    expect(DEFAULT_ROLE_GRANTS.inventory_clerk).not.toContain("gaps:resolve");
+    expect(DEFAULT_ROLE_GRANTS.accountant).toContain("gaps:read");
+    expect(DEFAULT_ROLE_GRANTS.accountant).not.toContain("gaps:write");
+    expect(DEFAULT_ROLE_GRANTS.accountant).not.toContain("gaps:resolve");
+    for (const role of ["owner", "supervisor", "cashier"] as const) {
+      expect(DEFAULT_ROLE_GRANTS[role].filter((p) => p.startsWith("gaps:"))).toEqual([]);
+    }
+  });
+
   it("trims names and keeps a valid cutoff", () => {
     const r = newBusiness(
       input({ name: "  Shop ", businessDayCutoff: "04:30" }, "  Acme  "),
