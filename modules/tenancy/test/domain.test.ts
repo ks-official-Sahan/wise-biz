@@ -43,6 +43,17 @@ describe("newBusiness (pure)", () => {
     expect(r.rolePermissions).toHaveLength(expected);
   });
 
+  it("stock counts: managers count and approve, clerks count only, accountants read", () => {
+    expect(DEFAULT_ROLE_GRANTS.manager).toEqual(
+      expect.arrayContaining(["counts:read", "counts:write", "counts:approve"]),
+    );
+    expect(DEFAULT_ROLE_GRANTS.inventory_clerk).toEqual(
+      expect.arrayContaining(["counts:read", "counts:write"]),
+    );
+    expect(DEFAULT_ROLE_GRANTS.inventory_clerk).not.toContain("counts:approve");
+    expect(DEFAULT_ROLE_GRANTS.accountant).toContain("counts:read");
+  });
+
   it("trims names and keeps a valid cutoff", () => {
     const r = newBusiness(
       input({ name: "  Shop ", businessDayCutoff: "04:30" }, "  Acme  "),

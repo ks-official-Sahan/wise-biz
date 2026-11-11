@@ -156,6 +156,10 @@ export const CountClosedV1 = defineEvent(
 );
 
 /** Approved: its variances were posted as count_variance movements in the same transaction. */
+/**
+ * Value fields (netValueMinor, unvaluedLines) are present for blind counts too: the payload is not changed by
+ * blindness. Consumers must filter by role (counts:approve) before showing values to anyone else.
+ */
 export const CountApprovedV1 = defineEvent(
   "inventory.count.approved",
   1,

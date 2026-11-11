@@ -218,10 +218,14 @@ export async function createCountCommand(
   const isFull = b.kind === "full";
   let scopeVariants: string[] = [];
   if (!isFull) {
+    // Two index-served branches: the primary key for explicit variants, the GIN index for categories. UNION dedupes
+    // a variant that matches both.
     const r = await tx.query<{ variant_id: string }>(
       `select variant_id from inventory.variant_facts
-        where tenant_id = $1 and archived = false
-          and (variant_id = any($2::uuid[]) or category_ids && $3::uuid[])`,
+        where tenant_id = $1 and archived = false and variant_id = any($2::uuid[])
+       union
+       select variant_id from inventory.variant_facts
+        where tenant_id = $1 and archived = false and category_ids && $3::uuid[]`,
       [tenantId, variantIds, categoryIds],
     );
     const known = new Set(r.rows.map((x) => x.variant_id));
@@ -467,6 +471,16 @@ export async function scanCountCommand(
     [tenantId, id, b.deviceId ?? null, JSON.stringify(rows)],
   );
   const accepted = inserted.rows.length;
+  if (accepted < rows.length) {
+    // A skipped id is a replay only when the stored scan belongs to this count. The same id under another count is a
+    // client bug (or a reused id), so refuse the batch; the throw rolls back the whole transaction.
+    const foreign = await tx.query<{ id: string }>(
+      `select id from inventory.count_scans
+        where tenant_id = $1 and id = any($2::uuid[]) and count_id <> $3 limit 1`,
+      [tenantId, rows.map((r) => r.id), id],
+    );
+    if (foreign.rows.length > 0) throw conflict("A scan id already belongs to another count.");
+  }
   return {
     status: 200,
     body: { accepted, duplicates: rows.length - accepted },

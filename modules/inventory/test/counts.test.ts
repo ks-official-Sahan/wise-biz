@@ -1036,3 +1036,56 @@ describe("count paths: validation, lifecycle, paging, valuation", () => {
     expect(opened).not.toHaveProperty("lines");
   });
 });
+
+describe("scan ids are unique across counts", () => {
+  it("a replay under the same count is a duplicate; the same id under another count is a 409", async () => {
+    const locA = newLocation();
+    const locB = newLocation();
+    const a = await untrackedWithStock(locA, "5");
+    const b = await untrackedWithStock(locB, "5");
+    const open = async (loc: string) => {
+      const c = await json<Header>(
+        await call("counter", "POST", "/counts", {
+          locationId: loc,
+          kind: "full",
+          blind: false,
+          mode: "live",
+          currency: "USD",
+        }),
+        201,
+      );
+      await json<Header>(
+        await call("counter", "POST", `/counts/${c.id}/open`, { version: 1 }),
+        200,
+      );
+      return c.id;
+    };
+    const countA = await open(locA);
+    const countB = await open(locB);
+
+    const s = scan(a, "2");
+    const scanPath = (id: string) => `/counts/${id}/scans`;
+    expect(
+      await json<{ accepted: number; duplicates: number }>(
+        await call("counter", "POST", scanPath(countA), { scans: [s] }),
+        200,
+      ),
+    ).toEqual({ accepted: 1, duplicates: 0 });
+    expect(
+      await json<{ accepted: number; duplicates: number }>(
+        await call("counter", "POST", scanPath(countA), { scans: [s] }),
+        200,
+      ),
+    ).toEqual({ accepted: 0, duplicates: 1 });
+
+    // Same id, other count, batched with a fresh scan: refused as a whole, nothing from the batch is stored.
+    const fresh = scan(b, "1");
+    const clash = await call("counter", "POST", scanPath(countB), { scans: [fresh, s] });
+    expect(clash.status).toBe(409);
+    const stored = await json<{ accepted: number; duplicates: number }>(
+      await call("counter", "POST", scanPath(countB), { scans: [fresh] }),
+      200,
+    );
+    expect(stored).toEqual({ accepted: 1, duplicates: 0 });
+  });
+});
