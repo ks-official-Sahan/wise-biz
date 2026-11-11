@@ -15,6 +15,12 @@ import {
   scanCountCommand,
 } from "./application/counts.ts";
 import {
+  fefoReport,
+  listNearExpiry,
+  markdownSuggestionCommand,
+  writeOffCommand,
+} from "./application/expiry.ts";
+import {
   addGapTaskCommand,
   generateGapCasesCommand,
   getGapCase,
@@ -52,6 +58,8 @@ import {
   CountVersionSchema,
   CreateCountSchema,
   CreateGapTaskSchema,
+  FefoReportQuerySchema,
+  FefoReportSchema,
   GapCaseDetailSchema,
   GapCasePageSchema,
   GapCaseSchema,
@@ -59,8 +67,12 @@ import {
   GapListQuerySchema,
   GapTaskResultSchema,
   GenerateGapsSchema,
+  MarkdownSuggestionSchema,
+  MarkdownSuggestSchema,
   MovementPageSchema,
   MovementsQuerySchema,
+  NearExpiryPageSchema,
+  NearExpiryQuerySchema,
   ReceiptSchema,
   ReceiveSchema,
   RecountSchema,
@@ -73,6 +85,8 @@ import {
   UpdateGapTaskSchema,
   uuid7,
   VarianceSchema,
+  WriteOffResultSchema,
+  WriteOffSchema,
 } from "./schemas.ts";
 
 import type { LocationExists } from "./application/stock.ts";
@@ -93,7 +107,9 @@ type InventoryPermission =
   | "counts:approve"
   | "gaps:read"
   | "gaps:write"
-  | "gaps:resolve";
+  | "gaps:resolve"
+  | "expiry:read"
+  | "expiry:writeoff";
 /** authorize runs BEFORE validation, so an unauthorized caller gets 404 without learning the request shape. */
 const needs =
   (permission: InventoryPermission, precheck?: AuthorizeResource): MiddlewareHandler<AppEnv> =>
@@ -353,6 +369,46 @@ const routes = {
     request: { params: Id, ...body(ResolveGapSchema) },
     responses: ok(GapCaseSchema),
   }),
+  nearExpiry: createRoute({
+    method: "get",
+    path: "/v1/inventory/expiry/near-expiry",
+    tags,
+    summary:
+      "Batches with stock expiring within `days` (default 30, max 365; expired included), by location, with value at cost (keyset pages)",
+    middleware: needs("expiry:read"),
+    request: { query: NearExpiryQuerySchema },
+    responses: ok(NearExpiryPageSchema),
+  }),
+  markdown: createRoute({
+    method: "post",
+    path: "/v1/inventory/expiry/markdowns",
+    tags,
+    summary:
+      "Record a promotion DRAFT for an expiring batch (event inventory.expiry.markdown_suggested); pricing decides later",
+    middleware: needs("expiry:writeoff"),
+    request: body(MarkdownSuggestSchema),
+    responses: created(MarkdownSuggestionSchema),
+  }),
+  writeOff: createRoute({
+    method: "post",
+    path: "/v1/inventory/expiry/writeoffs",
+    tags,
+    summary:
+      "Write off expired or expiring batch stock (within 7 days) as a writeoff adjustment, FEFO-consistent",
+    middleware: needs("expiry:writeoff"),
+    request: body(WriteOffSchema),
+    responses: created(WriteOffResultSchema),
+  }),
+  fefo: createRoute({
+    method: "get",
+    path: "/v1/inventory/expiry/fefo-report",
+    tags,
+    summary:
+      "FEFO compliance per variant over a date range (max 92 days): sales and transfers that took a later-expiring batch while an earlier one held stock",
+    middleware: needs("expiry:read"),
+    request: { query: FefoReportQuerySchema },
+    responses: ok(FefoReportSchema),
+  }),
 };
 
 export function mountRoutes(
@@ -526,5 +582,24 @@ export function mountRoutes(
     return command(c, "gaps:resolve", ResolveGapSchema, (tx, b, ctx) =>
       resolveGapCommand(tx, ctx, id, b, locationExists),
     );
+  });
+  app.openapi(routes.nearExpiry, async (c) => {
+    const q = c.req.valid("query");
+    const now = deps.clock.now();
+    return c.json(await reading(c, (tx, t) => listNearExpiry(tx, t, q, now)), 200);
+  });
+  app.openapi(routes.markdown, (c) =>
+    command(c, "expiry:writeoff", MarkdownSuggestSchema, (tx, b, ctx) =>
+      markdownSuggestionCommand(tx, ctx, b),
+    ),
+  );
+  app.openapi(routes.writeOff, (c) =>
+    command(c, "expiry:writeoff", WriteOffSchema, (tx, b, ctx) =>
+      writeOffCommand(tx, ctx, b, locationExists),
+    ),
+  );
+  app.openapi(routes.fefo, async (c) => {
+    const q = c.req.valid("query");
+    return c.json(await reading(c, (tx, t) => fefoReport(tx, t, q)), 200);
   });
 }

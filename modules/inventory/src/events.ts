@@ -228,6 +228,29 @@ export const GapResolvedV1 = defineEvent(
   }),
 );
 
+/**
+ * A promotion DRAFT for an expiring batch (P2-04c). Pricing consumes it later and decides; inventory moves no stock and
+ * sets no price. `expiresOn` is the batch's expiry (UTC date); `percent` is a multiple of 5 from the rule in domain/expiry.ts.
+ */
+export const ExpiryMarkdownSuggestedV1 = defineEvent(
+  "inventory.expiry.markdown_suggested",
+  1,
+  z.object({
+    batchId: z.string(),
+    variantId: z.string(),
+    locationId: z.string(),
+    expiresOn: z.string(),
+    daysLeft: z.number().int(),
+    percent: z.number().int().min(0).max(50),
+    state: z.literal("draft"),
+    stockAheadQty: qty,
+    soldQty: qty,
+    windowDays: z.number().int(),
+    currency: z.string(),
+    salePriceMinor: z.number().int().nullable(),
+  }),
+);
+
 export const INVENTORY_EVENTS = [
   MovementRecordedV1,
   BalanceNegativeV1,
@@ -245,4 +268,5 @@ export const INVENTORY_EVENTS = [
   GapDetectedV1,
   GapUpdatedV1,
   GapResolvedV1,
+  ExpiryMarkdownSuggestedV1,
 ] as const;

@@ -7897,6 +7897,288 @@
         },
         "required": ["version"],
         "type": "object"
+      },
+      "WriteOffResult": {
+        "properties": {
+          "balances": {
+            "items": {
+              "properties": {
+                "batchId": {
+                  "type": ["string", "null"]
+                },
+                "locationId": {
+                  "type": "string"
+                },
+                "qty": {
+                  "type": "string"
+                },
+                "reserved": {
+                  "type": "string"
+                },
+                "variantId": {
+                  "type": "string"
+                }
+              },
+              "required": ["locationId", "variantId", "batchId", "qty", "reserved"],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "lines": {
+            "items": {
+              "properties": {
+                "batchId": {
+                  "type": "string"
+                },
+                "qty": {
+                  "type": "string"
+                },
+                "unitCostMinor": {
+                  "type": "integer"
+                },
+                "valueMinor": {
+                  "type": "integer"
+                },
+                "variantId": {
+                  "type": "string"
+                }
+              },
+              "required": ["variantId", "batchId", "qty", "unitCostMinor", "valueMinor"],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "locationId": {
+            "type": "string"
+          },
+          "valueMinor": {
+            "type": "integer"
+          }
+        },
+        "required": ["id", "locationId", "valueMinor", "currency", "lines", "balances"],
+        "type": "object"
+      },
+      "WriteOff": {
+        "properties": {
+          "lines": {
+            "items": {
+              "properties": {
+                "batchId": {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                  "type": "string"
+                },
+                "qty": {
+                  "pattern": "^\\d{1,14}(\\.\\d{1,4})?$",
+                  "type": "string"
+                },
+                "variantId": {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                  "type": "string"
+                }
+              },
+              "required": ["variantId", "batchId", "qty"],
+              "type": "object"
+            },
+            "maxItems": 100,
+            "minItems": 1,
+            "type": "array"
+          },
+          "locationId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "note": {
+            "maxLength": 500,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": ["locationId", "lines"],
+        "type": "object"
+      },
+      "NearExpiryPage": {
+        "properties": {
+          "asOf": {
+            "type": "string"
+          },
+          "days": {
+            "type": "integer"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/NearExpiryItem"
+            },
+            "type": "array"
+          },
+          "nextCursor": {
+            "type": ["string", "null"]
+          }
+        },
+        "required": ["asOf", "days", "items", "nextCursor"],
+        "type": "object"
+      },
+      "NearExpiryItem": {
+        "properties": {
+          "batchId": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "daysLeft": {
+            "type": "integer"
+          },
+          "expiresOn": {
+            "type": "string"
+          },
+          "locationId": {
+            "type": "string"
+          },
+          "lotCode": {
+            "type": ["string", "null"]
+          },
+          "qtyOnHand": {
+            "type": "string"
+          },
+          "salePriceMinor": {
+            "type": ["integer", "null"]
+          },
+          "unitCostMinor": {
+            "type": "integer"
+          },
+          "valueMinor": {
+            "type": "integer"
+          },
+          "variantId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "batchId",
+          "variantId",
+          "locationId",
+          "lotCode",
+          "expiresOn",
+          "daysLeft",
+          "qtyOnHand",
+          "unitCostMinor",
+          "valueMinor",
+          "currency",
+          "salePriceMinor"
+        ],
+        "type": "object"
+      },
+      "MarkdownSuggestion": {
+        "properties": {
+          "batchId": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "daysLeft": {
+            "type": "integer"
+          },
+          "expiresOn": {
+            "type": "string"
+          },
+          "locationId": {
+            "type": "string"
+          },
+          "percent": {
+            "type": "integer"
+          },
+          "salePriceMinor": {
+            "type": ["integer", "null"]
+          },
+          "soldQty": {
+            "type": "string"
+          },
+          "state": {
+            "enum": ["draft"],
+            "type": "string"
+          },
+          "stockAheadQty": {
+            "type": "string"
+          },
+          "variantId": {
+            "type": "string"
+          },
+          "windowDays": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "batchId",
+          "variantId",
+          "locationId",
+          "expiresOn",
+          "daysLeft",
+          "percent",
+          "state",
+          "stockAheadQty",
+          "soldQty",
+          "windowDays",
+          "currency",
+          "salePriceMinor"
+        ],
+        "type": "object"
+      },
+      "MarkdownSuggest": {
+        "properties": {
+          "batchId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "locationId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          }
+        },
+        "required": ["locationId", "batchId"],
+        "type": "object"
+      },
+      "FefoReport": {
+        "properties": {
+          "from": {
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "properties": {
+                "outflows": {
+                  "type": "integer"
+                },
+                "variantId": {
+                  "type": "string"
+                },
+                "violatedQty": {
+                  "type": "string"
+                },
+                "violations": {
+                  "type": "integer"
+                }
+              },
+              "required": ["variantId", "outflows", "violations", "violatedQty"],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "nextCursor": {
+            "type": ["string", "null"]
+          },
+          "to": {
+            "type": "string"
+          }
+        },
+        "required": ["from", "to", "items", "nextCursor"],
+        "type": "object"
       }
     }
   },
@@ -9921,6 +10203,178 @@
           }
         },
         "summary": "Variance per line after close, valued at line cost (hidden for blind counts without counts:approve)",
+        "tags": ["inventory"]
+      }
+    },
+    "/v1/inventory/expiry/fefo-report": {
+      "get": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "from",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "after",
+            "required": false,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FefoReport"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "FEFO compliance per variant over a date range (max 92 days): sales and transfers that took a later-expiring batch while an earlier one held stock",
+        "tags": ["inventory"]
+      }
+    },
+    "/v1/inventory/expiry/markdowns": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MarkdownSuggest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MarkdownSuggestion"
+                }
+              }
+            },
+            "description": "Created"
+          }
+        },
+        "summary": "Record a promotion DRAFT for an expiring batch (event inventory.expiry.markdown_suggested); pricing decides later",
+        "tags": ["inventory"]
+      }
+    },
+    "/v1/inventory/expiry/near-expiry": {
+      "get": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "days",
+            "required": false,
+            "schema": {
+              "maximum": 365,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "locationId",
+            "required": false,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "after",
+            "required": false,
+            "schema": {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NearExpiryPage"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Batches with stock expiring within `days` (default 30, max 365; expired included), by location, with value at cost (keyset pages)",
+        "tags": ["inventory"]
+      }
+    },
+    "/v1/inventory/expiry/writeoffs": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WriteOff"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteOffResult"
+                }
+              }
+            },
+            "description": "Created"
+          }
+        },
+        "summary": "Write off expired or expiring batch stock (within 7 days) as a writeoff adjustment, FEFO-consistent",
         "tags": ["inventory"]
       }
     },

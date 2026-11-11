@@ -587,3 +587,117 @@ export const GapGenerateResultSchema = z
 export const GapTaskResultSchema = z
   .object({ task: GapTaskSchema, case: GapCaseSchema })
   .openapi("GapTaskResult");
+
+// --- Expiry (P2-04c) ---
+
+const lineWithBatch = z.object({ variantId: uuid7, batchId: uuid7, qty: positive });
+
+export const NearExpiryQuerySchema = z.object({
+  days: z.coerce.number().int().min(1).max(365).optional(),
+  locationId: uuid7.optional(),
+  after: z.string().min(1).max(200).optional(),
+  limit: z.coerce.number().int().min(1).max(200).optional(),
+});
+
+export const NearExpiryItemSchema = z
+  .object({
+    batchId: z.string(),
+    variantId: z.string(),
+    locationId: z.string(),
+    lotCode: z.string().nullable(),
+    expiresOn: z.string(),
+    daysLeft: z.number().int(),
+    qtyOnHand: z.string(),
+    unitCostMinor: z.number().int(),
+    valueMinor: z.number().int(),
+    currency: z.string(),
+    salePriceMinor: z.number().int().nullable(),
+  })
+  .openapi("NearExpiryItem");
+
+export const NearExpiryPageSchema = z
+  .object({
+    asOf: z.string(),
+    days: z.number().int(),
+    items: z.array(NearExpiryItemSchema),
+    nextCursor: z.string().nullable(),
+  })
+  .openapi("NearExpiryPage");
+
+export const MarkdownSuggestSchema = z
+  .object({ locationId: uuid7, batchId: uuid7 })
+  .openapi("MarkdownSuggest");
+
+export const MarkdownSuggestionSchema = z
+  .object({
+    batchId: z.string(),
+    variantId: z.string(),
+    locationId: z.string(),
+    expiresOn: z.string(),
+    daysLeft: z.number().int(),
+    percent: z.number().int(),
+    state: z.literal("draft"),
+    stockAheadQty: z.string(),
+    soldQty: z.string(),
+    windowDays: z.number().int(),
+    currency: z.string(),
+    salePriceMinor: z.number().int().nullable(),
+  })
+  .openapi("MarkdownSuggestion");
+
+export const WriteOffSchema = z
+  .object({
+    locationId: uuid7,
+    note: z.string().trim().min(1).max(500).optional(),
+    lines: z
+      .array(lineWithBatch)
+      .min(1)
+      .max(100)
+      .refine(
+        (ls) => new Set(ls.map((l) => `${l.variantId}|${l.batchId}`)).size === ls.length,
+        "one line per batch",
+      ),
+  })
+  .openapi("WriteOff");
+
+export const WriteOffResultSchema = z
+  .object({
+    id: z.string(),
+    locationId: z.string(),
+    valueMinor: z.number().int(),
+    currency: z.string(),
+    lines: z.array(
+      z.object({
+        variantId: z.string(),
+        batchId: z.string(),
+        qty: z.string(),
+        unitCostMinor: z.number().int(),
+        valueMinor: z.number().int(),
+      }),
+    ),
+    balances: z.array(Balance),
+  })
+  .openapi("WriteOffResult");
+
+export const FefoReportQuerySchema = z.object({
+  from: date,
+  to: date,
+  after: uuid7.optional(),
+  limit: z.coerce.number().int().min(1).max(200).optional(),
+});
+
+export const FefoReportSchema = z
+  .object({
+    from: z.string(),
+    to: z.string(),
+    items: z.array(
+      z.object({
+        variantId: z.string(),
+        outflows: z.number().int(),
+        violations: z.number().int(),
+        violatedQty: z.string(),
+      }),
+    ),
+    nextCursor: z.string().nullable(),
+  })
+  .openapi("FefoReport");

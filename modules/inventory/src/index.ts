@@ -23,6 +23,7 @@ export {
   CountRecountRequestedV1,
   CountStartedV1,
   DriftDetectedV1,
+  ExpiryMarkdownSuggestedV1,
   GapDetectedV1,
   GapResolvedV1,
   GapUpdatedV1,
@@ -76,6 +77,8 @@ export function createInventoryModule(opts: {
       ...definePermissions("counts", ["read", "write", "approve"]),
       // Stock-gap cases: reading (with the evidence panel), working the case, and resolving it.
       ...definePermissions("gaps", ["read", "write", "resolve"]),
+      // Expiry: the near-expiry list and the FEFO report read; markdown drafts and write-offs are the write side.
+      ...definePermissions("expiry", ["read", "writeoff"]),
     ],
     events: [...INVENTORY_EVENTS],
     routes: (app, deps) => {
