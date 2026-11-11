@@ -70,6 +70,21 @@ describe("newBusiness (pure)", () => {
     }
   });
 
+  it("support tickets: every system role except owner can open and read tickets", () => {
+    for (const role of [
+      "manager",
+      "supervisor",
+      "cashier",
+      "inventory_clerk",
+      "accountant",
+    ] as const) {
+      expect(DEFAULT_ROLE_GRANTS[role]).toEqual(
+        expect.arrayContaining(["support:create", "support:read"]),
+      );
+    }
+    expect(DEFAULT_ROLE_GRANTS.owner).toEqual([]);
+  });
+
   it("trims names and keeps a valid cutoff", () => {
     const r = newBusiness(
       input({ name: "  Shop ", businessDayCutoff: "04:30" }, "  Acme  "),

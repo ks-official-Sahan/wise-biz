@@ -85,6 +85,7 @@ describe("registry + migrations", () => {
       "procurement",
       "reporting",
       "notifications",
+      "support",
       "template",
     ]);
     expect(globals).toEqual(["identity"]);

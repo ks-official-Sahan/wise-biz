@@ -45,6 +45,7 @@
     "@wise-biz/module-sales": "workspace:*",
     "@wise-biz/module-search": "workspace:*",
     "@wise-biz/module-shortlinks": "workspace:*",
+    "@wise-biz/module-support": "workspace:*",
     "@wise-biz/module-sync": "workspace:*",
     "@wise-biz/module-template": "workspace:*",
     "@wise-biz/module-tenancy": "workspace:*",

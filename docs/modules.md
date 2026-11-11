@@ -25,7 +25,7 @@ Each module: owns a Postgres schema, exposes contracts in `@wise-biz/contracts/<
 | **audit** | Hash-chained audit log, read API for the console viewer (`/v1/audit/entries`, CSV `/v1/audit/export`, permissions `audit:read` / `audit:export`), platform snapshots, restore jobs | audit_log (partitioned), snapshots, restore_jobs | `audit.export.requested`, `audit.snapshot.created` | — (written in-tx by all) | P1 |
 | **media** | Wraps media-kit; per-tenant folders, variants for offline cache | media_assets, media_usage | `media.asset.*` | — | P1 |
 | **theming** | Theme tokens, fonts, receipt templates, letterheads, card templates | themes, fonts, receipt_templates, letterheads | `theming.theme.published` | — | P1 |
-| **support** | Tickets, platform announcements | tickets, ticket_messages | `support.*` | — | P2 |
+| **support** | Tenant help tickets with messages and SLA timers by plan (P2-15a: `/v1/support/tickets*`, permissions `support:create` / `support:read`); platform queue, announcements and attachments come later | tickets, ticket_messages | `support.ticket.created`, `support.ticket.message_added`, `support.ticket.status_changed` (v1, topic `support`, key tenant) | — | P2 |
 | **search** | Hybrid search projection (ADR 0007): `simple` FTS with prefix tsquery + trigram KNN (GiST, word-similarity distance) on a punctuation-free `norm`, fused by reciprocal rank; `GET /v1/search/variants` (catalog:read) | search_documents (FTS + trigram + nullable vector) | — | `catalog.variant.upserted` (consumer `search.catalog-projection` in the workers; `customers.*` later) | P1 |
 | **shortlinks** | URL shortening for receipts, payment links, campaigns (edge) | short_links | — | — | P1 |
 

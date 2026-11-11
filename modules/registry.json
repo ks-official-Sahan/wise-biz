@@ -16,6 +16,7 @@
     "procurement",
     "reporting",
     "notifications",
+    "support",
     "_template"
   ],
   "global": ["identity"]

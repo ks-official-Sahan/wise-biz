@@ -1708,6 +1708,42 @@
         "required": ["id", "name", "kind", "value", "taxCategory", "active", "version"],
         "type": "object"
       },
+      "FefoReport": {
+        "properties": {
+          "from": {
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "properties": {
+                "outflows": {
+                  "type": "integer"
+                },
+                "variantId": {
+                  "type": "string"
+                },
+                "violatedQty": {
+                  "type": "string"
+                },
+                "violations": {
+                  "type": "integer"
+                }
+              },
+              "required": ["variantId", "outflows", "violations", "violatedQty"],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "nextCursor": {
+            "type": ["string", "null"]
+          },
+          "to": {
+            "type": "string"
+          }
+        },
+        "required": ["from", "to", "items", "nextCursor"],
+        "type": "object"
+      },
       "FxRate": {
         "properties": {
           "base": {
@@ -2194,6 +2230,76 @@
         ],
         "type": "object"
       },
+      "MarkdownSuggest": {
+        "properties": {
+          "batchId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "locationId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          }
+        },
+        "required": ["locationId", "batchId"],
+        "type": "object"
+      },
+      "MarkdownSuggestion": {
+        "properties": {
+          "batchId": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "daysLeft": {
+            "type": "integer"
+          },
+          "expiresOn": {
+            "type": "string"
+          },
+          "locationId": {
+            "type": "string"
+          },
+          "percent": {
+            "type": "integer"
+          },
+          "salePriceMinor": {
+            "type": ["integer", "null"]
+          },
+          "soldQty": {
+            "type": "string"
+          },
+          "state": {
+            "enum": ["draft"],
+            "type": "string"
+          },
+          "stockAheadQty": {
+            "type": "string"
+          },
+          "variantId": {
+            "type": "string"
+          },
+          "windowDays": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "batchId",
+          "variantId",
+          "locationId",
+          "expiresOn",
+          "daysLeft",
+          "percent",
+          "state",
+          "stockAheadQty",
+          "soldQty",
+          "windowDays",
+          "currency",
+          "salePriceMinor"
+        ],
+        "type": "object"
+      },
       "MovementPage": {
         "properties": {
           "items": {
@@ -2247,6 +2353,78 @@
           }
         },
         "required": ["items", "nextCursor"],
+        "type": "object"
+      },
+      "NearExpiryItem": {
+        "properties": {
+          "batchId": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "daysLeft": {
+            "type": "integer"
+          },
+          "expiresOn": {
+            "type": "string"
+          },
+          "locationId": {
+            "type": "string"
+          },
+          "lotCode": {
+            "type": ["string", "null"]
+          },
+          "qtyOnHand": {
+            "type": "string"
+          },
+          "salePriceMinor": {
+            "type": ["integer", "null"]
+          },
+          "unitCostMinor": {
+            "type": "integer"
+          },
+          "valueMinor": {
+            "type": "integer"
+          },
+          "variantId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "batchId",
+          "variantId",
+          "locationId",
+          "lotCode",
+          "expiresOn",
+          "daysLeft",
+          "qtyOnHand",
+          "unitCostMinor",
+          "valueMinor",
+          "currency",
+          "salePriceMinor"
+        ],
+        "type": "object"
+      },
+      "NearExpiryPage": {
+        "properties": {
+          "asOf": {
+            "type": "string"
+          },
+          "days": {
+            "type": "integer"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/NearExpiryItem"
+            },
+            "type": "array"
+          },
+          "nextCursor": {
+            "type": ["string", "null"]
+          }
+        },
+        "required": ["asOf", "days", "items", "nextCursor"],
         "type": "object"
       },
       "OperatorSession": {
@@ -5185,6 +5363,252 @@
         "required": ["items"],
         "type": "object"
       },
+      "SupportAddMessage": {
+        "properties": {
+          "body": {
+            "maxLength": 8000,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": ["body"],
+        "type": "object"
+      },
+      "SupportChangeStatus": {
+        "properties": {
+          "status": {
+            "enum": ["open", "pending", "solved", "closed"],
+            "type": "string"
+          }
+        },
+        "required": ["status"],
+        "type": "object"
+      },
+      "SupportCreateTicket": {
+        "properties": {
+          "body": {
+            "maxLength": 8000,
+            "minLength": 1,
+            "type": "string"
+          },
+          "branchId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "diagnostics": {
+            "additionalProperties": {},
+            "type": "object"
+          },
+          "priority": {
+            "default": "normal",
+            "enum": ["low", "normal", "high", "urgent"],
+            "type": "string"
+          },
+          "subject": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": ["subject", "body"],
+        "type": "object"
+      },
+      "SupportMessage": {
+        "properties": {
+          "authorId": {
+            "type": "string"
+          },
+          "authorKind": {
+            "enum": ["tenant", "platform"],
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "internal": {
+            "type": "boolean"
+          }
+        },
+        "required": ["id", "authorKind", "authorId", "body", "internal", "createdAt"],
+        "type": "object"
+      },
+      "SupportTicket": {
+        "properties": {
+          "branchId": {
+            "type": ["string", "null"]
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "firstRespondedAt": {
+            "type": ["string", "null"]
+          },
+          "id": {
+            "type": "string"
+          },
+          "planCode": {
+            "type": "string"
+          },
+          "priority": {
+            "enum": ["low", "normal", "high", "urgent"],
+            "type": "string"
+          },
+          "slaFirstResponseDueAt": {
+            "type": "string"
+          },
+          "slaResolutionDueAt": {
+            "type": "string"
+          },
+          "solvedAt": {
+            "type": ["string", "null"]
+          },
+          "status": {
+            "enum": ["open", "pending", "solved", "closed"],
+            "type": "string"
+          },
+          "subject": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "subject",
+          "status",
+          "priority",
+          "branchId",
+          "planCode",
+          "slaFirstResponseDueAt",
+          "slaResolutionDueAt",
+          "firstRespondedAt",
+          "solvedAt",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object"
+      },
+      "SupportTicketDetail": {
+        "properties": {
+          "branchId": {
+            "type": ["string", "null"]
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "diagnostics": {
+            "properties": {
+              "appVersion": {
+                "type": "string"
+              },
+              "branchId": {
+                "type": "string"
+              },
+              "deviceId": {
+                "type": "string"
+              },
+              "lastErrors": {
+                "items": {
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["message"],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "platform": {
+                "type": "string"
+              }
+            },
+            "required": ["lastErrors"],
+            "type": "object"
+          },
+          "firstRespondedAt": {
+            "type": ["string", "null"]
+          },
+          "id": {
+            "type": "string"
+          },
+          "messages": {
+            "items": {
+              "$ref": "#/components/schemas/SupportMessage"
+            },
+            "type": "array"
+          },
+          "messagesTruncated": {
+            "type": "boolean"
+          },
+          "planCode": {
+            "type": "string"
+          },
+          "priority": {
+            "enum": ["low", "normal", "high", "urgent"],
+            "type": "string"
+          },
+          "slaFirstResponseDueAt": {
+            "type": "string"
+          },
+          "slaResolutionDueAt": {
+            "type": "string"
+          },
+          "solvedAt": {
+            "type": ["string", "null"]
+          },
+          "status": {
+            "enum": ["open", "pending", "solved", "closed"],
+            "type": "string"
+          },
+          "subject": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "subject",
+          "status",
+          "priority",
+          "branchId",
+          "planCode",
+          "slaFirstResponseDueAt",
+          "slaResolutionDueAt",
+          "firstRespondedAt",
+          "solvedAt",
+          "createdAt",
+          "updatedAt",
+          "diagnostics",
+          "messages",
+          "messagesTruncated"
+        ],
+        "type": "object"
+      },
+      "SupportTicketPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SupportTicket"
+            },
+            "type": "array"
+          },
+          "nextCursor": {
+            "type": ["string", "null"]
+          }
+        },
+        "required": ["items", "nextCursor"],
+        "type": "object"
+      },
       "SyncBootstrap": {
         "properties": {
           "builtAt": {
@@ -7898,6 +8322,44 @@
         "required": ["version"],
         "type": "object"
       },
+      "WriteOff": {
+        "properties": {
+          "lines": {
+            "items": {
+              "properties": {
+                "batchId": {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                  "type": "string"
+                },
+                "qty": {
+                  "pattern": "^\\d{1,14}(\\.\\d{1,4})?$",
+                  "type": "string"
+                },
+                "variantId": {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                  "type": "string"
+                }
+              },
+              "required": ["variantId", "batchId", "qty"],
+              "type": "object"
+            },
+            "maxItems": 100,
+            "minItems": 1,
+            "type": "array"
+          },
+          "locationId": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "note": {
+            "maxLength": 500,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": ["locationId", "lines"],
+        "type": "object"
+      },
       "WriteOffResult": {
         "properties": {
           "balances": {
@@ -7962,222 +8424,6 @@
           }
         },
         "required": ["id", "locationId", "valueMinor", "currency", "lines", "balances"],
-        "type": "object"
-      },
-      "WriteOff": {
-        "properties": {
-          "lines": {
-            "items": {
-              "properties": {
-                "batchId": {
-                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
-                  "type": "string"
-                },
-                "qty": {
-                  "pattern": "^\\d{1,14}(\\.\\d{1,4})?$",
-                  "type": "string"
-                },
-                "variantId": {
-                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
-                  "type": "string"
-                }
-              },
-              "required": ["variantId", "batchId", "qty"],
-              "type": "object"
-            },
-            "maxItems": 100,
-            "minItems": 1,
-            "type": "array"
-          },
-          "locationId": {
-            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
-            "type": "string"
-          },
-          "note": {
-            "maxLength": 500,
-            "minLength": 1,
-            "type": "string"
-          }
-        },
-        "required": ["locationId", "lines"],
-        "type": "object"
-      },
-      "NearExpiryPage": {
-        "properties": {
-          "asOf": {
-            "type": "string"
-          },
-          "days": {
-            "type": "integer"
-          },
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/NearExpiryItem"
-            },
-            "type": "array"
-          },
-          "nextCursor": {
-            "type": ["string", "null"]
-          }
-        },
-        "required": ["asOf", "days", "items", "nextCursor"],
-        "type": "object"
-      },
-      "NearExpiryItem": {
-        "properties": {
-          "batchId": {
-            "type": "string"
-          },
-          "currency": {
-            "type": "string"
-          },
-          "daysLeft": {
-            "type": "integer"
-          },
-          "expiresOn": {
-            "type": "string"
-          },
-          "locationId": {
-            "type": "string"
-          },
-          "lotCode": {
-            "type": ["string", "null"]
-          },
-          "qtyOnHand": {
-            "type": "string"
-          },
-          "salePriceMinor": {
-            "type": ["integer", "null"]
-          },
-          "unitCostMinor": {
-            "type": "integer"
-          },
-          "valueMinor": {
-            "type": "integer"
-          },
-          "variantId": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "batchId",
-          "variantId",
-          "locationId",
-          "lotCode",
-          "expiresOn",
-          "daysLeft",
-          "qtyOnHand",
-          "unitCostMinor",
-          "valueMinor",
-          "currency",
-          "salePriceMinor"
-        ],
-        "type": "object"
-      },
-      "MarkdownSuggestion": {
-        "properties": {
-          "batchId": {
-            "type": "string"
-          },
-          "currency": {
-            "type": "string"
-          },
-          "daysLeft": {
-            "type": "integer"
-          },
-          "expiresOn": {
-            "type": "string"
-          },
-          "locationId": {
-            "type": "string"
-          },
-          "percent": {
-            "type": "integer"
-          },
-          "salePriceMinor": {
-            "type": ["integer", "null"]
-          },
-          "soldQty": {
-            "type": "string"
-          },
-          "state": {
-            "enum": ["draft"],
-            "type": "string"
-          },
-          "stockAheadQty": {
-            "type": "string"
-          },
-          "variantId": {
-            "type": "string"
-          },
-          "windowDays": {
-            "type": "integer"
-          }
-        },
-        "required": [
-          "batchId",
-          "variantId",
-          "locationId",
-          "expiresOn",
-          "daysLeft",
-          "percent",
-          "state",
-          "stockAheadQty",
-          "soldQty",
-          "windowDays",
-          "currency",
-          "salePriceMinor"
-        ],
-        "type": "object"
-      },
-      "MarkdownSuggest": {
-        "properties": {
-          "batchId": {
-            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
-            "type": "string"
-          },
-          "locationId": {
-            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
-            "type": "string"
-          }
-        },
-        "required": ["locationId", "batchId"],
-        "type": "object"
-      },
-      "FefoReport": {
-        "properties": {
-          "from": {
-            "type": "string"
-          },
-          "items": {
-            "items": {
-              "properties": {
-                "outflows": {
-                  "type": "integer"
-                },
-                "variantId": {
-                  "type": "string"
-                },
-                "violatedQty": {
-                  "type": "string"
-                },
-                "violations": {
-                  "type": "integer"
-                }
-              },
-              "required": ["variantId", "outflows", "violations", "violatedQty"],
-              "type": "object"
-            },
-            "type": "array"
-          },
-          "nextCursor": {
-            "type": ["string", "null"]
-          },
-          "to": {
-            "type": "string"
-          }
-        },
-        "required": ["from", "to", "items", "nextCursor"],
         "type": "object"
       }
     }
@@ -13727,6 +13973,188 @@
         },
         "summary": "Hybrid search (full text + typo-tolerant trigram, reciprocal rank fusion) over sellable variants",
         "tags": ["search"]
+      }
+    },
+    "/v1/support/tickets": {
+      "get": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "after",
+            "required": false,
+            "schema": {
+              "maxLength": 200,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "enum": ["open", "pending", "solved", "closed"],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupportTicketPage"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "The tenant's tickets, newest first, keyset-paged; optionally by status",
+        "tags": ["support"]
+      },
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SupportCreateTicket"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupportTicketDetail"
+                }
+              }
+            },
+            "description": "Created"
+          }
+        },
+        "summary": "Open a ticket with its first message and an optional diagnostic bundle (sanitised)",
+        "tags": ["support"]
+      }
+    },
+    "/v1/support/tickets/{id}": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupportTicketDetail"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "One ticket with its thread (internal notes are never included)",
+        "tags": ["support"]
+      }
+    },
+    "/v1/support/tickets/{id}/messages": {
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SupportAddMessage"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupportMessage"
+                }
+              }
+            },
+            "description": "Created"
+          }
+        },
+        "summary": "Reply on a ticket: reopens a pending or solved ticket (solved only within 14 days)",
+        "tags": ["support"]
+      }
+    },
+    "/v1/support/tickets/{id}/status": {
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SupportChangeStatus"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupportTicket"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Mark a ticket solved or closed, or reopen a solved one within 14 days",
+        "tags": ["support"]
       }
     },
     "/v1/sync/bootstrap": {

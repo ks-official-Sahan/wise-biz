@@ -9,6 +9,7 @@ import { createReportingModule } from "@wise-biz/module-reporting";
 import { createSalesModule } from "@wise-biz/module-sales";
 import { createSearchModule } from "@wise-biz/module-search";
 import { shortlinksModule } from "@wise-biz/module-shortlinks";
+import { createSupportModule } from "@wise-biz/module-support";
 import { createSyncModule } from "@wise-biz/module-sync";
 import { templateModule } from "@wise-biz/module-template";
 import { createTenancyModule } from "@wise-biz/module-tenancy";
@@ -70,6 +71,11 @@ export function createModules(
     // MIS reports read the rollups the worker maintains (P1-14).
     createReportingModule({ store }),
     notificationsModule,
+    // Tenant help tickets (P2-15a). Billing (P2) has no plan source yet, so every tenant gets the free-plan SLA.
+    createSupportModule({
+      refs: { branchExists },
+      plans: () => Promise.resolve("free"),
+    }),
     templateModule,
   ];
 }

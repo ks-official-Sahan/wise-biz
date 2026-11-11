@@ -55,6 +55,8 @@ export const DEFAULT_ROLE_GRANTS: Readonly<Record<SystemRole, readonly Permissio
     "sales:price_override",
     "sales:open_drawer",
     "sales:cash",
+    "support:create",
+    "support:read",
   ],
   supervisor: [
     "tenancy:read",
@@ -75,6 +77,8 @@ export const DEFAULT_ROLE_GRANTS: Readonly<Record<SystemRole, readonly Permissio
     "sales:price_override",
     "sales:open_drawer",
     "sales:cash",
+    "support:create",
+    "support:read",
   ],
   cashier: [
     "devices:pin",
@@ -86,6 +90,8 @@ export const DEFAULT_ROLE_GRANTS: Readonly<Record<SystemRole, readonly Permissio
     "sales:return",
     "sales:void",
     "sales:open_drawer",
+    "support:create",
+    "support:read",
   ],
   inventory_clerk: [
     "devices:pin",
@@ -100,6 +106,8 @@ export const DEFAULT_ROLE_GRANTS: Readonly<Record<SystemRole, readonly Permissio
     "counts:write",
     "gaps:read",
     "gaps:write",
+    "support:create",
+    "support:read",
   ],
   accountant: [
     "tenancy:read",
@@ -110,6 +118,8 @@ export const DEFAULT_ROLE_GRANTS: Readonly<Record<SystemRole, readonly Permissio
     "gaps:read",
     "sales:read",
     "reporting:read",
+    "support:create",
+    "support:read",
   ],
 };
 
