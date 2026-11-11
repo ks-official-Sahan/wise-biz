@@ -32,7 +32,14 @@
     "db:seed": "node --env-file-if-exists=.env scripts/seed-demo.mts",
     "db:migration": "pnpm -F @wise-biz/db migration",
     "db:rls-check": "pnpm -F @wise-biz/db rls-check",
-    "load:template": "node scripts/load/template-create.mjs"
+    "load:template": "node scripts/load/template-create.mjs",
+    "stack:env": "node scripts/stack-env.mts",
+    "stack:build": "docker compose -f infra/docker/compose.stack.yaml --env-file .env.stack build",
+    "stack:up": "docker compose -f infra/docker/compose.stack.yaml --env-file .env.stack up -d --build --wait --wait-timeout 900",
+    "stack:smoke": "node scripts/stack-smoke.mts",
+    "stack:logs": "docker compose -f infra/docker/compose.stack.yaml --env-file .env.stack logs -f --tail=100",
+    "stack:down": "docker compose -f infra/docker/compose.stack.yaml --env-file .env.stack down",
+    "stack:reset": "docker compose -f infra/docker/compose.stack.yaml --env-file .env.stack down -v"
   },
   "devDependencies": {
     "@changesets/cli": "3.0.3",

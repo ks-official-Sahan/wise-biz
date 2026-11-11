@@ -1,0 +1,287 @@
+name: wise-biz-stack
+
+# The whole product on one host, with no external service: Postgres, Redis, object storage and a mail sink all run here.
+# Local testing: pnpm stack:env && pnpm stack:up && pnpm stack:smoke (docs/runbooks/docker.md, part A).
+# The same images on a VPS: add compose.vps.yaml (docs/runbooks/docker.md, part B).
+#
+# Order: postgres -> db-roles (creates the five roles) -> migrate (runs to completion) -> api, workers, realtime, console
+# -> nginx. Every value comes from the env files that scripts/stack-env.mts writes (.env.stack and .env.stack.<service>).
+#
+# Networks: `data` is internal (no route out, no published ports): Postgres, Redis and object storage live there only.
+# `edge` has egress for the apps (mail, Sentry, object store on R2 in the VPS setup) and carries nginx traffic.
+
+x-app: &app
+  restart: unless-stopped
+  read_only: true
+  tmpfs: [/tmp]
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  logging:
+    driver: json-file
+    options: { max-size: "20m", max-file: "5" }
+
+services:
+  postgres:
+    image: pgvector/pgvector:0.8.7-pg18-trixie
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?run pnpm stack:env first}
+      POSTGRES_DB: postgres
+    command: postgres -c shared_preload_libraries=pg_stat_statements -c pg_stat_statements.track=all
+    volumes:
+      - pgdata:/var/lib/postgresql
+    networks: [data]
+    healthcheck:
+      # TCP: the image's temporary init server listens on the socket only, so this turns healthy after init.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U postgres -d postgres"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+      start_period: 10s
+    deploy: { resources: { limits: { cpus: "1", memory: 1g } } }
+
+  db-roles:
+    image: pgvector/pgvector:0.8.7-pg18-trixie
+    restart: "no"
+    env_file: [../../.env.stack.db-roles]
+    environment:
+      PGHOST: postgres
+      PGUSER: postgres
+    volumes:
+      - ../neon/provision-roles.sql:/sql/provision-roles.sql:ro
+    networks: [data]
+    # First run: create wise_biz and run the role script. Later runs (volume kept): only re-sync the five passwords to the
+    # current env file, so a regenerated .env.stack never leaves the apps with a stale password.
+    command:
+      - sh
+      - -ec
+      - |
+        roles_exist="$$(psql -v ON_ERROR_STOP=1 -tAc "select count(*) from pg_roles where rolname = 'wb_migrator'" postgres)"
+        if [ "$$roles_exist" = "1" ]; then
+          echo "roles exist: syncing passwords"
+          psql -v ON_ERROR_STOP=1 -q -d postgres \
+            -v migrator_pw="$$WB_MIGRATOR_PASSWORD" -v app_pw="$$WB_APP_PASSWORD" \
+            -v worker_pw="$$WB_WORKER_PASSWORD" -v chainer_pw="$$WB_CHAINER_PASSWORD" \
+            -v identity_pw="$$WB_IDENTITY_PASSWORD" <<'SQL'
+        ALTER ROLE wb_migrator WITH PASSWORD :'migrator_pw';
+        ALTER ROLE wb_app WITH PASSWORD :'app_pw';
+        ALTER ROLE wb_worker WITH PASSWORD :'worker_pw';
+        ALTER ROLE wb_chainer WITH PASSWORD :'chainer_pw';
+        ALTER ROLE wb_identity WITH PASSWORD :'identity_pw';
+        SQL
+        else
+          psql -v ON_ERROR_STOP=1 -q -d postgres -c "create database wise_biz owner postgres"
+          psql -v ON_ERROR_STOP=1 -q -d wise_biz \
+            -v migrator_pw="$$WB_MIGRATOR_PASSWORD" -v app_pw="$$WB_APP_PASSWORD" \
+            -v worker_pw="$$WB_WORKER_PASSWORD" -v chainer_pw="$$WB_CHAINER_PASSWORD" \
+            -v identity_pw="$$WB_IDENTITY_PASSWORD" -v dbname=wise_biz \
+            -f /sql/provision-roles.sql
+        fi
+        # Proof: all five roles exist and the database is owned by the migrator.
+        count="$$(psql -v ON_ERROR_STOP=1 -tAc "select count(*) from pg_roles where rolname in ('wb_migrator','wb_app','wb_worker','wb_chainer','wb_identity')" postgres)"
+        [ "$$count" = "5" ] || { echo "expected 5 roles, found $$count" >&2; exit 1; }
+        echo "db-roles ok"
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  migrate:
+    <<: *app
+    restart: "no"
+    build:
+      context: ../..
+      dockerfile: infra/docker/service.Dockerfile
+      args: { APP: api }
+    image: wise-biz/api:${WB_VERSION:-local}
+    env_file: [../../.env.stack.migrate]
+    working_dir: /repo
+    command: ["node", "packages/db/scripts/migrate.mts"]
+    networks: [data]
+    depends_on:
+      db-roles: { condition: service_completed_successfully }
+
+  redis:
+    image: redis:8.10.2-alpine
+    restart: unless-stopped
+    command:
+      [
+        "redis-server",
+        "--appendonly",
+        "yes",
+        "--save",
+        "",
+        "--requirepass",
+        "${REDIS_PASSWORD:?run pnpm stack:env first}",
+      ]
+    environment:
+      REDISCLI_AUTH: ${REDIS_PASSWORD:?run pnpm stack:env first}
+    volumes:
+      - redisdata:/data
+    networks: [data]
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    deploy: { resources: { limits: { cpus: "0.5", memory: 256m } } }
+
+  storage:
+    image: rustfs/rustfs:1.0.3
+    restart: unless-stopped
+    environment:
+      RUSTFS_ACCESS_KEY: ${STORAGE_ACCESS_KEY_ID:?run pnpm stack:env first}
+      RUSTFS_SECRET_KEY: ${STORAGE_SECRET_ACCESS_KEY:?run pnpm stack:env first}
+      RUSTFS_VOLUMES: /data
+      RUSTFS_CONSOLE_ENABLE: "true"
+      RUSTFS_ADDRESS: ":9000"
+      RUSTFS_CONSOLE_ADDRESS: ":9001"
+    ports:
+      # Host ports for inspection only (bound to loopback). They differ from the dev infra (compose.yaml: 9000, 9001, 8025) so
+      # the stack and `pnpm infra:up` can run side by side. compose.vps.yaml removes them.
+      - "127.0.0.1:19000:9000"
+      - "127.0.0.1:19001:9001"
+    volumes:
+      - storagedata:/data
+    networks: [data]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9000/health/ready || exit 1"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+      start_period: 5s
+    deploy: { resources: { limits: { cpus: "1", memory: 512m } } }
+
+  storage-init:
+    image: amazon/aws-cli:2.38.1
+    restart: "no"
+    environment:
+      AWS_ACCESS_KEY_ID: ${STORAGE_ACCESS_KEY_ID:?run pnpm stack:env first}
+      AWS_SECRET_ACCESS_KEY: ${STORAGE_SECRET_ACCESS_KEY:?run pnpm stack:env first}
+      AWS_DEFAULT_REGION: us-east-1
+      AWS_ENDPOINT_URL: http://storage:9000
+    entrypoint: ["sh", "-c"]
+    # Bucket, then the CORS rule the console needs for browser uploads (presigned PUT from the public origin).
+    command:
+      - |
+        aws s3api head-bucket --bucket wise-biz 2>/dev/null || aws s3api create-bucket --bucket wise-biz
+        aws s3api put-bucket-cors --bucket wise-biz --cors-configuration '{"CORSRules":[{"AllowedOrigins":["${STACK_PUBLIC_ORIGIN:?run pnpm stack:env first}"],"AllowedMethods":["GET","PUT","HEAD"],"AllowedHeaders":["*"],"ExposeHeaders":["ETag"],"MaxAgeSeconds":3000}]}'
+        echo "storage-init ok"
+    networks: [data]
+    depends_on:
+      storage: { condition: service_healthy }
+
+  mailpit:
+    image: axllent/mailpit:v1.31.6
+    restart: unless-stopped
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: "1"
+      MP_SMTP_AUTH_ALLOW_INSECURE: "1"
+    ports:
+      # Web UI and API for humans and scripts/stack-smoke.mts. SMTP (1025) stays inside the stack.
+      - "127.0.0.1:18025:8025"
+    networks: [edge]
+    healthcheck:
+      test: ["CMD", "/mailpit", "readyz"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    deploy: { resources: { limits: { cpus: "0.25", memory: 128m } } }
+
+  api:
+    <<: *app
+    build:
+      context: ../..
+      dockerfile: infra/docker/service.Dockerfile
+      args: { APP: api, PORT: "3001" }
+    image: wise-biz/api:${WB_VERSION:-local}
+    env_file: [../../.env.stack.api]
+    networks: [data, edge]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      storage-init: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+      mailpit: { condition: service_healthy }
+    deploy: { resources: { limits: { cpus: "1", memory: 768m } } }
+
+  workers:
+    <<: *app
+    build:
+      context: ../..
+      dockerfile: infra/docker/service.Dockerfile
+      args: { APP: workers, PORT: "" }
+    image: wise-biz/workers:${WB_VERSION:-local}
+    env_file: [../../.env.stack.workers]
+    stop_grace_period: 30s
+    networks: [data, edge]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      storage-init: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+      mailpit: { condition: service_healthy }
+    deploy: { resources: { limits: { cpus: "1", memory: 768m } } }
+
+  realtime:
+    <<: *app
+    build:
+      context: ../..
+      dockerfile: infra/docker/service.Dockerfile
+      args: { APP: realtime, PORT: "3002" }
+    image: wise-biz/realtime:${WB_VERSION:-local}
+    env_file: [../../.env.stack.realtime]
+    environment:
+      REALTIME_PORT: "3002"
+    networks: [data, edge]
+    depends_on:
+      redis: { condition: service_healthy }
+    deploy: { resources: { limits: { cpus: "0.5", memory: 256m } } }
+
+  console:
+    <<: *app
+    build:
+      context: ../..
+      dockerfile: infra/docker/console.Dockerfile
+    image: wise-biz/console:${WB_VERSION:-local}
+    env_file: [../../.env.stack.console]
+    environment:
+      API_ORIGIN: http://api:3001
+    tmpfs: [/tmp, /repo/apps/console/.next/cache]
+    networks: [edge]
+    depends_on:
+      api: { condition: service_healthy }
+    deploy: { resources: { limits: { cpus: "0.5", memory: 512m } } }
+
+  nginx:
+    image: nginx:1.29-alpine
+    restart: unless-stopped
+    read_only: true
+    tmpfs: [/tmp, /var/cache/nginx, /var/run]
+    cap_drop: [ALL]
+    cap_add: [CHOWN, SETUID, SETGID]
+    security_opt: ["no-new-privileges:true"]
+    volumes:
+      - ./nginx/stack.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      # The one entry point for the browser and for scripts/stack-smoke.mts.
+      - "127.0.0.1:8080:8080"
+    networks: [edge]
+    depends_on:
+      api: { condition: service_healthy }
+      console: { condition: service_healthy }
+      realtime: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8081/nginx-health | grep -q ok"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 3s
+    deploy: { resources: { limits: { cpus: "0.5", memory: 128m } } }
+
+volumes:
+  pgdata:
+  redisdata:
+  storagedata:
+
+networks:
+  data:
+    internal: true
+  edge: {}

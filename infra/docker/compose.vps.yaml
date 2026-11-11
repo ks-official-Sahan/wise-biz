@@ -1,0 +1,26 @@
+name: wise-biz-stack
+
+# VPS overlay: the same stack as compose.stack.yaml, with TLS and with every host port closed except 80 and 443.
+#   docker compose -f infra/docker/compose.stack.yaml -f infra/docker/compose.vps.yaml --env-file .env.stack up -d --build --wait
+#
+# Postgres, Redis and object storage publish no port at all (they sit on the internal `data` network). The storage
+# console port and the Mailpit ports from the local file are removed here. nginx serves TLS with the production config
+# (infra/nginx/nginx.conf, which redirects port 80 to HTTPS). Certificates: copy fullchain.pem and privkey.pem into
+# TLS_DIR (default: infra/docker/tls, not committed). docs/runbooks/docker.md, part B, has the steps.
+
+services:
+  nginx:
+    volumes: !override
+      - ../nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ${TLS_DIR:-./tls}:/etc/nginx/tls:ro
+    ports: !override
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    cap_add: [NET_BIND_SERVICE, CHOWN, SETUID, SETGID]
+
+  storage:
+    ports: !reset []
+
+  mailpit:
+    ports: !reset []
