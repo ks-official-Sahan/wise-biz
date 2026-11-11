@@ -145,6 +145,21 @@ export const PERMISSION_GROUPS: readonly { module: string; items: readonly Permi
     ],
   },
   {
+    module: "Support",
+    items: [
+      {
+        permission: "support:read",
+        label: "View support",
+        allows: "See your support tickets and replies.",
+      },
+      {
+        permission: "support:create",
+        label: "Ask for support",
+        allows: "Open tickets, reply, and mark them solved or reopen them.",
+      },
+    ],
+  },
+  {
     module: "Stock counts",
     items: [
       {

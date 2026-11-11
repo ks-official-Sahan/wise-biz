@@ -13,6 +13,7 @@ export interface NavItem {
     | "/stock"
     | "/purchasing"
     | "/transfers"
+    | "/support"
     | "/counts"
     | "/gaps"
     | "/expiry"
@@ -75,6 +76,12 @@ export const NAV: readonly NavItem[] = [
     href: "/purchasing",
     label: "Purchasing",
     keywords: ["purchase orders", "po", "suppliers", "buy", "order", "supplier", "goods in"],
+    primary: false,
+  },
+  {
+    href: "/support",
+    label: "Support",
+    keywords: ["tickets", "help", "issue", "contact"],
     primary: false,
   },
   {

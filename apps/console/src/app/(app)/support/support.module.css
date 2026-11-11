@@ -1,0 +1,73 @@
+.filters {
+  display: grid;
+  gap: var(--wb-space-3);
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 16rem));
+}
+.form {
+  display: grid;
+  gap: var(--wb-space-3);
+}
+.textarea {
+  width: 100%;
+  min-height: 7rem;
+  resize: vertical;
+  font: inherit;
+  line-height: 1.5;
+  box-sizing: border-box;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--wb-space-2);
+  justify-content: flex-end;
+}
+.sla {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.countdown {
+  font-weight: 500;
+}
+.facts {
+  display: grid;
+  gap: var(--wb-space-2) var(--wb-space-4);
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  margin: 0;
+}
+.fact {
+  display: contents;
+}
+.facts dt {
+  color: var(--wb-color-text-muted, inherit);
+}
+.facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.thread {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--wb-space-3);
+}
+.message {
+  padding: var(--wb-space-3) var(--wb-space-4);
+  border: 1px solid var(--wb-color-border);
+  border-radius: var(--wb-radius-md);
+  min-width: 0;
+}
+.fromSupport {
+  border-left: 4px solid var(--wb-color-accent, currentColor);
+}
+.meta {
+  margin: 0 0 var(--wb-space-2);
+  color: var(--wb-color-text-muted, inherit);
+  overflow-wrap: anywhere;
+}
+.body {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
